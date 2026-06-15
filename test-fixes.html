@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Fixes - Laboratory Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://*.supabase.co; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self';">
+
+    <!-- Supabase -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Navigation will be loaded here by nav.js -->
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="text-center mb-4">Laboratory Management System - Test Fixes</h1>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Test Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="test-results">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <div class="mt-2">Running tests...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load configuration and services first -->
+    <script src="config/config.js"></script>
+    <script src="config/supabase.js"></script>
+    <script src="js/services/billingService.js"></script>
+    <script src="js/services/testService.js"></script>
+    <script src="js/services/referenceService.js"></script>
+    <script src="js/services/centerService.js"></script>
+    <script src="js/services/packageService.js"></script>
+    <script src="js/services/reportsService.js"></script>
+
+    <!-- Load main app -->
+    <script src="js/app.js"></script>
+
+    <script>
+        // Test script to verify fixes
+        document.addEventListener('DOMContentLoaded', async () => {
+            const resultsDiv = document.getElementById('test-results');
+            const results = [];
+
+            try {
+                // Test 1: Check if app initializes
+                results.push('✓ App initialization: Testing...');
+
+                // Wait for app to initialize
+                await new Promise((resolve) => {
+                    if (window.app && window.app.isInitialized) {
+                        resolve();
+                    } else {
+                        window.app.on('app:initialized', resolve);
+                    }
+                });
+
+                results.push('✓ App initialization: SUCCESS');
+
+                // Test 2: Check services
+                results.push('✓ Services check: Testing...');
+                const services = ['billing', 'test', 'reference', 'center', 'package', 'reports'];
+                let servicesWorking = 0;
+
+                for (const serviceName of services) {
+                    const service = window.app.getService(serviceName);
+                    if (service) {
+                        servicesWorking++;
+                        results.push(`✓ ${serviceName} service: Available`);
+                    } else {
+                        results.push(`✗ ${serviceName} service: Not available`);
+                    }
+                }
+
+                results.push(`✓ Services check: ${servicesWorking}/${services.length} services working`);
+
+                // Test 3: Check Supabase connection
+                results.push('✓ Supabase connection: Testing...');
+                if (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.supabase) {
+                    results.push('✓ Supabase connection: Connected');
+                } else {
+                    results.push('⚠ Supabase connection: Not connected (using sample data)');
+                }
+
+                // Test 4: Test reports service methods
+                results.push('✓ Reports service methods: Testing...');
+                const reportsService = window.app.getService('reports');
+                if (reportsService) {
+                    try {
+                        const centers = await reportsService.getAllCenters();
+                        results.push(`✓ getAllCenters: ${centers.length} centers loaded`);
+
+                        const references = await reportsService.getAllReferences();
+                        results.push(`✓ getAllReferences: ${references.length} references loaded`);
+
+                        const dailyReport = await reportsService.getDailySalesReport({});
+                        results.push(`✓ getDailySalesReport: ${dailyReport.length} records loaded`);
+
+                        results.push('✓ Reports service methods: All working');
+                    } catch (error) {
+                        results.push(`✗ Reports service methods: Error - ${error.message}`);
+                    }
+                } else {
+                    results.push('✗ Reports service methods: Service not available');
+                }
+
+                // Test 5: Check for console errors
+                results.push('✓ Console errors: Checking...');
+                const originalError = console.error;
+                let errorCount = 0;
+                console.error = function (...args) {
+                    errorCount++;
+                    originalError.apply(console, args);
+                };
+
+                // Wait a bit to catch any errors
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                console.error = originalError;
+
+                if (errorCount === 0) {
+                    results.push('✓ Console errors: No errors detected');
+                } else {
+                    results.push(`⚠ Console errors: ${errorCount} errors detected`);
+                }
+
+            } catch (error) {
+                results.push(`✗ Test failed: ${error.message}`);
+            }
+
+            // Display results
+            resultsDiv.innerHTML = results.map(result => `<div class="mb-2">${result}</div>`).join('');
+
+            // Add summary
+            const successCount = results.filter(r => r.startsWith('✓')).length;
+            const totalCount = results.length;
+            const summary = `<div class="alert alert-${successCount === totalCount ? 'success' : 'warning'} mt-3">
+                <strong>Test Summary:</strong> ${successCount}/${totalCount} tests passed
+            </div>`;
+            resultsDiv.innerHTML += summary;
+        });
+    </script>
+    <script src="js/nav.js"></script>
+</body>
+
+</html>

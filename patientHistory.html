@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUWAJEEWA LABORATORIES - Patient History</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <!-- Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://*.supabase.co; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self';">
+
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: #eaf5f8;
+        }
+
+        .page-title {
+            font-weight: 900;
+            font-size: 48px;
+            text-align: center;
+            margin: 24px 0;
+            color: #0b2636;
+        }
+
+        .filter-label {
+            font-size: 24px;
+            font-weight: 700;
+            color: #0b2636;
+        }
+
+        .filter-input {
+            height: 56px;
+            font-size: 18px;
+        }
+
+        .search-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        .table thead th {
+            background: #1b1f23;
+            color: #fff;
+            font-weight: 800;
+            font-size: 18px;
+            vertical-align: middle;
+        }
+
+        .table td {
+            background: #f4fbfd;
+            height: 72px;
+        }
+
+        .panel {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .filters-row {
+            row-gap: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation will be injected by nav.js -->
+
+    <section class="container my-4">
+        <h1 class="page-title">History Management</h1>
+
+        <div class="panel mb-4">
+            <div class="row align-items-center filters-row">
+                <div class="col-lg-4 col-md-6 mb-3 mb-lg-0">
+                    <label class="filter-label mb-2">Center</label>
+                    <div class="input-group">
+                        <select id="centerSelect" class="form-select filter-input">
+                            <option selected>Select the center</option>
+                        </select>
+                        <span class="input-group-text filter-input"><i class="fa-solid fa-chevron-down"></i></span>
+                    </div>
+                </div>
+
+                <div class="col-lg-4 col-md-6 mb-3 mb-lg-0">
+                    <label class="filter-label mb-2">Search</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input id="searchInput" type="text" class="form-control filter-input"
+                            placeholder="search bill no or phone number here ...">
+                        <button id="searchBtn" class="btn btn-primary search-btn"><i
+                                class="fa-solid fa-magnifying-glass"></i></button>
+                    </div>
+                </div>
+
+                <div class="col-lg-4 col-md-6">
+                    <label class="filter-label mb-2">Member</label>
+                    <div class="input-group">
+                        <select id="memberSelect" class="form-select filter-input">
+                            <option selected>Select the member</option>
+                        </select>
+                        <span class="input-group-text filter-input"><i class="fa-solid fa-chevron-down"></i></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle">
+                    <thead>
+                        <tr>
+                            <th>BILL NO</th>
+                            <th>NAME</th>
+                            <th>Date</th>
+                            <th>Gender</th>
+                            <th>test</th>
+                            <th>Paid Amount</th>
+                            <th>Remaining to Pay</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">No data. Use the filters above to search.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Supabase -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+    <!-- Load configuration and services first -->
+    <script src="config/config.js"></script>
+    <script src="config/supabase.js"></script>
+    <script src="js/services/billingService.js"></script>
+    <script src="js/services/testService.js"></script>
+    <script src="js/services/referenceService.js"></script>
+    <script src="js/services/centerService.js"></script>
+    <script src="js/services/packageService.js"></script>
+    <script src="js/services/reportsService.js"></script>
+
+    <!-- App bootstrap & nav -->
+    <script src="js/app.js"></script>
+    <script src="js/nav.js"></script>
+    <script src="js/controllers/patientHistoryController.js"></script>
+</body>
+
+</html>

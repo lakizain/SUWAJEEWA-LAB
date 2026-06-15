@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin User Management</title>
+  <link rel="stylesheet" href="nav.css" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: light; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+      color: #0f172a;
+      background: linear-gradient(180deg, #f8fbff, #eef6ff);
+    }
+    .page { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(2,8,23,0.08);
+      border: 1px solid rgba(2,8,23,0.06);
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #1565ff;
+      color: #fff;
+      padding: 16px 20px;
+    }
+    .card-title { font-size: 20px; font-weight: 800; margin: 0; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 10px; border: 0; cursor: pointer; font-weight: 700; }
+    .btn.primary { background: #1565ff; color: #fff; }
+    .btn.secondary { background: #0ea5e9; color: #fff; }
+    .btn.danger { background: #ef4444; color: #fff; }
+    .btn:disabled { opacity: .7; cursor: not-allowed; }
+    .table-wrap { padding: 16px 20px 20px; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { text-align: left; font-size: 12px; letter-spacing: .06em; color: #e2e8f0; background: #1f2937; padding: 12px; }
+    tbody td { padding: 12px; border-bottom: 1px solid #e5e7eb; background: #fff; }
+    .actions { display: flex; gap: 8px; }
+    .badge { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .badge.admin { background: #dbeafe; color: #1d4ed8; }
+    .badge.staff { background: #e0f2fe; color: #0369a1; }
+    .muted { color: #64748b; }
+
+    /* Dialog */
+    dialog { border: 0; border-radius: 12px; width: 480px; max-width: calc(100% - 24px); padding: 0; box-shadow: 0 20px 60px rgba(2,8,23,.25); }
+    dialog::backdrop { background: rgba(2,8,23,.5); }
+    .dialog-header { padding: 16px 18px; border-bottom: 1px solid #e5e7eb; font-weight: 800; }
+    .dialog-body { padding: 16px 18px; }
+    .field { margin-bottom: 12px; }
+    label { display: block; font-weight: 700; color: #0f172a; font-size: 12px; letter-spacing: .02em; margin-bottom: 6px; }
+    input, select { box-sizing: border-box; width: 100%; border: 1px solid #94a3b8; border-radius: 10px; padding: 10px 12px; min-height: 40px; font-size: 14px; background: #fff; }
+    input:focus, select:focus { outline: none; border-color: #1d4ed8; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px; border-top: 1px solid #e5e7eb; }
+    .empty { padding: 18px; text-align: center; color: #64748b; }
+    
+    /* Bills section specific styles */
+    .bills-table-container { max-height: 400px; overflow-y: auto; }
+    .input-group { display: flex; }
+    .input-group input { border-radius: 10px 0 0 10px; }
+    .input-group button { border-radius: 0 10px 10px 0; border: 1px solid #94a3b8; background: #f8f9fa; }
+    .input-group button:hover { background: #e9ecef; }
+    .btn.view { background: #10b981; color: #fff; font-size: 12px; padding: 6px 10px; }
+    .btn.print { background: #3b82f6; color: #fff; font-size: 12px; padding: 6px 10px; }
+    .btn.delete { background: #ef4444; color: #fff; font-size: 12px; padding: 6px 10px; }
+    .amount { font-weight: 700; color: #059669; }
+    .remaining { font-weight: 700; color: #dc2626; }
+    
+    /* Tab styles */
+    .tab-container {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(2,8,23,0.08);
+      border: 1px solid rgba(2,8,23,0.06);
+      overflow: hidden;
+    }
+    .tab-nav {
+      display: flex;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .tab-button {
+      flex: 1;
+      padding: 16px 20px;
+      background: none;
+      border: none;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: #64748b;
+      border-bottom: 3px solid transparent;
+    }
+    .tab-button:hover {
+      background: #e2e8f0;
+      color: #374151;
+    }
+    .tab-button.active {
+      background: #fff;
+      color: #1565ff;
+      border-bottom-color: #1565ff;
+    }
+    .tab-content {
+      display: none;
+      padding: 0;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .tab-header {
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between;
+      background: #1565ff;
+      color: #fff;
+      padding: 16px 20px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation will be loaded here by nav.js -->
+  <main class="page">
+    <section class="tab-container">
+      <!-- Tab Navigation -->
+      <div class="tab-nav">
+        <button class="tab-button active" data-tab="users-tab">
+          <i class="fas fa-users"></i> Admin User Management
+        </button>
+        <button class="tab-button" data-tab="bills-tab">
+          <i class="fas fa-list"></i> Recent Bills & Patient History
+        </button>
+      </div>
+
+      <!-- Admin Users Tab Content -->
+      <div id="users-tab" class="tab-content active">
+        <div class="tab-header">
+          <h1 class="card-title">Admin User Management</h1>
+          <div>
+            <button id="btnAddUser" class="btn secondary">+ Add New User</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div id="status" class="muted" style="margin-bottom:10px;"></div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>USERNAME</th>
+                  <th>EMAIL</th>
+                  <th>PASSWORD</th>
+                  <th>ROLE</th>
+                  <th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="usersBody">
+                <tr><td colspan="5" class="empty">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Bills Tab Content -->
+      <div id="bills-tab" class="tab-content">
+        <div class="tab-header">
+          <h1 class="card-title"><i class="fas fa-list"></i> Recent Bills & Patient History</h1>
+          <div>
+            <button class="btn secondary" id="btn-refresh-bills">
+              <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div class="mb-3">
+            <div class="input-group">
+              <input type="text" class="form-control" id="bills-search-input"
+                placeholder="Search by Bill No or Patient Name...">
+              <button class="btn btn-outline-secondary" type="button" id="clear-bills-search">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div id="bills-search-results-counter" class="muted" style="margin-top: 8px; display: none;">
+              Found 0 result(s)
+            </div>
+          </div>
+
+          <div class="bills-table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>BILL NO</th>
+                  <th>NAME</th>
+                  <th>DATE</th>
+                  <th>GENDER</th>
+                  <th>TEST</th>
+                  <th>PAID AMOUNT</th>
+                  <th>REMAINING TO PAY</th>
+                  <th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="billsHistoryBody">
+                <tr>
+                  <td colspan="8" class="empty">
+                    <i class="fas fa-info-circle"></i>
+                    <div>No bills found</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="addUserDialog">
+    <div class="dialog-header" id="dialogTitle">Add New User</div>
+    <form id="addUserForm" method="dialog">
+      <div class="dialog-body">
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" autocomplete="off" required />
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="new-password" required />
+        </div>
+        <div class="field">
+          <label for="role">Role</label>
+          <select id="role" name="role" required>
+            <option value="staff">Staff</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div id="formMsg" class="muted"></div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="btnCancel" class="btn">Cancel</button>
+        <button type="submit" id="btnCreate" class="btn primary">Create</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Supabase (browser) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+  <!-- Project config / Supabase client bootstrap -->
+  <script src="config/config.js"></script>
+  <script src="config/supabase.js"></script>
+  <!-- Admin Users Service -->
+  <script src="js/services/adminUsersService.js"></script>
+  <!-- Billing Service for bills history -->
+  <script src="js/services/billingService.js"></script>
+  <!-- Admin Bills Service -->
+  <script src="js/services/adminBillsService.js"></script>
+  <script src="js/controllers/adminUsersController.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/nav.js"></script>
+  <!-- Tab functionality and role-based access control -->
+  <script src="js/tab.js"></script>
+</body>
+</html>
+
+

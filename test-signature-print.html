@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signature Print Test</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 16mm 2mm;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            color: #111;
+            margin: 0;
+            padding: 0;
+            background: white;
+        }
+
+        .report-container {
+            width: 100%;
+            background: white;
+            padding: 20px;
+        }
+
+        .top-space {
+            height: calc(55mm - 16mm);
+        }
+
+        .info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 8px;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .info-col {
+            display: grid;
+            grid-auto-rows: min-content;
+            gap: 2px;
+        }
+
+        .info .info-col:last-child {
+            margin-left: 5mm;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 140px 8px 1fr;
+            align-items: baseline;
+        }
+
+        .label {
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+        }
+
+        .colon {
+            text-align: center;
+        }
+
+        .investigation-line {
+            display: grid;
+            grid-template-columns: 140px 8px 1fr;
+            align-items: baseline;
+            margin-top: 16px;
+            font-size: 11px;
+        }
+
+        .investigation-line .label,
+        .investigation-line .colon {
+            white-space: nowrap;
+        }
+
+        .hr {
+            margin-top: 8px;
+            border-top: 1px solid #999;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+
+        .results-table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: separate;
+            border-spacing: 0 2px;
+        }
+
+        .results-table th,
+        .results-table td {
+            border: none;
+            padding: 2px 6px;
+            vertical-align: top;
+        }
+
+        .results-table thead th {
+            background: #fff;
+            font-weight: 700;
+            text-align: left;
+        }
+
+        .results-table thead th:nth-child(2) {
+            transform: translateX(-5mm);
+        }
+
+        .results-table tbody td:nth-child(2)::before {
+            content: ":";
+            display: inline-block;
+            width: 10px;
+            text-align: center;
+            margin-right: 6px;
+        }
+
+        .results-table tbody tr.empty-category-row td:nth-child(2)::before {
+            content: "";
+        }
+
+        .results-table tbody td:nth-child(2) {
+            padding-left: 0;
+            transform: translateX(-5mm);
+        }
+
+        .results-table tbody td:first-child {
+            font-weight: 400;
+        }
+
+        .remarks {
+            margin-top: 18mm;
+            font-size: 11px;
+        }
+
+        .remarks .label {
+            font-weight: 700;
+        }
+
+        .signature-section {
+            margin-top: 20mm;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            width: 25%;
+            margin-left: 65%;
+            padding-right: 5mm;
+        }
+
+        .signature-image {
+            margin-bottom: 8px;
+            text-align: center;
+            width: 100%;
+        }
+
+        .signature-line {
+            width: 100%;
+            height: 1px;
+            border-bottom: 1px dashed #000;
+            margin-bottom: 6px;
+        }
+
+        .signature-label {
+            font-size: 11px;
+            font-weight: 500;
+            text-align: center;
+            width: 100%;
+            word-wrap: break-word;
+        }
+
+        .no-print-btn {
+            text-align: center;
+            margin-top: 16px;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="report-container">
+        <div class="top-space"></div>
+
+        <div class="info">
+            <div class="info-col">
+                <div class="row">
+                    <div class="label">NAME</div>
+                    <div class="colon">:</div>
+                    <div>Test Patient</div>
+                </div>
+                <div class="row">
+                    <div class="label">AGE</div>
+                    <div class="colon">:</div>
+                    <div>30y</div>
+                </div>
+                <div class="row">
+                    <div class="label">GENDER</div>
+                    <div class="colon">:</div>
+                    <div>Male</div>
+                </div>
+                <div class="row">
+                    <div class="label">REQUESTED BY</div>
+                    <div class="colon">:</div>
+                    <div>Dr. Smith</div>
+                </div>
+            </div>
+            <div class="info-col">
+                <div class="row">
+                    <div class="label">SAMPLE RECEIVED ON</div>
+                    <div class="colon">:</div>
+                    <div>2024-01-15</div>
+                </div>
+                <div class="row">
+                    <div class="label">SAMPLE REPORTED ON</div>
+                    <div class="colon">:</div>
+                    <div>10:30 AM</div>
+                </div>
+                <div class="row">
+                    <div class="label">INV NO</div>
+                    <div class="colon">:</div>
+                    <div>INV001</div>
+                </div>
+                <div class="row">
+                    <div class="label">SAMPLE TYPE</div>
+                    <div class="colon">:</div>
+                    <div>Blood</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="investigation-line">
+            <div class="label">INVESTIGATION</div>
+            <div class="colon">:</div>
+            <div>Complete Blood Count</div>
+        </div>
+
+        <div class="hr"></div>
+
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th style="width: 40%">INVESTIGATION</th>
+                    <th style="width: 20%">RESULT</th>
+                    <th style="width: 15%">UNIT</th>
+                    <th style="width: 25%">REFERENCE RANGE</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Hemoglobin</td>
+                    <td>14.5</td>
+                    <td>g/dL</td>
+                    <td>12.0 - 16.0</td>
+                </tr>
+                <tr>
+                    <td>White Blood Cells</td>
+                    <td>7.2</td>
+                    <td>×10³/μL</td>
+                    <td>4.0 - 10.0</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="remarks">
+            <span class="label">Remarks :</span>
+            <div style="margin-top:6px; white-space: pre-wrap;">All values within normal range.</div>
+        </div>
+
+        <div class="signature-section">
+            <div class="signature-image">
+                <img src="Imgs/signature.svg" alt="Signature" style="max-width: 100%; height: auto; max-height: 30px;">
+            </div>
+            <div class="signature-line"></div>
+            <div class="signature-label">Medical Laboratory Technologist</div>
+        </div>
+
+        <div class="no-print-btn no-print">
+            <button onclick="window.print()">Print Test Report</button>
+        </div>
+    </div>
+</body>
+
+</html>

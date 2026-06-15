@@ -1,0 +1,25 @@
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+.card {
+  border-radius: 12px;
+}
+.table th,
+.table td {
+  vertical-align: middle;
+}
+.badge.bg-info {
+  font-size: 0.95em;
+  padding: 0.5em 1em;
+}
+.badge.bg-success {
+  font-size: 0.95em;
+  padding: 0.5em 1em;
+}
+.btn {
+  font-weight: 500;
+}
+input[disabled] {
+  background: #f5f5f5;
+  color: #888;
+}

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Center Details Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="center-management.css">
+
+    <!-- Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://*.supabase.co; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self';">
+</head>
+
+<body class="bg-light">
+    <!-- Navigation will be loaded here by nav.js -->
+    <div class="container">
+        <h2 class="text-center fw-bold mb-4">Center Details Management</h2>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold"><i class="bi bi-search"></i> Search Centers</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" placeholder="Search by name or ID...">
+                                <button class="btn btn-outline-secondary" type="button"><i
+                                        class="bi bi-funnel"></i></button>
+                            </div>
+                        </div>
+                        <hr>
+                        <h5 class="fw-bold mb-3"><i class="bi bi-building"></i> Center Details</h5>
+                        <div class="mb-2">
+                            <label class="form-label">CID</label>
+                            <input type="text" class="form-control" value="Auto-generated" disabled>
+                            <small class="text-muted">CID will be automatically generated when you save</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Center Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" placeholder="Enter center name">
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary flex-fill"><i class="bi bi-plus-lg"></i> Create New</button>
+                            <button class="btn btn-success flex-fill"><i class="bi bi-save"></i> Save</button>
+                            <button class="btn btn-danger flex-fill"><i class="bi bi-trash"></i> Delete</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-list-ul"></i> Center List</h5>
+                            <button class="btn btn-outline-primary btn-sm"><i class="bi bi-arrow-clockwise"></i>
+                                Refresh</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>CID</th>
+                                        <th>Center Name</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Example rows -->
+                                    <tr>
+                                        <td><span class="badge bg-info">CID001</span></td>
+                                        <td>
+                                            <span class="fw-bold">MADHIPOLA SUWAJEEWA LAB</span><br>
+                                            <small class="text-muted">Created: 8/3/2025</small>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-outline-primary btn-sm"><i
+                                                    class="bi bi-pencil"></i></button>
+                                            <button class="btn btn-outline-danger btn-sm"><i
+                                                    class="bi bi-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                    <!-- More rows as needed -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="config/config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config/supabase.js"></script>
+    <script src="js/services/billingService.js"></script>
+    <script src="js/services/testService.js"></script>
+    <script src="js/services/referenceService.js"></script>
+    <script src="js/services/centerService.js"></script>
+    <script src="js/services/packageService.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/nav.js"></script>
+    <script>
+        function waitForAppAndInit() {
+            if (window.app && window.app.debounce && window.app.showWarning) {
+                let selectedCenterId = null;
+                const centerNameInput = document.querySelector('input[placeholder="Enter center name"]');
+                const cidInput = document.querySelector('input[disabled]');
+                const createBtn = document.querySelector('.btn-primary');
+                const saveBtn = document.querySelector('.btn-success');
+                const deleteBtn = document.querySelector('.btn-danger');
+                const centerTableBody = document.querySelector('table tbody');
+                const searchInput = document.querySelector('input[placeholder="Search by name or ID..."]');
+                const refreshBtn = document.querySelector('.btn-outline-primary.btn-sm');
+
+                // Helper: Clear form
+                function clearForm() {
+                    selectedCenterId = null;
+                    centerNameInput.value = '';
+                    cidInput.value = 'Auto-generated';
+                    deleteBtn.disabled = true;
+                    saveBtn.textContent = 'Save';
+                }
+
+                // Helper: Fill form for edit
+                function fillForm(center) {
+                    selectedCenterId = center.id;
+                    centerNameInput.value = center.center_name;
+                    cidInput.value = center.cid;
+                    deleteBtn.disabled = false;
+                    saveBtn.textContent = 'Update';
+                }
+
+                // Helper: Render center list
+                async function renderCenters(searchTerm = '') {
+                    centerTableBody.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
+                    let centers = [];
+                    try {
+                        if (searchTerm) {
+                            centers = await window.app.services.center.searchCenters(searchTerm);
+                        } else {
+                            centers = await window.app.services.center.getAllCenters();
+                        }
+                    } catch (e) {
+                        window.app.showError('Failed to load centers');
+                        centerTableBody.innerHTML = '<tr><td colspan="3">Error loading data</td></tr>';
+                        return;
+                    }
+                    if (!centers || centers.length === 0) {
+                        centerTableBody.innerHTML = '<tr><td colspan="3">No centers found</td></tr>';
+                        return;
+                    }
+                    centerTableBody.innerHTML = '';
+                    centers.forEach(center => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><span class="badge bg-info">${center.cid}</span></td>
+                            <td>
+                                <span class="fw-bold">${center.center_name}</span><br>
+                                <small class="text-muted">Created: ${window.app.formatDate(center.created_at)}</small>
+                            </td>
+                            <td>
+                                <button class="btn btn-outline-primary btn-sm edit-btn"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-outline-danger btn-sm delete-btn"><i class="bi bi-trash"></i></button>
+                            </td>
+                        `;
+                        // Edit
+                        tr.querySelector('.edit-btn').addEventListener('click', () => fillForm(center));
+                        // Delete
+                        tr.querySelector('.delete-btn').addEventListener('click', async () => {
+                            if (confirm('Are you sure you want to delete this center?')) {
+                                try {
+                                    await window.app.services.center.deleteCenter(center.id);
+                                    window.app.showSuccess('Center deleted');
+                                    clearForm();
+                                    renderCenters();
+                                } catch (e) {
+                                    window.app.showError(e.message || 'Delete failed');
+                                }
+                            }
+                        });
+                        centerTableBody.appendChild(tr);
+                    });
+                }
+
+                // Create New
+                createBtn.addEventListener('click', () => {
+                    clearForm();
+                });
+
+                // Save/Update
+                saveBtn.addEventListener('click', async () => {
+                    const name = centerNameInput.value.trim();
+                    if (!name) {
+                        window.app.showWarning('Center name is required');
+                        return;
+                    }
+                    try {
+                        if (selectedCenterId) {
+                            // Update
+                            await window.app.services.center.updateCenter(selectedCenterId, { center_name: name });
+                            window.app.showSuccess('Center updated');
+                        } else {
+                            // Create
+                            await window.app.services.center.createCenter({ center_name: name });
+                            window.app.showSuccess('Center created');
+                        }
+                        clearForm();
+                        renderCenters();
+                    } catch (e) {
+                        window.app.showError(e.message || 'Save failed');
+                    }
+                });
+
+                // Delete
+                deleteBtn.addEventListener('click', async () => {
+                    if (!selectedCenterId) return;
+                    if (confirm('Are you sure you want to delete this center?')) {
+                        try {
+                            await window.app.services.center.deleteCenter(selectedCenterId);
+                            window.app.showSuccess('Center deleted');
+                            clearForm();
+                            renderCenters();
+                        } catch (e) {
+                            window.app.showError(e.message || 'Delete failed');
+                        }
+                    }
+                });
+
+                // Search
+                searchInput.addEventListener('input', window.app.debounce(function () {
+                    renderCenters(searchInput.value.trim());
+                }, 400));
+
+                // Refresh
+                refreshBtn.addEventListener('click', () => {
+                    renderCenters();
+                });
+
+                // Initial load
+                renderCenters();
+                clearForm();
+            } else {
+                setTimeout(waitForAppAndInit, 50);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', waitForAppAndInit);
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+</body>
+
+</html>

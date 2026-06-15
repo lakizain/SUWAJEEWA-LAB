@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Suwajeewa Labs — Login</title>
+  <link rel="stylesheet" href="nav.css" />
+  <style>
+    :root { color-scheme: light; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+                  /* subtle lab grid */
+                  repeating-linear-gradient(0deg, rgba(15, 23, 42, 0.035) 0 2px, transparent 2px 40px),
+                  repeating-linear-gradient(90deg, rgba(15, 23, 42, 0.035) 0 2px, transparent 2px 40px),
+                  /* soft blue glows */
+                  radial-gradient(1000px 600px at -10% -10%, #e6f0ff 0%, transparent 62%),
+                  radial-gradient(900px 600px at 110% 8%, #dbeafe 0%, transparent 58%),
+                  linear-gradient(135deg, #f8fbff, #eef6ff);
+      background-attachment: fixed;
+      overflow: hidden;
+    }
+    /* Decorative animated blobs */
+    .decor {
+      position: fixed;
+      inset: -20% -10% -10% -10%;
+      z-index: 0;
+      pointer-events: none;
+      filter: blur(40px);
+    }
+    .decor .blob {
+      position: absolute;
+      border-radius: 9999px;
+      opacity: .55;
+      transform: translateZ(0);
+      will-change: transform, opacity;
+      animation: float 18s ease-in-out infinite;
+    }
+    .decor .blob.a { width: 420px; height: 420px; background: #bfdbfe; left: -6%; top: -4%; animation-delay: 0s; }
+    .decor .blob.b { width: 360px; height: 360px; background: #93c5fd; right: -4%; top: 8%; animation-delay: 4s; }
+    .decor .blob.c { width: 440px; height: 440px; background: #60a5fa; left: 10%; bottom: -12%; animation-delay: 8s; }
+    @keyframes float {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      50% { transform: translate3d(0, -12px, 0) scale(1.03); }
+    }
+    .login-page { width: 100%; max-width: 420px; padding: 24px; position: relative; z-index: 1; }
+    .login-card {
+      background: rgba(255, 255, 255, 0.82);
+      -webkit-backdrop-filter: saturate(140%) blur(14px);
+      backdrop-filter: saturate(140%) blur(14px);
+      border-radius: 16px;
+      box-shadow: 0 18px 42px rgba(2, 8, 23, 0.12), 0 0 0 1px rgba(59, 130, 246, 0.06) inset;
+      border: 1px solid rgba(59, 130, 246, 0.10);
+      padding: 24px;
+    }
+    .login-header { text-align: center; margin: 8px 0 8px; }
+    .login-title { font-size: 22px; font-weight: 800; margin: 0; letter-spacing: -0.02em; }
+    .login-subtitle { color: #64748b; font-size: 13px; margin-top: 6px; }
+    form { margin-top: 14px; }
+    .field { margin-bottom: 12px; }
+    label { display: block; font-weight: 700; color: #0f172a; font-size: 12px; letter-spacing: .02em; margin-bottom: 6px; }
+    .input, .input-group input {
+      box-sizing: border-box;
+      width: 100%;
+      border: 1px solid #94a3b8; /* darker slate border */
+      border-radius: 10px;
+      padding: 12px 12px; /* larger touch target */
+      min-height: 44px;  /* a11y: minimum tap area */
+      font-size: 16px;   /* prevent iOS zoom */
+      line-height: 1.5;
+      outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+      background: rgba(255,255,255,0.9);
+    }
+    .input:hover, .input-group input:hover { border-color: #64748b; }
+    .input:focus, .input-group input:focus {
+      border-color: #1d4ed8;
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+      background: #fff;
+    }
+    .input-group { position: relative; overflow: hidden; }
+    .input-group input { padding-right: 86px; }
+    .toggle-visibility {
+      position: absolute;
+      top: 0;
+      right: 6px;
+      height: 100%;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 12px;
+      background: transparent;
+      border: 0;
+      color: #475569;
+      font-size: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .toggle-visibility:focus { outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18); }
+    .toggle-visibility:hover { color: #1f2937; background: rgba(2, 8, 23, 0.06); }
+    .actions { margin-top: 14px; }
+    .btn {
+      width: 100%;
+      background: linear-gradient(180deg, #2563eb, #1d4ed8);
+      color: white;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-weight: 800;
+      letter-spacing: .02em;
+      font-size: 14px;
+      cursor: pointer;
+      transition: filter .12s ease, transform .04s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn:hover { filter: brightness(1.05); }
+    .btn:active { transform: translateY(1px); }
+    .btn:disabled { opacity: .7; cursor: not-allowed; }
+    .btn .spinner { width: 16px; height: 16px; display: none; }
+    .btn.loading .spinner { display: inline-block; }
+    .btn.loading .btn-text { opacity: .9; }
+    .message { margin-top: 10px; min-height: 18px; font-size: 13px; }
+    .message.error { color: #b91c1c; }
+    .message.success { color: #065f46; }
+    .footer-note { text-align: center; color: #64748b; font-size: 12px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <!-- background decor -->
+  <div class="decor" aria-hidden="true">
+    <span class="blob a"></span>
+    <span class="blob b"></span>
+    <span class="blob c"></span>
+  </div>
+  <main class="login-page">
+    <section class="login-card">
+      <!-- nav-login.html will be injected at the top of this card by js/nav-login.js -->
+
+      <div class="login-header">
+        <h1 class="login-title">Welcome back</h1>
+        <p class="login-subtitle">Sign in to continue to the dashboard</p>
+      </div>
+
+      <form id="login-form" autocomplete="on">
+        <div class="field">
+          <label for="username">Username</label>
+          <input class="input" id="username" name="username" type="text" inputmode="text" autocomplete="username" autocapitalize="none" spellcheck="false" enterkeyhint="next" required autofocus />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="input-group">
+            <input class="input" id="password" name="password" type="password" autocomplete="current-password" enterkeyhint="go" required />
+            <button id="toggle-password" class="toggle-visibility" type="button" aria-label="Show password" aria-pressed="false">Show</button>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="login-button" class="btn" type="submit">
+            <svg class="spinner" viewBox="0 0 50 50" aria-hidden="true">
+              <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-dasharray="31.4 31.4">
+                <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="0.9s" repeatCount="indefinite"/>
+              </circle>
+            </svg>
+            <span class="btn-text">Sign in</span>
+          </button>
+        </div>
+        <div id="login-message" class="message" aria-live="polite"></div>
+      </form>
+
+      <p class="footer-note">© <span id="year"></span> Suwajeewa Laboratories</p>
+    </section>
+  </main>
+
+  <!-- Supabase (browser) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+  <!-- Project config / Supabase client bootstrap -->
+  <script src="config/supabase.js"></script>
+  <!-- Admin Users Service for authentication -->
+  <script src="js/services/adminUsersService.js"></script>
+  <!-- Inject login page header/navigation -->
+  <script src="js/nav-login.js"></script>
+  <script>
+    (function () {
+      const yearEl = document.getElementById('year');
+      if (yearEl) yearEl.textContent = String(new Date().getFullYear());
+
+      function setMessage(text, type) {
+        const el = document.getElementById('login-message');
+        if (!el) return;
+        el.textContent = text || '';
+        el.classList.remove('error', 'success');
+        if (type) el.classList.add(type);
+      }
+
+      async function ensureSupabase() {
+        if (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.supabase) {
+          return window.SUPABASE_CONFIG.supabase;
+        }
+        return new Promise(function (resolve) {
+          const i = setInterval(function () {
+            if (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.supabase) {
+              clearInterval(i);
+              resolve(window.SUPABASE_CONFIG.supabase);
+            }
+          }, 50);
+        });
+      }
+
+      async function ensureAdminUsersService() {
+        const sb = await ensureSupabase();
+        if (window.AdminUsersService) {
+          return new window.AdminUsersService(sb);
+        }
+        return new Promise(function (resolve) {
+          const i = setInterval(function () {
+            if (window.AdminUsersService) {
+              clearInterval(i);
+              resolve(new window.AdminUsersService(sb));
+            }
+          }, 50);
+        });
+      }
+
+      // Check if user is already logged in via session storage
+      (async function redirectIfAuthenticated() {
+        try {
+          const loggedInUser = sessionStorage.getItem('loggedInUser');
+          if (loggedInUser) {
+            const userData = JSON.parse(loggedInUser);
+            if (userData && userData.username) {
+              window.location.replace('dashboard.html');
+            }
+          }
+        } catch (e) {
+          // Clear invalid session data
+          sessionStorage.removeItem('loggedInUser');
+        }
+      })();
+
+      // Handle login submit
+      const form = document.getElementById('login-form');
+      const button = document.getElementById('login-button');
+      const passwordInput = document.getElementById('password');
+      const togglePassword = document.getElementById('toggle-password');
+      if (togglePassword && passwordInput) {
+        togglePassword.addEventListener('click', function () {
+          const isHidden = passwordInput.getAttribute('type') === 'password';
+          passwordInput.setAttribute('type', isHidden ? 'text' : 'password');
+          togglePassword.textContent = isHidden ? 'Hide' : 'Show';
+          togglePassword.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+          togglePassword.setAttribute('aria-pressed', String(isHidden));
+          passwordInput.focus({ preventScroll: true });
+          if (!isHidden) {
+            // Re-hide cursor at end to avoid selection jump on mobile
+            const len = passwordInput.value.length;
+            passwordInput.setSelectionRange(len, len);
+          }
+        });
+      }
+      if (form) {
+        form.addEventListener('submit', async function (evt) {
+          evt.preventDefault();
+          setMessage('', '');
+          if (button) { button.disabled = true; button.classList.add('loading'); button.querySelector('.btn-text').textContent = 'Signing in…'; }
+          try {
+            const adminUsersService = await ensureAdminUsersService();
+            const username = String(document.getElementById('username').value || '').trim();
+            const password = String(document.getElementById('password').value || '');
+            if (!username || !password) {
+              setMessage('Please enter both username and password.', 'error');
+              return;
+            }
+            
+            // Validate credentials against admin_users table
+            const userData = await adminUsersService.validateCredentials(username, password);
+            if (userData) {
+              // Store user session data
+              sessionStorage.setItem('loggedInUser', JSON.stringify({
+                id: userData.id,
+                username: userData.username,
+                email: userData.email,
+                role: userData.role
+              }));
+              setMessage('Login successful. Redirecting…', 'success');
+              window.location.replace('dashboard.html');
+            } else {
+              setMessage('Invalid username or password. Please try again.', 'error');
+            }
+          } catch (err) {
+            setMessage('An error occurred. Please try again.', 'error');
+          } finally {
+            if (button) { button.disabled = false; button.classList.remove('loading'); button.querySelector('.btn-text').textContent = 'Sign in'; }
+          }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
+
+
