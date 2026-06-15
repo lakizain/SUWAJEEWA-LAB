@@ -14,66 +14,45 @@ class BillingService {
     return this.supabase !== null;
   }
 
-  // Extract the numeric sequence from a bill number (e.g. B2254-8002 -> 2254)
-  parseBillSequenceNumber(billNo) {
-    const match = String(billNo || "").match(/^B(\d+)/i);
-    return match ? parseInt(match[1], 10) : 0;
-  }
-
-  formatBillNumber(sequence) {
-    return `B${sequence}`;
-  }
-
-  async getMaxBillSequenceNumber() {
-    const { data: bills, error } = await this.supabase
-      .from("bills")
-      .select("bill_no")
-      .like("bill_no", "B%");
-
-    if (error) throw error;
-
-    let maxNumber = 0;
-    (bills || []).forEach((bill) => {
-      const sequence = this.parseBillSequenceNumber(bill.bill_no);
-      if (sequence > maxNumber) maxNumber = sequence;
-    });
-    return maxNumber;
-  }
-
-  async billNumberExists(billNo) {
-    const { data, error } = await this.supabase
-      .from("bills")
-      .select("bill_no")
-      .eq("bill_no", billNo)
-      .maybeSingle();
-
-    if (error) throw error;
-    return !!data;
-  }
-
-  // Generate unique bill number based on the highest existing sequence
+  // Generate unique bill number
   async generateBillNumber() {
     if (!this.isSupabaseAvailable()) {
+      // Generate a timestamp-based bill number for offline mode
       const timestamp = Date.now().toString().slice(-6);
       return `B${timestamp}`;
     }
 
     try {
-      const maxNumber = await this.getMaxBillSequenceNumber();
-      return this.formatBillNumber(maxNumber + 1);
+      const { data: lastBill, error } = await this.supabase
+        .from("bills")
+        .select("bill_no")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      let nextNumber = 1;
+      if (lastBill && lastBill.length > 0) {
+        const lastBillNo = lastBill[0].bill_no;
+        const lastNumber = parseInt(lastBillNo.replace("B", ""));
+        nextNumber = lastNumber + 1;
+      }
+
+      return `B${nextNumber.toString().padStart(3, "0")}`;
     } catch (error) {
       console.error("Error generating bill number:", error);
+      // Fallback to timestamp-based number
       const timestamp = Date.now().toString().slice(-6);
       return `B${timestamp}`;
     }
   }
 
   // Create new bill with retry mechanism for race conditions
-  async createBill(billData, retryCount = 0, forcedBillNumber = null) {
-    const maxRetries = 5;
+  async createBill(billData, retryCount = 0) {
+    const maxRetries = 3;
 
     try {
-      let billNumber = forcedBillNumber || (await this.generateBillNumber());
+      const billNumber = await this.generateBillNumber();
 
       // If Supabase is not available, return mock data for offline mode
       if (!this.isSupabaseAvailable()) {
@@ -87,27 +66,6 @@ class BillingService {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
-      }
-
-      // If the generated number is taken, advance to the next free number
-      let reserveAttempts = 0;
-      while (
-        (await this.billNumberExists(billNumber)) &&
-        reserveAttempts < maxRetries
-      ) {
-        console.warn(
-          `Bill number ${billNumber} already exists, trying next number`
-        );
-        billNumber = this.formatBillNumber(
-          this.parseBillSequenceNumber(billNumber) + 1
-        );
-        reserveAttempts++;
-      }
-
-      if (reserveAttempts >= maxRetries) {
-        throw new Error(
-          "Could not reserve a unique bill number. Please try again."
-        );
       }
 
       const billPayload = {
@@ -148,6 +106,30 @@ class BillingService {
         JSON.stringify(billPayload, null, 2)
       );
 
+      // Check if bill number already exists (race condition protection)
+      const { data: existingBill, error: checkError } = await this.supabase
+        .from("bills")
+        .select("bill_no")
+        .eq("bill_no", billNumber)
+        .single();
+
+      if (checkError && checkError.code !== "PGRST116") {
+        // PGRST116 = no rows returned
+        console.error("Error checking existing bill:", checkError);
+        throw checkError;
+      }
+
+      if (existingBill) {
+        console.warn(
+          "Bill number already exists, generating new one:",
+          billNumber
+        );
+        // Generate a new bill number with timestamp to avoid conflicts
+        const timestamp = Date.now().toString().slice(-4);
+        billPayload.bill_no = `${billNumber}-${timestamp}`;
+        console.log("New bill number generated:", billPayload.bill_no);
+      }
+
       const { data: bill, error } = await this.supabase
         .from("bills")
         .insert(billPayload)
@@ -167,23 +149,18 @@ class BillingService {
         if (error.code === "23505") {
           // Unique violation
           if (error.constraint && error.constraint.includes("bill_no")) {
+            // Retry with a new bill number if it's a bill number conflict
             if (retryCount < maxRetries) {
-              const nextBillNumber = this.formatBillNumber(
-                this.parseBillSequenceNumber(billPayload.bill_no) + 1
-              );
               console.log(
-                `Bill number conflict detected, retrying with ${nextBillNumber} (${
+                `Bill number conflict detected, retrying (${
                   retryCount + 1
                 }/${maxRetries})...`
               );
+              // Wait a bit before retrying to avoid immediate conflicts
               await new Promise((resolve) =>
                 setTimeout(resolve, 100 * (retryCount + 1))
               );
-              return this.createBill(
-                billData,
-                retryCount + 1,
-                nextBillNumber
-              );
+              return this.createBill(billData, retryCount + 1);
             } else {
               throw new Error(
                 `Bill number ${billPayload.bill_no} already exists. Please try again.`
@@ -209,19 +186,15 @@ class BillingService {
             "Invalid reference data. Please check center or reference selection."
           );
         } else if (error.code === "409") {
+          // Conflict
           if (retryCount < maxRetries) {
-            const nextBillNumber = this.formatBillNumber(
-              this.parseBillSequenceNumber(billPayload.bill_no) + 1
-            );
             console.log(
-              `Conflict detected, retrying with ${nextBillNumber} (${
-                retryCount + 1
-              }/${maxRetries})...`
+              `Conflict detected, retrying (${retryCount + 1}/${maxRetries})...`
             );
             await new Promise((resolve) =>
               setTimeout(resolve, 200 * (retryCount + 1))
             );
-            return this.createBill(billData, retryCount + 1, nextBillNumber);
+            return this.createBill(billData, retryCount + 1);
           } else {
             throw new Error(
               "Conflict detected after multiple attempts. Please try again."
