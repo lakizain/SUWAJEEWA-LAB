@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Reference Fix</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+    <!-- Navigation will be loaded here by nav.js -->
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="mb-0">Reference Selection Fix Test</h3>
+                    </div>
+                    <div class="card-body">
+                        <h5>Issue Fixed:</h5>
+                        <p>The problem was in the reference selection logic. The functions were checking for
+                            <code>selectedIndex > 0</code>, but when the first reference option is selected, the index
+                            is 0, which was being treated as "no selection".
+                        </p>
+
+                        <h5>Changes Made:</h5>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">
+                                <i class="fas fa-check text-success"></i>
+                                <strong>Fixed getSelectedReferenceName():</strong> Changed condition from
+                                <code>selectedIndex > 0</code> to <code>dropdown.value && dropdown.value !== ''</code>
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-check text-success"></i>
+                                <strong>Fixed getSelectedReferenceDetails():</strong> Same fix applied to ensure proper
+                                reference detection
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-check text-success"></i>
+                                <strong>Updated dropdown population:</strong> Added proper value attributes to all
+                                options including the default "Select Reference" option
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-check text-success"></i>
+                                <strong>Added debugging:</strong> Enhanced console logging to help troubleshoot
+                                reference selection issues
+                            </li>
+                        </ul>
+
+                        <hr>
+
+                        <h5>How to Test the Fix:</h5>
+                        <ol>
+                            <li>Go to <code>billing.html</code></li>
+                            <li>Wait for references to load in the "Ref By" dropdown</li>
+                            <li>Select any reference from the dropdown</li>
+                            <li>Add some tests and save the bill</li>
+                            <li>Check the printed bill - the reference should now show correctly instead of "N/A"</li>
+                            <li>Open browser console to see debug information about reference selection</li>
+                        </ol>
+
+                        <div class="alert alert-success mt-3">
+                            <i class="fas fa-check-circle"></i>
+                            <strong>Fix Applied:</strong> The reference selection issue has been resolved. References
+                            selected in the billing form will now properly appear in printed bills.
+                        </div>
+
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Debug Information:</strong> You can test the reference selection by opening the
+                            browser console and running <code>window.billingController.testReferenceSelection()</code>
+                            to see detailed information about the dropdown state.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/nav.js"></script>
+</body>
+
+</html>

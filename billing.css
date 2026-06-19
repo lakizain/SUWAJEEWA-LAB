@@ -1,0 +1,479 @@
+/* SUWAJEEWA LABORATORIES - Billing Page Styles */
+
+:root {
+  --bg: #F5F7FA;
+  --panel: #FFFFFF;
+  --panel-border: #CBD5E1;
+  --text: #1E293B;
+  --text-secondary: #475569;
+  --accent: #2563EB;
+  --btn-hover: #1E40AF;
+  --input-bg: #F9FAFB;
+  --table-header: #E2E8F0;
+  --error: #DC2626;
+  --success: #16A34A;
+}
+
+body {
+  background-color: var(--bg);
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+}
+
+/* Header Styles */
+.header {
+  background: var(--panel);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 1rem 0;
+  border-bottom: 2px solid var(--panel-border);
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo-icon {
+  width: 45px;
+  height: 45px;
+  background: var(--panel);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  font-size: 1.3rem;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+.logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+}
+
+.company-name {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 1.4rem;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.company-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 0;
+  font-weight: 500;
+}
+
+.btn-logout {
+  background: var(--error);
+  border: none;
+  color: #F9FAFB;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+}
+
+.btn-logout:hover {
+  background: #B91C1C;
+  color: #F9FAFB;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+}
+
+/* Content Section */
+.content-section {
+  padding: 2rem 0;
+}
+
+/* Panel Styles */
+.panel {
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--panel-border);
+}
+
+.panel-header {
+  background: var(--accent);
+  color: #F9FAFB;
+  padding: 1rem 1.5rem;
+  margin: -1.5rem -1.5rem 1.5rem;
+  border-radius: 8px 8px 0 0;
+  font-weight: 600;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.panel-header i {
+  font-size: 1.2rem;
+}
+
+/* Payment Panel Special Styling */
+.payment-panel {
+  background: var(--table-header) !important;
+  color: var(--text) !important;
+}
+
+.payment-panel .panel-header {
+  background: var(--accent) !important;
+  color: #F9FAFB !important;
+}
+
+.payment-panel .summary-label,
+.payment-panel .summary-value {
+  color: var(--text) !important;
+}
+
+/* Form Styles */
+.form-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.form-control {
+  border-radius: 6px;
+  border: 2px solid #CBD5E1;
+  background: var(--input-bg);
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  transition: all 0.3s ease;
+}
+
+.form-control:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  outline: none;
+  background: var(--panel);
+}
+
+.form-control-sm {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+/* Button Styles */
+.btn {
+  border-radius: 6px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #F9FAFB;
+  padding: 0.6rem 1.2rem;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+.btn-primary:hover {
+  background: var(--btn-hover);
+  color: #F9FAFB;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn-success {
+  background: var(--success);
+  color: #F9FAFB;
+  padding: 0.6rem 1.2rem;
+  box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2);
+}
+
+.btn-success:hover {
+  background: #15803D;
+  color: #F9FAFB;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+}
+
+.btn-secondary {
+  background: var(--table-header);
+  color: var(--text);
+  padding: 0.6rem 1.2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--panel-border);
+}
+
+.btn-secondary:hover {
+  background: #CBD5E1;
+  color: var(--text);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* Table Styles */
+.table {
+  margin-bottom: 0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.table th {
+  background: var(--table-header);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  font-weight: 600;
+  padding: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.table td {
+  vertical-align: middle;
+  padding: 0.75rem;
+  border-color: var(--panel-border);
+  color: var(--text);
+}
+
+.table tbody tr:nth-child(even) {
+  background: var(--input-bg);
+}
+
+.table tbody tr:nth-child(odd) {
+  background: var(--panel);
+}
+
+.table-bordered {
+  border: 2px solid var(--panel-border);
+}
+
+/* Payment Summary Styles */
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.summary-item:last-child {
+  border-bottom: none;
+}
+
+.summary-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.summary-value {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Save Button */
+.btn-save {
+  background: var(--accent);
+  color: #F9FAFB;
+  padding: 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  transition: all 0.3s ease;
+}
+
+.btn-save:hover {
+  background: var(--btn-hover);
+  color: #F9FAFB;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 2.5rem;
+  background: var(--bg);
+  border-radius: 8px;
+}
+
+.empty-state i {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  opacity: 0.4;
+  color: var(--text-secondary);
+}
+
+.empty-state div {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+/* Info Text */
+.info-text {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+.info-text i {
+  color: var(--accent);
+  margin-right: 0.5rem;
+}
+
+/* Notification Icon */
+.notification-icon {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  width: 45px;
+  height: 45px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #F9FAFB;
+  font-weight: bold;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.notification-icon:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+  background: var(--btn-hover);
+}
+
+/* Bottom Bar */
+.bottom-bar {
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--panel-border);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .panel {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .panel-header {
+    margin: -1rem -1rem 1rem;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+  }
+
+  .content-section {
+    padding: 1rem 0;
+  }
+
+  .btn-save {
+    padding: 0.75rem;
+    font-size: 1rem;
+  }
+
+  .company-name {
+    font-size: 1.2rem;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--table-header);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Animation for loading states */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Focus states for accessibility */
+.btn:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Print styles */
+@media print {
+  .btn-logout,
+  .notification-icon,
+  .btn {
+    display: none !important;
+  }
+
+  .panel {
+    box-shadow: none;
+    border: 1px solid var(--text);
+  }
+}
+
+/* Additional text color helpers */
+.text-primary {
+  color: var(--accent) !important;
+}
+
+.text-info {
+  color: var(--accent) !important;
+}
+
+.text-success {
+  color: var(--success) !important;
+}
+
+.text-muted {
+  color: var(--text-secondary) !important;
+}
+
+.text-white {
+  color: #F9FAFB !important;
+}
+
+.text-white-50 {
+  color: rgba(249, 250, 251, 0.5) !important;
+}

@@ -1,0 +1,180 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.admin_users (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  username character varying NOT NULL UNIQUE,
+  email character varying NOT NULL UNIQUE,
+  password text NOT NULL,
+  role character varying NOT NULL CHECK (role::text = ANY (ARRAY['admin'::character varying, 'staff'::character varying]::text[])),
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT admin_users_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.bill_items (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  bill_id uuid,
+  test_id uuid,
+  package_id uuid,
+  quantity integer DEFAULT 1,
+  unit_price numeric NOT NULL,
+  total_price numeric NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  report_status character varying DEFAULT 'pending'::character varying,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT bill_items_pkey PRIMARY KEY (id),
+  CONSTRAINT bill_items_bill_id_fkey FOREIGN KEY (bill_id) REFERENCES public.bills(id),
+  CONSTRAINT bill_items_test_id_fkey FOREIGN KEY (test_id) REFERENCES public.tests(id),
+  CONSTRAINT bill_items_package_id_fkey FOREIGN KEY (package_id) REFERENCES public.packages(id)
+);
+CREATE TABLE public.bills (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  bill_no character varying NOT NULL UNIQUE,
+  bill_date timestamp with time zone DEFAULT now(),
+  bill_type character varying DEFAULT 'Main Lab'::character varying,
+  center_id uuid,
+  patient_phone character varying,
+  patient_name character varying NOT NULL,
+  patient_title character varying,
+  patient_age_years integer,
+  patient_age_months integer,
+  patient_age_days integer,
+  patient_gender character varying CHECK (patient_gender::text = ANY (ARRAY['Male'::character varying, 'Female'::character varying, 'Other'::character varying]::text[])),
+  ref_by character varying,
+  new_referral character varying,
+  total_amount numeric DEFAULT 0.00,
+  discount numeric DEFAULT 0.00,
+  final_amount numeric DEFAULT 0.00,
+  paid_amount numeric DEFAULT 0.00,
+  remaining_amount numeric DEFAULT 0.00,
+  status character varying DEFAULT 'pending'::character varying CHECK (status::text = ANY (ARRAY['pending'::character varying, 'paid'::character varying, 'partial'::character varying, 'cancelled'::character varying]::text[])),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  lifetime_discount boolean NOT NULL DEFAULT false,
+  CONSTRAINT bills_pkey PRIMARY KEY (id),
+  CONSTRAINT bills_center_id_fkey FOREIGN KEY (center_id) REFERENCES public.centers(id)
+);
+CREATE TABLE public.centers (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  cid character varying NOT NULL UNIQUE,
+  center_name character varying NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT centers_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.package_tests (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  package_id uuid,
+  test_id uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT package_tests_pkey PRIMARY KEY (id),
+  CONSTRAINT package_tests_package_id_fkey FOREIGN KEY (package_id) REFERENCES public.packages(id),
+  CONSTRAINT package_tests_test_id_fkey FOREIGN KEY (test_id) REFERENCES public.tests(id)
+);
+CREATE TABLE public.packages (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  pgid character varying NOT NULL UNIQUE,
+  package_name character varying NOT NULL,
+  price numeric NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT packages_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.reference_ranges (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  test_id uuid,
+  gender character varying CHECK (gender::text = ANY (ARRAY['Male'::character varying, 'Female'::character varying, 'Both'::character varying]::text[])),
+  age_min integer,
+  age_max integer,
+  unit character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  subcategory_id uuid,
+  min_value text,
+  max_value text,
+  CONSTRAINT reference_ranges_pkey PRIMARY KEY (id),
+  CONSTRAINT reference_ranges_test_id_fkey FOREIGN KEY (test_id) REFERENCES public.tests(id),
+  CONSTRAINT reference_ranges_subcategory_id_fkey FOREIGN KEY (subcategory_id) REFERENCES public.test_subcategories(id)
+);
+CREATE TABLE public.references (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  rid character varying NOT NULL UNIQUE,
+  name character varying NOT NULL,
+  commission numeric DEFAULT 0.00,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT references_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.subcategory_suggestions (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  subcategory_id uuid,
+  suggestion_text text NOT NULL,
+  suggestion_type character varying DEFAULT 'tag'::character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT subcategory_suggestions_pkey PRIMARY KEY (id),
+  CONSTRAINT subcategory_suggestions_subcategory_id_fkey FOREIGN KEY (subcategory_id) REFERENCES public.test_subcategories(id)
+);
+CREATE TABLE public.test_report_headers (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  comments_result text,
+  special_notes text,
+  status character varying NOT NULL DEFAULT 'draft'::character varying,
+  verified_by character varying,
+  created_by character varying,
+  updated_by character varying,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  bill_id uuid,
+  bill_item_id uuid,
+  CONSTRAINT test_report_headers_pkey PRIMARY KEY (id),
+  CONSTRAINT test_report_headers_bill_id_fkey FOREIGN KEY (bill_id) REFERENCES public.bills(id),
+  CONSTRAINT test_report_headers_bill_item_id_fkey FOREIGN KEY (bill_item_id) REFERENCES public.bill_items(id)
+);
+CREATE TABLE public.test_results (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  bill_id uuid NOT NULL,
+  bill_item_id uuid NOT NULL,
+  subcategory_id uuid,
+  value text,
+  unit character varying,
+  status character varying,
+  comments text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT test_results_pkey PRIMARY KEY (id),
+  CONSTRAINT test_results_bill_id_fkey FOREIGN KEY (bill_id) REFERENCES public.bills(id),
+  CONSTRAINT test_results_bill_item_id_fkey FOREIGN KEY (bill_item_id) REFERENCES public.bill_items(id),
+  CONSTRAINT test_results_subcategory_id_fkey FOREIGN KEY (subcategory_id) REFERENCES public.test_subcategories(id)
+);
+CREATE TABLE public.test_subcategories (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  test_id uuid,
+  subcategory_name character varying NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  uom character varying,
+  less_more text CHECK (less_more IS NULL OR (less_more = ANY (ARRAY['less'::text, 'more'::text]))),
+  less_more_comment text,
+  less_more_mark numeric,
+  CONSTRAINT test_subcategories_pkey PRIMARY KEY (id),
+  CONSTRAINT test_subcategories_test_id_fkey FOREIGN KEY (test_id) REFERENCES public.tests(id)
+);
+CREATE TABLE public.tests (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  test_name character varying NOT NULL,
+  short_name character varying NOT NULL,
+  price numeric NOT NULL,
+  remarks text,
+  specimen character varying,
+  tube character varying,
+  category character varying,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  duration integer CHECK (duration > 0),
+  test_cost numeric CHECK (test_cost >= 0::numeric),
+  footer_text text,
+  footer_image_url text CHECK (footer_image_url IS NULL OR footer_image_url ~* '^https?://'::text),
+  CONSTRAINT tests_pkey PRIMARY KEY (id)
+);

@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Entry</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="reportEntry.css">
+    <style>
+        /* Global body styling */
+        body {
+            background-color: #F5F7FA !important;
+            font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #1E293B;
+        }
+
+        #printWithSignature {
+            border: 2px solid #000 !important;
+        }
+
+        #printWithSignature:checked {
+            background-color: #000 !important;
+            border-color: #000 !important;
+        }
+
+        /* Performance optimizations for test results table */
+        #resultsItemsBody {
+            contain: layout style paint;
+        }
+
+        #resultsItemsBody tr {
+            will-change: transform;
+        }
+
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        /* Optimize table rendering */
+        .table-responsive {
+            contain: layout;
+        }
+
+        /* Smooth transitions for better UX */
+        #resultsItemsBody tr {
+            transition: background-color 0.15s ease-in-out;
+        }
+
+        /* Report status visualization styles */
+        .report-status-pending {
+            background-color: #FEF3C7 !important;
+            border-left: 4px solid #F59E0B;
+        }
+
+        .report-status-completed {
+            background-color: #DBEAFE !important;
+            border-left: 4px solid #2563EB;
+        }
+
+        .report-status-ready {
+            background-color: #DCFCE7 !important;
+            border-left: 4px solid #16A34A;
+        }
+
+        /* Overdue (duration exceeded) */
+        .report-status-overdue {
+            background-color: #FEE2E2 !important; /* light red */
+            border-left: 4px solid #DC2626;
+        }
+
+        .report-status-pending:hover {
+            background-color: #FDE68A !important;
+        }
+
+        .report-status-completed:hover {
+            background-color: #BFDBFE !important;
+        }
+
+        .report-status-ready:hover {
+            background-color: #BBF7D0 !important;
+        }
+
+        /* Ensure text remains visible on colored backgrounds */
+        .report-status-pending td,
+        .report-status-completed td,
+        .report-status-ready td,
+        .report-status-overdue td {
+            color: #1E293B;
+            font-weight: 500;
+        }
+
+        /* Status indicator badge */
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge-pending {
+            background-color: #F59E0B;
+            color: #FFFFFF;
+        }
+
+        .status-badge-completed {
+            background-color: #2563EB;
+            color: #FFFFFF;
+        }
+
+        .status-badge-ready {
+            background-color: #16A34A;
+            color: #FFFFFF;
+        }
+
+        .status-badge-overdue {
+            background-color: #DC2626;
+            color: #FFFFFF;
+        }
+
+        /* History row selection highlight */
+        #patientHistoryBody tr.history-row-selected {
+            background-color: #DBEAFE !important;
+            border-left: 3px solid #2563EB;
+        }
+        #patientHistoryBody tr { cursor: pointer; }
+
+        /* Form labels - consistent styling */
+        .form-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 0.25rem;
+        }
+
+        /* Card headers */
+        .card-header {
+            background-color: #FFFFFF !important;
+            border-bottom: 1px solid #CBD5E1 !important;
+        }
+
+        /* Table hover effect for clickable rows */
+        .table-hover tbody tr:hover {
+            background-color: rgba(37, 99, 235, 0.05) !important;
+            cursor: pointer;
+        }
+
+        /* Sticky table headers */
+        .sticky-top {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #E2E8F0 !important;
+        }
+
+        /* Checkbox styling */
+        .form-check-input {
+            border-color: #CBD5E1 !important;
+            cursor: pointer;
+        }
+
+        .form-check-input:checked {
+            background-color: #2563EB !important;
+            border-color: #2563EB !important;
+        }
+
+        .form-check-input:focus {
+            border-color: #2563EB !important;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+        }
+
+        .form-check-label {
+            color: #475569;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        /* Button groups */
+        .btn-group .btn {
+            border-color: #CBD5E1 !important;
+        }
+
+        /* Input group buttons */
+        .input-group .btn-primary {
+            border-radius: 0 6px 6px 0 !important;
+        }
+
+        /* Table responsive scrollbar styling */
+        .table-responsive::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 4px;
+        }
+
+        .table-responsive::-webkit-scrollbar-track {
+            background: #F9FAFB;
+        }
+
+        /* Readonly inputs — avoid opacity (it fades text and hurts contrast) */
+        input[readonly],
+        textarea[readonly],
+        select[disabled] {
+            background-color: #F1F5F9 !important;
+            color: #0f172a !important;
+            cursor: not-allowed;
+        }
+
+        /* Spacing improvements */
+        .card + .card {
+            margin-top: 1rem;
+        }
+
+        .gap-2 {
+            gap: 0.5rem !important;
+        }
+
+        .gap-3 {
+            gap: 1rem !important;
+        }
+
+        /* Tab content padding */
+        .tab-content {
+            padding: 0;
+        }
+
+        .tab-pane {
+            padding: 0;
+        }
+
+        /* Clear search button styling */
+        #clearSearchBtn {
+            background-color: #E2E8F0 !important;
+            border-color: #CBD5E1 !important;
+            color: #475569 !important;
+        }
+
+        #clearSearchBtn:hover {
+            background-color: #CBD5E1 !important;
+            color: #1E293B !important;
+        }
+
+        /* Preview controls styling */
+        .preview-controls {
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #closePreviewBtn {
+            background-color: #E2E8F0 !important;
+            border-color: #CBD5E1 !important;
+            color: #1E293B !important;
+        }
+
+        #closePreviewBtn:hover {
+            background-color: #CBD5E1 !important;
+        }
+
+        #printFromPreviewBtn {
+            background-color: #2563EB !important;
+            border-color: #2563EB !important;
+            color: #FFFFFF !important;
+        }
+
+        #printFromPreviewBtn:hover {
+            background-color: #1E40AF !important;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation will be loaded here by nav.js -->
+    <div class="container-fluid py-3">
+        <div class="row g-3">
+            <!-- Left: Entry Panel -->
+            <div class="col-lg-8">
+                <!-- Top box with tabs -->
+                <div class="card">
+                    <div class="card-header p-0">
+                        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab"
+                                    data-bs-target="#tab-summary" type="button" role="tab">Summary</button></li>
+                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab"
+                                    data-bs-target="#tab-patient" type="button" role="tab">Patient Details</button></li>
+                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab"
+                                    data-bs-target="#tab-report" type="button" role="tab">Report Details</button></li>
+                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab"
+                                    data-bs-target="#tab-prescription" type="button" role="tab">Prescription</button>
+                            </li>
+                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab"
+                                    data-bs-target="#tab-remark" type="button" role="tab">Remark</button></li>
+                        </ul>
+                    </div>
+                    <div class="card-body" id="report-search">
+                        <div class="tab-content">
+                            <div class="tab-pane fade show active" id="tab-summary" role="tabpanel">
+                                <div class="row gx-3 gy-0">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Report ID</label>
+                                        <input type="text" class="form-control" readonly>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Bill No</label>
+                                        <input type="text" class="form-control" readonly>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Patient</label>
+                                        <input type="text" class="form-control" readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Title</label>
+                                        <input type="text" class="form-control" readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Age</label>
+                                        <input type="text" class="form-control" readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Gender</label>
+                                        <input type="text" class="form-control" readonly>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Test Type</label>
+                                        <input type="text" class="form-control" readonly>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Specimen</label>
+                                        <input type="text" class="form-control" readonly>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Ref. By</label>
+                                        <input type="text" class="form-control" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="tab-patient" role="tabpanel">
+                                <div class="text-muted">Patient details content</div>
+                            </div>
+                            <div class="tab-pane fade" id="tab-report" role="tabpanel">
+                                <div class="text-muted">Report details content</div>
+                            </div>
+                            <div class="tab-pane fade" id="tab-prescription" role="tabpanel">
+                                <div class="text-muted">Prescription content</div>
+                            </div>
+                            <div class="tab-pane fade" id="tab-remark" role="tabpanel">
+                                <div class="text-muted">Remark content</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Middle box with tabs (Test Results, Comments Result, Special Note) -->
+                <div class="card mt-3">
+                    <div class="card-header p-0">
+                        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab"
+                                    data-bs-target="#tab-results" type="button" role="tab">Test Results</button></li>
+                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab"
+                                    data-bs-target="#tab-remarknote" type="button" role="tab">Comment</button></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <div class="tab-content">
+                            <div class="tab-pane fade show active" id="tab-results" role="tabpanel">
+                                <div class="results-top-fields">
+                                    <div>
+                                        <label class="form-label">Category</label>
+                                        <input id="topCategoryInput" type="text" class="form-control"
+                                            placeholder="Enter category" readonly>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Value</label>
+                                        <input id="topValueInput" type="text" class="form-control"
+                                            list="valueSuggestions" placeholder="Type value and press Enter">
+                                        <datalist id="valueSuggestions"></datalist>
+                                    </div>
+                                    <div class="placeholder">
+                                        <label class="form-label">UOM</label>
+                                        <input type="text" class="form-control" disabled>
+                                    </div>
+                                    <div class="placeholder">
+                                        <label class="form-label">Remark</label>
+                                        <input type="text" class="form-control" disabled>
+                                    </div>
+                                </div>
+                                <div class="table-responsive mt-3">
+                                    <table class="table table-sm table-striped align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Category</th>
+                                                <th>Value</th>
+                                                <th>UOM</th>
+                                                <th>Ref Range</th>
+                                                <th>Remark</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="resultsItemsBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="tab-remarknote" role="tabpanel">
+                                <textarea id="commentsResultInput" class="form-control" rows="4"
+                                    placeholder="Enter comment..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom action bar -->
+                <div class="d-flex gap-2 justify-content-end align-items-center mt-3">
+                    <div class="form-check me-3">
+                        <input class="form-check-input" type="checkbox" id="printWithSignature">
+                        <label class="form-check-label" for="printWithSignature">
+                            Print with signature
+                        </label>
+                    </div>
+                    <button class="btn btn-primary">Save & Print</button>
+                    <button class="btn btn-outline-secondary" id="previewReportBtn">Preview</button>
+                </div>
+            </div>
+
+            <!-- Right: Search Panel -->
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <ul class="nav nav-tabs card-header-tabs">
+                            <li class="nav-item"><button class="nav-link active" type="button">Report Search</button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <!-- Filters -->
+                        <div class="row g-3 align-items-end">
+                            <div class="col-12 col-sm-6">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" id="dateFrom">
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <label class="form-label">To</label>
+                                <div class="input-group">
+                                    <input type="date" class="form-control" id="dateTo">
+                                    <button class="btn btn-primary" type="button">Find</button>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Test</label>
+                                <select class="form-select" id="filterTest">
+                                    <option value="all">All</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Center</label>
+                                <select class="form-select" id="filterCenter">
+                                    <option value="all">All</option>
+                                </select>
+                            </div>
+                            <div class="col-12 position-relative">
+                                <label class="form-label">Bill #</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="filterBillNo" autocomplete="off">
+                                    <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn"
+                                        title="Clear search">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div id="billSuggestions" class="list-group position-absolute w-100"
+                                    style="z-index: 1000; max-height: 240px; overflow: auto; display: none;"></div>
+                            </div>
+
+                        </div>
+
+                        <!-- Results Tabs: Pending (default) and Ready -->
+                        <ul class="nav nav-tabs mt-3" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="tab-pending-tab" data-bs-toggle="tab" data-bs-target="#tab-pending" type="button" role="tab" aria-controls="tab-pending" aria-selected="true">Pending Reports</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="tab-ready-tab" data-bs-toggle="tab" data-bs-target="#tab-ready" type="button" role="tab" aria-controls="tab-ready" aria-selected="false">Ready Reports</button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content">
+                            <!-- Pending Reports Pane (default) -->
+                            <div class="tab-pane fade show active" id="tab-pending" role="tabpanel" aria-labelledby="tab-pending-tab">
+                                <div class="table-responsive mt-3" style="max-height: 360px;">
+                                    <table class="table table-sm table-hover align-middle mb-0">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>Bill No.</th>
+                                                <th>Patient</th>
+                                                <th>Test</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <!-- Keep existing tbody id for compatibility -->
+                                        <tbody id="resultsTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Ready Reports Pane -->
+                            <div class="tab-pane fade" id="tab-ready" role="tabpanel" aria-labelledby="tab-ready-tab">
+                                <div class="table-responsive mt-3" style="max-height: 360px;">
+                                    <table class="table table-sm table-hover align-middle mb-0">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>Bill No.</th>
+                                                <th>Patient</th>
+                                                <th>Test</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="resultsTableBodyReady"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-outline-secondary">Select All</button>
+                            <button class="btn btn-outline-secondary">Print List</button>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="autoRefresh">
+                            <label class="form-check-label" for="autoRefresh">Auto refresh list</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Patient Report History Section -->
+    <div class="container-fluid py-3">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <input type="text" class="form-control form-control-sm" id="historyPhoneInput" placeholder="Enter mobile number">
+                    <button class="btn btn-sm btn-primary" id="loadHistoryBtn">Load</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Patient Name</th>
+                                <th>Test</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patientHistoryBody">
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">No history to show</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+        crossorigin="anonymous"></script>
+    <script src="config/config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config/supabase.js"></script>
+    <script src="js/services/testService.js"></script>
+    <script src="js/services/centerService.js"></script>
+    <script src="js/services/billingService.js"></script>
+    <script src="js/services/reportEntryService.js"></script>
+    <script src="js/controllers/reportEntryController.js"></script>
+    <script src="js/nav.js"></script>
+
+    <!-- Patient history wiring (uses BillingService) -->
+    <script>
+        (function () {
+            if (!window.BillingService) return;
+
+            const billing = new BillingService();
+            const phoneInput = document.getElementById('historyPhoneInput');
+            const loadBtn = document.getElementById('loadHistoryBtn');
+            const tableBody = document.getElementById('patientHistoryBody');
+
+            function getCurrentTests() {
+                // Use controller state; do not read subcategory table rows
+                const ctrl = window.ReportEntryController;
+                if (!ctrl || !ctrl.selectedBill) return [];
+                const items = Array.isArray(ctrl.selectedBill.bill_items) ? ctrl.selectedBill.bill_items : [];
+                const toName = (it) => (it?.tests?.test_name || it?.packages?.package_name || '').toString().trim();
+                if (ctrl.selectedTestItem) {
+                    const name = toName(ctrl.selectedTestItem);
+                    return name ? [name] : [];
+                }
+                const names = items.map(toName).filter(Boolean);
+                return Array.from(new Set(names));
+            }
+
+            function renderRows(bills) {
+                const todayTests = getCurrentTests();
+                const todayDate = new Date().toLocaleDateString();
+                const ctrl = window.ReportEntryController;
+                const patientName = (ctrl && ctrl.selectedBill && ctrl.selectedBill.patient_name) ? ctrl.selectedBill.patient_name : (document.querySelector('#tab-summary input[readonly]')?.value || '').trim();
+
+                let rowsHtml = '';
+
+                // Render current session tests as separate rows
+                if (todayTests.length > 0) {
+                    const billNo = (ctrl && ctrl.selectedBill && ctrl.selectedBill.bill_no) ? ctrl.selectedBill.bill_no : (document.querySelector('#tab-summary input[readonly] + .form-control')?.value || '').trim();
+                    rowsHtml += todayTests
+                        .map(t => `\n<tr data-bill-no="${billNo}" data-test-name="${t}"><td>${todayDate}</td><td>${patientName}</td><td>${t}</td></tr>`)
+                        .join('');
+                }
+
+                // Render historical tests: one row per test
+                if (Array.isArray(bills) && bills.length > 0) {
+                    bills.forEach(bill => {
+                        const dateStr = bill.bill_date ? new Date(bill.bill_date).toLocaleDateString() : '';
+                        const items = (bill.bill_items || []);
+                        if (items.length === 0) {
+                            rowsHtml += `<tr data-bill-no="${bill.bill_no}"><td>${dateStr}</td><td>${bill.patient_name || ''}</td><td></td></tr>`;
+                        } else {
+                            items.forEach(it => {
+                                const testName = it.tests?.test_name || it.packages?.package_name || '';
+                                rowsHtml += `<tr data-bill-no="${bill.bill_no}" data-test-name="${testName}"><td>${dateStr}</td><td>${bill.patient_name || ''}</td><td>${testName}</td></tr>`;
+                            });
+                        }
+                    });
+                }
+
+                if (!rowsHtml) {
+                    rowsHtml = '<tr><td colspan="3" class="text-center text-muted">No history to show</td></tr>';
+                }
+
+                tableBody.innerHTML = rowsHtml;
+
+                // Wire row clicks to load report details for that bill/test
+                Array.from(tableBody.querySelectorAll('tr')).forEach(tr => {
+                    tr.addEventListener('click', () => {
+                        // Highlight selected history row
+                        Array.from(tableBody.querySelectorAll('tr')).forEach(r => r.classList.remove('history-row-selected'));
+                        tr.classList.add('history-row-selected');
+
+                        const billNo = tr.getAttribute('data-bill-no') || '';
+                        const testName = tr.getAttribute('data-test-name') || '';
+                        if (window.ReportEntryController && typeof window.ReportEntryController.selectBillByNumberAndTest === 'function') {
+                            window.ReportEntryController.selectBillByNumberAndTest(billNo, testName);
+                        }
+                    });
+                });
+            }
+
+            async function loadHistory() {
+                const phone = (phoneInput?.value || '').trim();
+                if (!phone) {
+                    renderRows([]);
+                    return;
+                }
+                try {
+                    const bills = await billing.getPatientHistory(phone);
+                    renderRows(bills || []);
+                } catch (e) {
+                    console.error('Failed to load history', e);
+                    tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Failed to load</td></tr>';
+                }
+            }
+
+            // Auto-search as you type (min 3 digits) and on Enter
+            let debounceId;
+            if (phoneInput) {
+                phoneInput.addEventListener('input', () => {
+                    const v = (phoneInput.value || '').trim();
+                    clearTimeout(debounceId);
+                    debounceId = setTimeout(() => {
+                        if (v.length >= 3) loadHistory();
+                        else tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Enter mobile number</td></tr>';
+                    }, 250);
+                });
+                phoneInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') loadHistory();
+                });
+            }
+            if (loadBtn) loadBtn.addEventListener('click', loadHistory);
+
+            // Re-render when current tests table changes (basic mutation observer)
+            const resultsBody = document.getElementById('resultsItemsBody');
+            if (resultsBody) {
+                const observer = new MutationObserver(() => renderRows([]));
+                observer.observe(resultsBody, { childList: true, subtree: true, characterData: true });
+            }
+
+            // Expose a simple API to load history by phone programmatically
+            window.PatientHistoryLoader = {
+                async loadByPhone(phone) {
+                    try {
+                        const value = (phone || '').toString().trim();
+                        if (phoneInput) phoneInput.value = value;
+                        if (!value) {
+                            renderRows([]);
+                            return;
+                        }
+                        const bills = await billing.getPatientHistory(value);
+                        renderRows(bills || []);
+                    } catch (e) {
+                        console.error('Failed to load history', e);
+                        tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Failed to load</td></tr>';
+                    }
+                },
+                setPhoneAndLoad(phone) {
+                    return this.loadByPhone(phone);
+                }
+            };
+        })();
+    </script>
+
+    <!-- Print Container (Hidden by default) -->
+    <div id="print-container" style="display: none;">
+        <!-- Preview Close Button -->
+        <div class="preview-controls" style="position: fixed; top: 10px; right: 10px; z-index: 1000;">
+            <button class="btn btn-secondary" id="closePreviewBtn" style="margin-right: 10px;">Close Preview</button>
+            <button class="btn btn-primary" id="printFromPreviewBtn">Print</button>
+        </div>
+
+        <!-- Header Section -->
+        <div class="print-header">
+            <div class="header-left">
+                <img src="Imgs/suwajeewa_logo.png" alt="Logo" class="print-logo">
+            </div>
+            <div class="header-center">
+                <h1 class="print-title">SUWAJEEWA MEDICAL LABORATORY</h1>
+                <p class="print-subtitle">No. 1/1, 1st Floor, Kandy Road, Kurunegala</p>
+                <p class="print-subtitle">Tel: 037-222 2222 | Email: info@suwajeewa.lk</p>
+            </div>
+            <div class="header-right">
+                <div class="report-info">
+                    <p><strong>Report ID:</strong> <span id="print-report-id">RPT-001</span></p>
+                    <p><strong>Date:</strong> <span id="print-date">2024-01-15</span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Patient Details Section -->
+        <div class="print-section">
+            <h3 class="section-title">PATIENT DETAILS</h3>
+            <div class="patient-details-grid">
+                <div class="detail-item">
+                    <label>Patient Name:</label>
+                    <span id="print-patient-name">John Doe</span>
+                </div>
+                <div class="detail-item">
+                    <label>Age:</label>
+                    <span id="print-patient-age">35</span>
+                </div>
+                <div class="detail-item">
+                    <label>Gender:</label>
+                    <span id="print-patient-gender">Male</span>
+                </div>
+                <div class="detail-item">
+                    <label>Bill No:</label>
+                    <span id="print-bill-no">BIL-001</span>
+                </div>
+                <div class="detail-item">
+                    <label>Test Type:</label>
+                    <span id="print-test-type">Blood Test</span>
+                </div>
+                <div class="detail-item">
+                    <label>Specimen:</label>
+                    <span id="print-specimen">Blood</span>
+                </div>
+                <div class="detail-item full-width">
+                    <label>Referred By:</label>
+                    <span id="print-referred-by">Dr. Smith</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Results Section -->
+        <div class="print-section">
+            <h3 class="section-title">TEST RESULTS</h3>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th>Test</th>
+                        <th>Result</th>
+                        <th>Unit</th>
+                        <th>Reference Range</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="print-results-body">
+                    <tr>
+                        <td>Hemoglobin</td>
+                        <td>14.5</td>
+                        <td>g/dL</td>
+                        <td>12.0 - 16.0</td>
+                        <td>Normal</td>
+                    </tr>
+                    <tr>
+                        <td>White Blood Cells</td>
+                        <td>7.2</td>
+                        <td>×10³/μL</td>
+                        <td>4.0 - 11.0</td>
+                        <td>Normal</td>
+                    </tr>
+                    <tr>
+                        <td>Platelets</td>
+                        <td>250</td>
+                        <td>×10³/μL</td>
+                        <td>150 - 450</td>
+                        <td>Normal</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Footer Link Image Section (if available) -->
+        <div id="print-footer-link-section" class="print-section" style="display: none; text-align: left; margin-top: 20px;">
+            <img id="print-footer-link-image" alt="Footer Image" style="max-width: 100%; max-height: 200px; height: auto; display: block; margin: 0;" onerror="this.parentElement.style.display='none';" />
+        </div>
+
+        <!-- Comments Section -->
+        <div class="print-section">
+            <h3 class="section-title">COMMENTS</h3>
+            <div class="comments-box">
+                <p id="print-comments">All test results are within normal limits. No abnormalities detected.</p>
+            </div>
+        </div>
+
+        <!-- Footer Section -->
+        <div class="print-footer">
+            <div class="footer-left">
+                <div class="signature-section">
+                    <p class="signature-label">Laboratory Technician:</p>
+                    <div class="signature-line"></div>
+                    <p class="signature-name">[Name]</p>
+                </div>
+            </div>
+            <div class="footer-right">
+                <div class="signature-section">
+                    <p class="signature-label">Authorized by:</p>
+                    <div class="signature-line"></div>
+                    <p class="signature-name">[Name]</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Date and Time -->
+        <div class="print-datetime">
+            <p>Report Generated: <span id="print-generated-date">2024-01-15 10:30 AM</span></p>
+        </div>
+    </div>
+
+    <script>
+        // Print functionality
+        document.getElementById('printReportBtn').addEventListener('click', function () {
+            // Populate print data from current form
+            populatePrintData();
+
+            // Show print container
+            document.getElementById('print-container').style.display = 'block';
+
+            // Print
+            window.print();
+
+            // Hide print container after printing
+            setTimeout(() => {
+                document.getElementById('print-container').style.display = 'none';
+            }, 1000);
+        });
+
+        // Preview functionality
+        document.getElementById('previewReportBtn').addEventListener('click', function () {
+            // Populate print data from current form
+            populatePrintData();
+
+            // Show print container for preview
+            document.getElementById('print-container').style.display = 'block';
+
+            // Scroll to top to show the preview
+            window.scrollTo(0, 0);
+        });
+
+        // Close preview functionality
+        document.getElementById('closePreviewBtn').addEventListener('click', function () {
+            document.getElementById('print-container').style.display = 'none';
+        });
+
+        // Print from preview functionality
+        document.getElementById('printFromPreviewBtn').addEventListener('click', function () {
+            window.print();
+
+            // Hide print container after printing
+            setTimeout(() => {
+                document.getElementById('print-container').style.display = 'none';
+            }, 1000);
+        });
+
+        function populatePrintData() {
+            // Get current date and time
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-GB');
+            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+            // Update print data from form fields
+            document.getElementById('print-date').textContent = dateStr;
+            document.getElementById('print-generated-date').textContent = `${dateStr} ${timeStr}`;
+
+            // Get data from form fields (adjust selectors based on your actual form structure)
+            const reportIdInput = document.querySelector('#tab-summary input[readonly]');
+            const billNoInput = document.querySelector('#tab-summary input[readonly]');
+            const patientInput = document.querySelector('#tab-summary input[readonly]');
+            const ageInput = document.querySelector('#tab-summary input[readonly]');
+            const genderInput = document.querySelector('#tab-summary input[readonly]');
+            const testTypeInput = document.querySelector('#tab-summary input[readonly]');
+            const specimenInput = document.querySelector('#tab-summary input[readonly]');
+            const refByInput = document.querySelector('#tab-summary input[readonly]');
+
+            // Populate patient details
+            if (reportIdInput) document.getElementById('print-report-id').textContent = reportIdInput.value || 'RPT-001';
+            if (billNoInput) document.getElementById('print-bill-no').textContent = billNoInput.value || 'BIL-001';
+            if (patientInput) document.getElementById('print-patient-name').textContent = patientInput.value || 'John Doe';
+            if (ageInput) document.getElementById('print-patient-age').textContent = ageInput.value || '35';
+            if (genderInput) document.getElementById('print-patient-gender').textContent = genderInput.value || 'Male';
+            if (testTypeInput) document.getElementById('print-test-type').textContent = testTypeInput.value || 'Blood Test';
+            if (specimenInput) document.getElementById('print-specimen').textContent = specimenInput.value || 'Blood';
+            if (refByInput) document.getElementById('print-referred-by').textContent = refByInput.value || 'Dr. Smith';
+
+            // Get comments from textarea
+            const commentsInput = document.getElementById('commentsResultInput');
+            if (commentsInput) {
+                document.getElementById('print-comments').textContent = commentsInput.value || 'All test results are within normal limits. No abnormalities detected.';
+            }
+
+            // Populate footer link image if available from selected test
+            try {
+                const ctrl = window.ReportEntryController;
+                if (ctrl && ctrl.selectedTestItem && ctrl.selectedTestItem.tests && ctrl.selectedTestItem.tests.footer_text) {
+                    const footerLink = (ctrl.selectedTestItem.tests.footer_text || '').trim();
+                    if (footerLink) {
+                        const footerSection = document.getElementById('print-footer-link-section');
+                        const footerImage = document.getElementById('print-footer-link-image');
+                        if (footerSection && footerImage) {
+                            footerImage.src = footerLink;
+                            footerSection.style.display = 'block';
+                        }
+                    }
+                } else {
+                    // Hide footer section if no footer link
+                    const footerSection = document.getElementById('print-footer-link-section');
+                    if (footerSection) footerSection.style.display = 'none';
+                }
+            } catch (e) {
+                console.warn('Failed to load footer link:', e);
+            }
+
+            // Populate test results table from the results table
+            populateTestResults();
+        }
+
+        function populateTestResults() {
+            const resultsBody = document.getElementById('resultsItemsBody');
+            const printResultsBody = document.getElementById('print-results-body');
+
+            if (resultsBody && printResultsBody) {
+                const rows = resultsBody.querySelectorAll('tr');
+                let html = '';
+
+                if (rows.length === 0) {
+                    // Default sample data if no results
+                    html = `
+                        <tr>
+                            <td>Hemoglobin</td>
+                            <td>14.5</td>
+                            <td>g/dL</td>
+                            <td>12.0 - 16.0</td>
+                            <td>Normal</td>
+                        </tr>
+                        <tr>
+                            <td>White Blood Cells</td>
+                            <td>7.2</td>
+                            <td>×10³/μL</td>
+                            <td>4.0 - 11.0</td>
+                            <td>Normal</td>
+                        </tr>
+                        <tr>
+                            <td>Platelets</td>
+                            <td>250</td>
+                            <td>×10³/μL</td>
+                            <td>150 - 450</td>
+                            <td>Normal</td>
+                        </tr>
+                    `;
+                } else {
+                    // Use actual data from the table
+                    rows.forEach(row => {
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length >= 5) {
+                            const valueText = (cells[1].textContent || '').trim();
+                            const uomText = (cells[2].textContent || '').trim();
+                            const refText = (cells[3].textContent || '').trim();
+                            const remarkText = (cells[4].textContent || '').trim();
+                            const isEmptyRow = !valueText && !uomText && !refText && !remarkText;
+                            const categoryText = isEmptyRow ? '' : (cells[0].textContent || '');
+                            html += `
+                                <tr>
+                                    <td>${categoryText || '&nbsp;'}</td>
+                                    <td>${valueText || '&nbsp;'}</td>
+                                    <td>${uomText || '&nbsp;'}</td>
+                                    <td>${refText || '&nbsp;'}</td>
+                                    <td>${remarkText || '&nbsp;'}</td>
+                                </tr>
+                            `;
+                        }
+                    });
+                }
+
+                printResultsBody.innerHTML = html;
+            }
+        }
+    </script>
+    <script>
+        // Hide sub category name in empty rows within the on-screen Test Results table
+        (function () {
+            const bodyEl = document.getElementById('resultsItemsBody');
+            if (!bodyEl) return;
+
+            function suppressEmptyRowCategories() {
+                const rows = bodyEl.querySelectorAll('tr');
+                rows.forEach(tr => {
+                    const tds = tr.querySelectorAll('td');
+                    if (tds.length < 5) return;
+                    const valueText = (tds[1].textContent || '').trim();
+                    const uomText = (tds[2].textContent || '').trim();
+                    const refText = (tds[3].textContent || '').trim();
+                    const remarkText = (tds[4].textContent || '').trim();
+                    const isEmptyRow = !valueText && !uomText && !refText && !remarkText;
+                    if (isEmptyRow) {
+                        tds[0].textContent = '';
+                    }
+                });
+            }
+
+            // Initial run
+            suppressEmptyRowCategories();
+
+            // Observe for dynamic changes to the results table
+            const observer = new MutationObserver(() => suppressEmptyRowCategories());
+            observer.observe(bodyEl, { childList: true, subtree: true, characterData: true });
+        })();
+    </script>
+</body>
+
+</html>

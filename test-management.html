@@ -1,0 +1,1919 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUWAJEEWA LABORATORIES - Test Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://*.supabase.co; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self';">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .header {
+            background: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 1rem 0;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #111;
+            font-size: 1.2rem;
+        }
+
+        .logo-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 50%;
+        }
+
+        .company-name {
+            color: #007bff;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin: 0;
+        }
+
+        .company-subtitle {
+            color: #6c757d;
+            font-size: 0.8rem;
+            margin: 0;
+        }
+
+        .btn-logout {
+            background: #dc3545;
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-logout:hover {
+            background: #c82333;
+            color: white;
+        }
+
+        .content-section {
+            padding: 2rem 0;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-title {
+            font-weight: 600;
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .panel-content {
+            padding: 1.5rem;
+        }
+
+        .left-panel .panel-header {
+            background: #007bff;
+            color: white;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .middle-panel .panel-header {
+            background: #6c757d;
+            color: white;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .right-panel .panel-header {
+            background: #28a745;
+            color: white;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .form-label {
+            font-weight: 500;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-control {
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+            margin-bottom: 1rem;
+        }
+
+        .form-control:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+
+        .btn-primary {
+            background: #007bff;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 5px;
+            font-weight: 500;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+            color: white;
+        }
+
+        .note-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            color: #856404;
+            font-size: 0.9rem;
+        }
+
+        .issue-indicator {
+            background: #dc3545;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-top: 1rem;
+        }
+
+        .search-section {
+            background: #e3f2fd;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+
+        .search-section .panel-title {
+            color: #1976d2;
+            font-size: 1rem;
+        }
+
+        .table-section {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 5px;
+        }
+
+        .table-section .panel-title {
+            color: #495057;
+            font-size: 1rem;
+        }
+
+        .table {
+            margin-bottom: 0;
+        }
+
+        .table th {
+            background: #343a40;
+            color: white;
+            border: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .table td {
+            vertical-align: middle;
+            font-size: 0.9rem;
+        }
+
+        .no-data {
+            text-align: center;
+            color: #6c757d;
+            padding: 2rem;
+            font-style: italic;
+        }
+
+        .subcategory-section {
+            background: #e8f5e8;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+
+        .subcategory-section .panel-title {
+            color: #28a745;
+            font-size: 1rem;
+        }
+
+        .reference-section {
+            background: #fff3e0;
+            padding: 1rem;
+            border-radius: 5px;
+        }
+
+        .reference-section .panel-title {
+            color: #f57c00;
+            font-size: 1rem;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 5px;
+            padding: 1rem;
+            text-align: center;
+            color: #1976d2;
+            font-style: italic;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .required {
+            color: #dc3545;
+        }
+
+        .btn-refresh {
+            background: #6c757d;
+            border: none;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+
+        .btn-refresh:hover {
+            background: #545b62;
+            color: white;
+        }
+
+        .test-row:hover {
+            background-color: #e3f2fd !important;
+        }
+
+        .test-row.table-active {
+            background-color: #007bff !important;
+            color: white !important;
+        }
+
+        .test-row.table-active:hover {
+            background-color: #0056b3 !important;
+        }
+
+        .list-group-item {
+            border: 1px solid #dee2e6;
+            margin-bottom: 0.25rem;
+            border-radius: 0.25rem;
+        }
+
+        .list-group-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .suggestions-section {
+            background-color: #f8f9fa;
+            border-radius: 0.25rem;
+            margin-top: 0.5rem;
+        }
+
+        .suggestion-item {
+            background-color: white;
+            transition: background-color 0.2s;
+        }
+
+        .suggestion-item:hover {
+            background-color: #e9ecef;
+        }
+
+        .suggestion-form {
+            background-color: white;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid #dee2e6;
+        }
+
+        .suggestions-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+
+        .tag-badge {
+            background-color: #e9f5ff;
+            color: #0b5ed7;
+            border: 1px solid #b6ddff;
+            border-radius: 16px;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .tag-remove {
+            background: transparent;
+            border: none;
+            color: #0b5ed7;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .tags-input {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            padding: 0.35rem 0.5rem;
+            background: #fff;
+        }
+
+        .tags-input-field {
+            border: none;
+            outline: none;
+            min-width: 120px;
+            flex: 1 1 120px;
+            padding: 0.25rem;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .list-group-item .badge {
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .subcategory-table {
+            font-size: 0.9rem;
+        }
+
+        .subcategory-table th {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .subcategory-table td {
+            vertical-align: middle;
+        }
+
+        .suggestions-section {
+            background-color: #f8f9fa;
+            border-top: 2px solid #dee2e6;
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        /* Global default: allow horizontal scroll with nowrap (as before) */
+        .table-section .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table-section table.table {
+            white-space: nowrap; /* prevent wrapping so overflow can scroll */
+        }
+
+        /* Middle panel override: remove horizontal scroll and wrap to fit */
+        .middle-panel .table-section .table-responsive {
+            overflow-x: hidden;
+        }
+        .middle-panel .table-section table.table {
+            white-space: normal;
+            table-layout: fixed;
+        }
+        .middle-panel .table-section table.table th,
+        .middle-panel .table-section table.table td {
+            white-space: normal;
+            word-break: break-word;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation will be loaded here by nav.js -->
+
+    <!-- Content Section -->
+    <section class="content-section">
+        <div class="container-fluid">
+            <div class="row">
+                <!-- Left Panel: Test Details -->
+                <div class="col-md-4">
+                    <div class="panel left-panel">
+                        <div class="panel-header">
+                            <h3 class="panel-title">Test Details</h3>
+                        </div>
+                        <div class="panel-content">
+                            <div class="note-box">
+                                <i class="fas fa-info-circle"></i>
+                                Note: Test ID will be auto-generated when you save the test.
+                            </div>
+
+                            <form>
+                                <div class="form-group">
+                                    <label class="form-label">Test Name <span class="required">*</span></label>
+                                    <input type="text" class="form-control" placeholder="Enter test name">
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Short Name <span class="required">*</span></label>
+                                    <input type="text" class="form-control" placeholder="Enter short name">
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Price <span class="required">*</span></label>
+                                    <input type="number" class="form-control" placeholder="Enter price">
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Test Duration (Minutes) <span
+                                            class="required">*</span></label>
+                                    <input type="number" class="form-control"
+                                        placeholder="Enter test duration in minutes" min="1">
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Test Cost <span class="required">*</span></label>
+                                    <input type="number" class="form-control" placeholder="Enter test cost" step="0.01"
+                                        min="0">
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Remarks</label>
+                                    <textarea class="form-control" rows="3" placeholder="Enter remarks"></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Specimen</label>
+                                    <select class="form-control">
+                                        <option>Select Specimen</option>
+                                        <option>Blood</option>
+                                        <option>Urine</option>
+                                        <option>Stool</option>
+                                        <option>Saliva</option>
+                                        <option>Senam</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Tube</label>
+                                    <select class="form-control">
+                                        <option>Select Tube</option>
+                                        <option>Red Top</option>
+                                        <option>Purple Top</option>
+                                        <option>Blue Top</option>
+                                        <option>Green Top</option>
+                                        <option>Yellow Top</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Category</label>
+                                    <select class="form-control">
+                                        <option>Select Category</option>
+                                        <option>Hematology</option>
+                                        <option>Biochemistry</option>
+                                        <option>Microbiology</option>
+                                        <option>Immunology</option>
+                                        <option>Serology</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Active</label>
+                                    <select class="form-control">
+                                        <option selected>Active</option>
+                                        <option>Inactive</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Default Decimal Places</label>
+                                    <select class="form-control" id="test-decimal-places">
+                                        <option value="0">0</option>
+                                        <option value="1">1</option>
+                                        <option value="2" selected>2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Footer Link</label>
+                                    <textarea id="footer-text" class="form-control" rows="5" placeholder="Enter footer text for this test" wrap="off" style="overflow-x: auto; overflow-y: auto;"></textarea>
+                                    <div class="mt-2">
+                                        <small class="text-muted">Paste an image URL to preview it below.</small>
+                                        <div id="footer-preview-container" class="mt-2" style="display:none;">
+                                            <div class="border rounded p-2 bg-white" style="max-width: 380px;">
+                                                <img id="footer-preview" alt="Footer image preview" style="max-width: 100%; max-height: 200px; display:block; object-fit: contain; margin: 0 auto;" />
+                                            </div>
+                                        </div>
+                                        <div id="footer-preview-status" class="small mt-2 text-muted"></div>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-plus"></i> ADD TEST
+                                </button>
+
+                                <div class="issue-indicator">
+                                    <i class="fas fa-times"></i> 1 Issue
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Middle Panel: Test Search and List -->
+                <div class="col-md-4">
+                    <div class="panel middle-panel">
+                        <div class="panel-header">
+                            <h3 class="panel-title">Test Details</h3>
+                            <button class="btn-refresh">
+                                <i class="fas fa-sync-alt"></i> REFRESH
+                            </button>
+                        </div>
+                        <div class="panel-content">
+                            <!-- Search Section -->
+                            <div class="search-section">
+                                <h4 class="panel-title">Search</h4>
+                                <input type="text" class="form-control" id="searchInput"
+                                    placeholder="Search by Test Name or Short Name">
+                            </div>
+
+                            <!-- Table Section -->
+                            <div class="table-section">
+                                <h4 class="panel-title">Test Details</h4>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>TEST NAME</th>
+                                                <th>SHORT NAME</th>
+                                                <th>PRICE</th>
+                                                <th>ACTION</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="testTableBody">
+                                            <tr>
+                                                <td colspan="5" class="no-data">No tests found</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel: Test Sub Category and Reference Ranges -->
+                <div class="col-md-4">
+                    <div class="panel right-panel">
+                        <div class="panel-header">
+                            <h3 class="panel-title">Test Sub Category and Reference Ranges</h3>
+                        </div>
+                        <div class="panel-content">
+                            <!-- Test Sub Category Section -->
+                            <div class="subcategory-section">
+                                <h4 class="panel-title">Test Sub Category</h4>
+                                <div id="subcategoryContent">
+                                    <div class="info-box">
+                                        Please select a test from the middle panel to add sub categories.
+                                    </div>
+                                </div>
+                            </div>
+
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+
+    <!-- Supabase CDN -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+    <!-- Load configuration and services first -->
+    <script src="config/config.js"></script>
+    <script src="config/supabase.js"></script>
+    <script src="js/services/billingService.js"></script>
+    <script src="js/services/testService.js"></script>
+    <script src="js/services/referenceService.js"></script>
+    <script src="js/services/centerService.js"></script>
+    <script src="js/services/packageService.js"></script>
+    <script src="js/services/reportsService.js"></script>
+
+    <!-- Load main app -->
+    <script src="js/app.js"></script>
+    <script src="js/nav.js"></script>
+    <script>
+        // Wait for Supabase to be ready before initializing TestService
+        let testService;
+        let tests = [];
+        let allTests = [];
+        let isUpdateMode = false;
+        let selectedTestId = null;
+        let editingSubcategoryId = null;
+
+        // Initialize TestService after a short delay to ensure Supabase is ready
+        setTimeout(() => {
+            testService = new TestService();
+            console.log('TestService initialized after delay');
+            // Fetch tests after initialization
+            fetchTests();
+        }, 100);
+
+        // Footer image upload handler removed per request
+
+        // Render table rows
+        function renderTestTable() {
+            console.log('Rendering test table with tests:', tests);
+            const tbody = document.querySelector("#testTableBody");
+            if (!tbody) {
+                console.error('Table body element not found!');
+                return;
+            }
+            tbody.innerHTML = "";
+            if (tests.length === 0) {
+                console.log('No tests to display');
+                tbody.innerHTML = `<tr><td colspan="5" class="no-data">No tests found</td></tr>`;
+                return;
+            }
+            tests.forEach((test, idx) => {
+                tbody.innerHTML += `
+                    <tr class="test-row" data-test-id="${test.id}" style="cursor: pointer;">
+                        <td>${idx + 1}</td>
+                        <td>${test.test_name}</td>
+                        <td>${test.short_name}</td>
+                        <td>${test.price}</td>
+                        <td>
+                            <button class="btn btn-secondary btn-sm edit-test-btn" data-test-id="${test.id}">Edit</button>
+                            <button class="btn btn-danger btn-sm delete-test-btn" data-test-id="${test.id}">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Add click event listeners to test rows
+            document.querySelectorAll('.test-row').forEach(row => {
+                row.addEventListener('click', function () {
+                    const rawId = this.getAttribute('data-test-id');
+                    const testId = coerceId(rawId);
+                    selectTest(testId);
+                });
+            });
+
+            // Add event listeners for edit and delete buttons
+            document.querySelectorAll('.edit-test-btn').forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const rawId = this.getAttribute('data-test-id');
+                    const testId = coerceId(rawId);
+                    editTest(testId);
+                });
+            });
+
+            document.querySelectorAll('.delete-test-btn').forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const rawId = this.getAttribute('data-test-id');
+                    const testId = coerceId(rawId);
+                    deleteTest(testId);
+                });
+            });
+        }
+
+        // Fetch all tests from DB
+        async function fetchTests() {
+            try {
+                console.log('Fetching tests...');
+                tests = await testService.getAllTests();
+                console.log('Tests fetched:', tests);
+                allTests = Array.isArray(tests) ? [...tests] : [];
+                console.log('All tests array:', allTests);
+                renderTestTable();
+            } catch (err) {
+                console.error('Error fetching tests:', err);
+                alert('Failed to load tests: ' + err.message);
+            }
+        }
+
+        // Edit function implementation
+        function editTest(id) {
+            const test = tests.find(t => String(t.id) === String(id));
+            if (!test) return alert("Test not found!");
+
+            const form = document.querySelector(".left-panel form");
+            form.querySelector('input[placeholder="Enter test name"]').value = test.test_name || '';
+            form.querySelector('input[placeholder="Enter short name"]').value = test.short_name || '';
+            form.querySelector('input[placeholder="Enter price"]').value = test.price || '';
+            form.querySelector('input[placeholder="Enter test duration in minutes"]').value = test.duration || '';
+            form.querySelector('input[placeholder="Enter test cost"]').value = test.test_cost || '';
+            form.querySelector('textarea[placeholder="Enter remarks"]').value = test.remarks || '';
+            form.querySelector('textarea[placeholder="Enter footer text for this test"]').value = test.footer_text || '';
+            // Update footer preview with loaded value
+            updateFooterPreview(test.footer_text || '');
+            form.querySelectorAll('select.form-control')[0].value = test.specimen || 'Select Specimen';
+            form.querySelectorAll('select.form-control')[1].value = test.tube || 'Select Tube';
+            form.querySelectorAll('select.form-control')[2].value = test.category || 'Select Category';
+            form.querySelectorAll('select.form-control')[3].value = test.is_active ? 'Active' : 'Inactive';
+            document.getElementById('test-decimal-places').value = test.decimal_places ?? 2;
+
+            isUpdateMode = true;
+            selectedTestId = id;
+            form.querySelector('.btn.btn-primary').innerHTML = '<i class="fas fa-save"></i> UPDATE TEST';
+        }
+
+        // Add or update test from form
+        document.querySelector(".left-panel form").addEventListener("submit", async function (e) {
+            e.preventDefault();
+            const name = this.querySelector('input[placeholder="Enter test name"]').value;
+            const shortName = this.querySelector('input[placeholder="Enter short name"]').value;
+            const price = this.querySelector('input[placeholder="Enter price"]').value;
+            const duration = this.querySelector('input[placeholder="Enter test duration in minutes"]').value;
+            const testCost = this.querySelector('input[placeholder="Enter test cost"]').value;
+            const remarks = this.querySelector('textarea[placeholder="Enter remarks"]').value;
+            const specimen = this.querySelectorAll('select.form-control')[0].value;
+            const tube = this.querySelectorAll('select.form-control')[1].value;
+            const category = this.querySelectorAll('select.form-control')[2].value;
+            const status = this.querySelectorAll('select.form-control')[3].value;
+            if (!name || !shortName || !price || !duration || !testCost) return alert("Please fill required fields");
+            const testData = {
+                test_name: name,
+                short_name: shortName,
+                price: price,
+                duration: parseInt(duration),
+                test_cost: parseFloat(testCost),
+                remarks: remarks,
+                specimen: specimen !== 'Select Specimen' ? specimen : null,
+                tube: tube !== 'Select Tube' ? tube : null,
+                category: category !== 'Select Category' ? category : null,
+                footer_text: this.querySelector('textarea[placeholder="Enter footer text for this test"]').value.trim() || null,
+                is_active: status === 'Active',
+                decimal_places: parseInt(document.getElementById('test-decimal-places').value)
+            };
+            try {
+                if (isUpdateMode && selectedTestId) {
+                    await testService.updateTest(selectedTestId, testData);
+                    isUpdateMode = false;
+                    selectedTestId = null;
+                    this.querySelector('.btn.btn-primary').innerHTML = '<i class="fas fa-plus"></i> ADD TEST';
+                } else {
+                    await testService.createTest(testData);
+                }
+                await fetchTests();
+                this.reset();
+                // Clear preview after reset
+                updateFooterPreview('');
+            } catch (err) {
+                alert('Failed to ' + (isUpdateMode ? 'update' : 'add') + ' test');
+            }
+        });
+        // --- Footer preview helpers ---
+        function updateFooterPreview(url) {
+            const container = document.getElementById('footer-preview-container');
+            const img = document.getElementById('footer-preview');
+            const status = document.getElementById('footer-preview-status');
+            if (!container || !img || !status) return;
+
+            const src = (url || '').trim();
+            if (!src) {
+                container.style.display = 'none';
+                img.removeAttribute('src');
+                status.textContent = '';
+                return;
+            }
+
+            // Basic URL validation
+            try {
+                const parsed = new URL(src);
+                const isImage = /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(parsed.pathname);
+                status.textContent = isImage ? '' : 'URL does not look like an image; attempting preview...';
+            } catch (e) {
+                status.textContent = 'Invalid URL format';
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+            img.style.display = 'block';
+            img.onerror = function () {
+                status.textContent = 'Failed to load image preview';
+            };
+            img.onload = function () {
+                status.textContent = '';
+            };
+            img.src = src;
+        }
+
+        // Wire input events to live preview
+        (function wireFooterPreview() {
+            const footerText = document.getElementById('footer-text');
+            if (!footerText) return;
+            footerText.addEventListener('input', function () {
+                updateFooterPreview(this.value);
+            });
+            // Initialize once on load (for existing value)
+            updateFooterPreview(footerText.value || '');
+        })();
+
+        // Delete test
+        async function deleteTest(id) {
+            if (!confirm('Are you sure you want to delete this test?')) return;
+            try {
+                await testService.deleteTest(id);
+                await fetchTests();
+            } catch (err) {
+                console.error('Delete test failed:', err);
+                const code = err?.code || err?.cause?.code || err?.status;
+                const referenced = code === 'REFERENCED_IN_BILLS' || code === '23503' || code === 409 || (err?.message || '').toLowerCase().includes('referenced');
+                if (referenced) {
+                    const proceed = confirm('This test has been used in bills and cannot be deleted. Do you want to deactivate it instead?');
+                    if (proceed) {
+                        try {
+                            await testService.updateTest(id, { is_active: false });
+                            alert('Test deactivated successfully.');
+                            await fetchTests();
+                        } catch (e2) {
+                            console.error('Failed to deactivate test:', e2);
+                            alert('Failed to deactivate test.');
+                        }
+                    }
+                } else {
+                    alert('Failed to delete test');
+                }
+            }
+        }
+
+        // Ensure ids are the right type for Supabase filtering
+        function coerceId(rawId) {
+            // If numeric-like, parse to number; else keep as string
+            if (rawId === null || rawId === undefined) return rawId;
+            const asNumber = Number(rawId);
+            return Number.isFinite(asNumber) ? asNumber : rawId;
+        }
+
+        // Select test and load sub-categories
+        async function selectTest(testId) {
+            try {
+                selectedTestId = testId;
+                const test = tests.find(t => t.id === testId);
+
+                // Highlight selected row
+                document.querySelectorAll('.test-row').forEach(row => {
+                    row.classList.remove('table-active');
+                });
+                document.querySelector(`[data-test-id="${testId}"]`).classList.add('table-active');
+
+                // Update right panel for Sub Category form and table
+                document.querySelector('#subcategoryContent').innerHTML = `
+                    <div class="mb-3">
+                        <h6 class="text-success">Selected Test: ${test.test_name}</h6>
+                    </div>
+                    <div class="card p-3 mb-3">
+                        <h6 class="mb-3">Test Sub Category</h6>
+                        <div class="mb-2">
+                            <label class="form-label">Heading <span class="required">*</span></label>
+                            <input type="text" class="form-control" id="sc-heading" placeholder="Heading *">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">UOM <span class="required">*</span></label>
+                            <input type="text" class="form-control" id="sc-uom" placeholder="UOM *">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Decimal Places</label>
+                            <select class="form-control" id="sc-decimal-places">
+                                <option value="0" ${test.decimal_places == 0 ? 'selected' : ''}>0</option>
+                                <option value="1" ${test.decimal_places == 1 ? 'selected' : ''}>1</option>
+                                <option value="2" ${test.decimal_places == 2 || test.decimal_places == null ? 'selected' : ''}>2</option>
+                                <option value="3" ${test.decimal_places == 3 ? 'selected' : ''}>3</option>
+                                <option value="4" ${test.decimal_places == 4 ? 'selected' : ''}>4</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <h6 class="mb-2">Reference Ranges</h6>
+                            <small class="text-muted mb-2 d-block">Use ">" for greater than (e.g., >5.0) or "<" for less than (e.g., <10.0)</small>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-6"><small class="text-muted">Male Ref Range</small></div>
+                                <div class="col-md-6"><small class="text-muted">Female Ref Range</small></div>
+                                <div class="col-md-3"><input type="text" class="form-control" id="sc-male-min" placeholder="Min or >value"></div>
+                                <div class="col-md-3"><input type="text" class="form-control" id="sc-male-max" placeholder="Max or <value"></div>
+                                <div class="col-md-3"><input type="text" class="form-control" id="sc-female-min" placeholder="Min or >value"></div>
+                                <div class="col-md-3"><input type="text" class="form-control" id="sc-female-max" placeholder="Max or <value"></div>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-12"><small class="text-muted">Baby Ref Range</small></div>
+                                <div class="col-md-6"><input type="text" class="form-control" id="sc-baby-min" placeholder="Min or >value"></div>
+                                <div class="col-md-6"><input type="text" class="form-control" id="sc-baby-max" placeholder="Max or <value"></div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">SUGGESTIONS</label>
+                                <input type="text" class="form-control" id="sc-suggestion" placeholder="Suggestion (optional)">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">less or more</label>
+                                <select class="form-control" id="sc-less-more">
+                                    <option value="">Select</option>
+                                    <option value="less">Less than</option>
+                                    <option value="more">More than</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">mark</label>
+                                <input type="number" step="any" class="form-control" id="sc-less-more-mark" placeholder="Enter numeric mark (e.g., 4 or 4.5)">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">The comment that should be shown if it is more or less.</label>
+                                <input type="text" class="form-control" id="sc-less-more-comment" placeholder="Enter comment to show when condition matches">
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button id="sc-set-all" class="btn btn-secondary">SET ALL</button>
+                                <button id="sc-update" class="btn btn-primary">UPDATE</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-section">
+                        <div class="table-responsive">
+                            <table class="table table-bordered subcategory-table">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>HEADING</th>
+                                        <th>UOM</th>
+                                        <th>MALE REF RANGE</th>
+                                        <th>FEMALE REF RANGE</th>
+                                        <th>BABY REF RANGE</th>
+                                        <th>Less/More</th>
+                                        <th>Mark</th>
+                                        <th>Comment</th>
+                                        <th>suggestions</th>
+                                        <th style="width:120px;">ACTION</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="subcategoryTableBody">
+                                    <tr><td colspan="10" class="no-data">Please select a test first</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+
+                // Reference ranges UI removed per request
+
+                // Wire actions
+                document.getElementById('sc-set-all').addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    await createOrUpdateSubcategoryAndRanges();
+                });
+                document.getElementById('sc-update').addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    await createOrUpdateSubcategoryAndRanges();
+                });
+
+                // Render table
+                await renderSubcategoryTable();
+
+            } catch (error) {
+                console.error('Error selecting test:', error);
+                alert('Failed to select test');
+            }
+        }
+
+        // Load sub-categories for a test
+        async function loadSubcategories(testId) {
+            try {
+                const subcategories = await testService.getTestSubcategories(testId);
+                await renderSubcategoryTable(subcategories);
+                // For each subcategory ensure suggestions and reference sections populate when expanded
+                if (subcategories && subcategories.length) {
+                    for (const sub of subcategories) {
+                        await loadSuggestions(sub.id);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading sub-categories:', error);
+            }
+        }
+
+        // Render subcategory table rows (Heading/UOM/Male/Female/Suggestions)
+        async function renderSubcategoryTable(preloaded = null) {
+            const tbody = document.getElementById('subcategoryTableBody');
+            if (!tbody) return;
+            const list = preloaded || await testService.getTestSubcategories(selectedTestId);
+            if (!list || list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" class="no-data">No sub-categories found</td></tr>`;
+                return;
+            }
+            // Show heading as subcategory_name and UOM, but display blank rows as empty
+            tbody.innerHTML = list.map((sub, index) => {
+                const isBlankRow = sub.subcategory_name.startsWith('Blank Row');
+                return `
+                <tr>
+                    <td>${isBlankRow ? '' : sub.subcategory_name}</td>
+                    <td>${sub.uom || ''}</td>
+                    <td id="row-male-${sub.id}">—</td>
+                    <td id="row-female-${sub.id}">—</td>
+                    <td id="row-baby-${sub.id}">—</td>
+                    <td>${sub.less_more ? (sub.less_more === 'less' ? 'Less than' : 'More than') : ''}</td>
+                    <td>${sub.less_more_mark ?? ''}</td>
+                    <td>${sub.less_more_comment || ''}</td>
+                    <td>
+                        <button class="btn btn-info btn-sm toggle-suggestions-btn" data-subcategory-id="${sub.id}">
+                            <i class="fas fa-comments"></i>
+                        </button>
+                    </td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm move-up-btn" data-subcategory-id="${sub.id}" data-index="${index}" ${index === 0 ? 'disabled' : ''}>
+                            <i class="fas fa-arrow-up"></i>
+                        </button>
+                        <button class="btn btn-secondary btn-sm move-down-btn" data-subcategory-id="${sub.id}" data-index="${index}" ${index === list.length - 1 ? 'disabled' : ''}>
+                            <i class="fas fa-arrow-down"></i>
+                        </button>
+                        <button class="btn btn-secondary btn-sm edit-subcategory-btn" data-subcategory-id="${sub.id}"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-danger btn-sm delete-subcategory-btn" data-subcategory-id="${sub.id}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                <tr id="suggestions-row-${sub.id}" style="display: none;">
+                    <td colspan="10" class="p-0">
+                        <div id="suggestions-${sub.id}" class="suggestions-section">
+                            <div class="p-3">
+                                <h6 class="text-info">Suggestions for ${isBlankRow ? 'Blank Row' : sub.subcategory_name}</h6>
+                                <div class="suggestion-form mb-3">
+                                    <div class="tags-input" id="tags-input-${sub.id}" data-subcategory-id="${sub.id}">
+                                        <div id="tags-inline-${sub.id}" class="tags-container"></div>
+                                        <input type="text" id="tags-field-${sub.id}" class="tags-input-field" placeholder="Type and press Enter" data-subcategory-id="${sub.id}">
+                                    </div>
+                                    <div class="text-end mt-2">
+                                        <button class="btn btn-info btn-sm submit-tags-btn" data-subcategory-id="${sub.id}"><i class="fas fa-plus"></i> Add</button>
+                                    </div>
+                                </div>
+                                <div id="suggestions-list-${sub.id}" class="suggestions-list mb-3 tags-container"></div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                `;
+            }).join('');
+            // Populate male/female preview columns from existing ranges
+            for (const sub of list) {
+                const refs = await testService.getSubcategoryReferenceRanges(sub.id);
+                const male = refs.find(r => r.gender === 'Male');
+                const female = refs.find(r => r.gender === 'Female');
+                const maleCell = document.getElementById(`row-male-${sub.id}`);
+                const femaleCell = document.getElementById(`row-female-${sub.id}`);
+                const baby = refs.find(r => r.gender === 'Baby');
+                const babyCell = document.getElementById(`row-baby-${sub.id}`);
+                
+                // Format male range display
+                if (maleCell) {
+                    if (male) {
+                        const minVal = male.min_value ?? '';
+                        const maxVal = male.max_value ?? '';
+                        if (minVal && maxVal) {
+                            maleCell.textContent = `${minVal} - ${maxVal}`;
+                        } else if (minVal) {
+                            maleCell.textContent = minVal;
+                        } else if (maxVal) {
+                            maleCell.textContent = maxVal;
+                        } else {
+                            maleCell.textContent = '—';
+                        }
+                    } else {
+                        maleCell.textContent = '—';
+                    }
+                }
+                
+                // Format female range display
+                if (femaleCell) {
+                    if (female) {
+                        const minVal = female.min_value ?? '';
+                        const maxVal = female.max_value ?? '';
+                        if (minVal && maxVal) {
+                            femaleCell.textContent = `${minVal} - ${maxVal}`;
+                        } else if (minVal) {
+                            femaleCell.textContent = minVal;
+                        } else if (maxVal) {
+                            femaleCell.textContent = maxVal;
+                        } else {
+                            femaleCell.textContent = '—';
+                        }
+                    } else {
+                        femaleCell.textContent = '—';
+                    }
+                }
+                // Format baby range display
+                if (babyCell) {
+                    if (baby) {
+                        const minVal = baby.min_value ?? '';
+                        const maxVal = baby.max_value ?? '';
+                        if (minVal && maxVal) {
+                            babyCell.textContent = `${minVal} - ${maxVal}`;
+                        } else if (minVal) {
+                            babyCell.textContent = minVal;
+                        } else if (maxVal) {
+                            babyCell.textContent = maxVal;
+                        } else {
+                            babyCell.textContent = '—';
+                        }
+                    } else {
+                        babyCell.textContent = '—';
+                    }
+                }
+            }
+
+            // Add event listeners for subcategory buttons
+            document.querySelectorAll('.toggle-suggestions-btn').forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const subcategoryId = this.getAttribute('data-subcategory-id');
+                    toggleSuggestions(subcategoryId);
+                });
+            });
+
+            document.querySelectorAll('.delete-subcategory-btn').forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const subcategoryId = this.getAttribute('data-subcategory-id');
+                    deleteSubcategory(subcategoryId);
+                });
+            });
+
+            document.querySelectorAll('.edit-subcategory-btn').forEach(btn => {
+                btn.addEventListener('click', async function (e) {
+                    e.stopPropagation();
+                    const subcategoryId = this.getAttribute('data-subcategory-id');
+                    await editSubcategory(subcategoryId);
+                });
+            });
+
+            document.querySelectorAll('.submit-tags-btn').forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const subcategoryId = this.getAttribute('data-subcategory-id');
+                    submitTags(subcategoryId);
+                });
+            });
+
+            document.querySelectorAll('.tags-input').forEach(input => {
+                input.addEventListener('click', function (e) {
+                    const subcategoryId = this.getAttribute('data-subcategory-id');
+                    focusTagsField(subcategoryId);
+                });
+            });
+
+            document.querySelectorAll('.tags-input-field').forEach(input => {
+                input.addEventListener('keydown', function (e) {
+                    const subcategoryId = this.getAttribute('data-subcategory-id');
+                    handleTagsKey(e, subcategoryId);
+                });
+            });
+
+            document.querySelectorAll('.move-up-btn').forEach(btn => {
+                btn.addEventListener('click', async function (e) {
+                    e.stopPropagation();
+                    const index = parseInt(this.getAttribute('data-index'));
+                    await moveSubcategory(index, index - 1);
+                });
+            });
+
+            document.querySelectorAll('.move-down-btn').forEach(btn => {
+                btn.addEventListener('click', async function (e) {
+                    e.stopPropagation();
+                    const index = parseInt(this.getAttribute('data-index'));
+                    await moveSubcategory(index, index + 1);
+                });
+            });
+
+            // Use event delegation for dynamically created elements
+            document.addEventListener('click', function (e) {
+                if (e.target.classList.contains('delete-reference-range-btn')) {
+                    e.stopPropagation();
+                    const referenceId = e.target.getAttribute('data-reference-id');
+                    deleteReferenceRange(referenceId);
+                }
+
+                if (e.target.classList.contains('delete-suggestion-btn')) {
+                    e.stopPropagation();
+                    const suggestionId = e.target.getAttribute('data-suggestion-id');
+                    const subcategoryId = e.target.getAttribute('data-subcategory-id');
+                    deleteSuggestion(suggestionId, subcategoryId);
+                }
+            });
+        }
+
+        // Helper function to validate reference range input
+        function validateReferenceRangeInput(value, fieldName) {
+            if (!value) return { valid: true, value: null };
+            
+            // Check if it starts with > or < and has a number after
+            if (value.startsWith('>') || value.startsWith('<')) {
+                const numPart = value.substring(1).trim();
+                if (isNaN(parseFloat(numPart))) {
+                    return { valid: false, error: `${fieldName} must have a valid number after ${value[0]}` };
+                }
+                return { valid: true, value: value };
+            }
+            
+            // Check if it's a valid number
+            if (isNaN(parseFloat(value))) {
+                return { valid: false, error: `${fieldName} must be a valid number or start with > or <` };
+            }
+            
+            // For now, store as string to avoid database issues
+            return { valid: true, value: value.toString() };
+        }
+
+        // Create or update subcategory with ranges
+        async function createOrUpdateSubcategoryAndRanges() {
+            const heading = document.getElementById('sc-heading').value.trim();
+            const uom = document.getElementById('sc-uom').value.trim();
+            const maleMin = document.getElementById('sc-male-min').value.trim();
+            const maleMax = document.getElementById('sc-male-max').value.trim();
+            const femaleMin = document.getElementById('sc-female-min').value.trim();
+            const femaleMax = document.getElementById('sc-female-max').value.trim();
+            const babyMin = document.getElementById('sc-baby-min').value.trim();
+            const babyMax = document.getElementById('sc-baby-max').value.trim();
+            const suggestion = document.getElementById('sc-suggestion').value.trim();
+            const lessMore = (document.getElementById('sc-less-more')?.value || '').trim();
+            const lessMoreComment = (document.getElementById('sc-less-more-comment')?.value || '').trim();
+            const lessMoreMarkRaw = (document.getElementById('sc-less-more-mark')?.value || '').trim();
+            const lessMoreMark = lessMoreMarkRaw === '' ? null : parseFloat(lessMoreMarkRaw);
+            const decimalPlaces = parseInt(document.getElementById('sc-decimal-places').value);
+
+            if (lessMoreMarkRaw !== '' && (isNaN(lessMoreMark) || !isFinite(lessMoreMark))) {
+                alert('Mark must be a valid number');
+                return;
+            }
+
+            // Validate reference range inputs
+            const maleMinValidation = validateReferenceRangeInput(maleMin, 'Male Min');
+            const maleMaxValidation = validateReferenceRangeInput(maleMax, 'Male Max');
+            const femaleMinValidation = validateReferenceRangeInput(femaleMin, 'Female Min');
+            const femaleMaxValidation = validateReferenceRangeInput(femaleMax, 'Female Max');
+            const babyMinValidation = validateReferenceRangeInput(babyMin, 'Baby Min');
+            const babyMaxValidation = validateReferenceRangeInput(babyMax, 'Baby Max');
+
+            if (!maleMinValidation.valid) {
+                alert(maleMinValidation.error);
+                return;
+            }
+            if (!maleMaxValidation.valid) {
+                alert(maleMaxValidation.error);
+                return;
+            }
+            if (!femaleMinValidation.valid) {
+                alert(femaleMinValidation.error);
+                return;
+            }
+            if (!femaleMaxValidation.valid) {
+                alert(femaleMaxValidation.error);
+                return;
+            }
+            if (!babyMinValidation.valid) {
+                alert(babyMinValidation.error);
+                return;
+            }
+            if (!babyMaxValidation.valid) {
+                alert(babyMaxValidation.error);
+                return;
+            }
+
+            // If all inputs are empty, create and save a blank subcategory row
+            if (!heading && !uom && !maleMin && !maleMax && !femaleMin && !femaleMax && !babyMin && !babyMax && !suggestion && !lessMore && !lessMoreComment && lessMoreMarkRaw === '') {
+                try {
+                    await testService.addTestSubcategory(selectedTestId, '', null, { decimal_places: decimalPlaces });
+                    await renderSubcategoryTable();
+                } catch (error) {
+                    console.error('Error creating blank subcategory:', error);
+                    alert('Failed to create blank subcategory');
+                }
+                return;
+            }
+
+            // Allow saving with Heading only; UOM is optional
+            if (!heading) {
+                alert('Please fill Heading');
+                return;
+            }
+
+            try {
+                if (editingSubcategoryId) {
+                    // Update existing subcategory
+                    await testService.updateTestSubcategory(editingSubcategoryId, { subcategory_name: heading || '', uom: uom || null, less_more: lessMore || null, less_more_comment: lessMoreComment || null, less_more_mark: lessMoreMark, decimal_places: decimalPlaces });
+
+                    // Upsert male/female reference ranges if values provided
+                    const existingRefs = await testService.getSubcategoryReferenceRanges(editingSubcategoryId);
+                    const maleRef = existingRefs.find(r => r.gender === 'Male');
+                    const femaleRef = existingRefs.find(r => r.gender === 'Female');
+                    const babyRef = existingRefs.find(r => r.gender === 'Baby');
+
+                    const ops = [];
+                    if (maleMinValidation.value || maleMaxValidation.value) {
+                        if (maleRef) {
+                            ops.push(testService.updateReferenceRange(maleRef.id, {
+                                min_value: maleMinValidation.value,
+                                max_value: maleMaxValidation.value
+                            }));
+                        } else {
+                            ops.push(testService.addReferenceRange({
+                                test_id: selectedTestId,
+                                subcategory_id: editingSubcategoryId,
+                                gender: 'Male',
+                                age_min: null,
+                                age_max: null,
+                                min_value: maleMinValidation.value,
+                                max_value: maleMaxValidation.value,
+                                unit: null
+                            }));
+                        }
+                    }
+                    if (femaleMinValidation.value || femaleMaxValidation.value) {
+                        if (femaleRef) {
+                            ops.push(testService.updateReferenceRange(femaleRef.id, {
+                                min_value: femaleMinValidation.value,
+                                max_value: femaleMaxValidation.value
+                            }));
+                        } else {
+                            ops.push(testService.addReferenceRange({
+                                test_id: selectedTestId,
+                                subcategory_id: editingSubcategoryId,
+                                gender: 'Female',
+                                age_min: null,
+                                age_max: null,
+                                min_value: femaleMinValidation.value,
+                                max_value: femaleMaxValidation.value,
+                                unit: null
+                            }));
+                        }
+                    }
+                    if (babyMinValidation.value || babyMaxValidation.value) {
+                        if (babyRef) {
+                            ops.push(testService.updateReferenceRange(babyRef.id, {
+                                min_value: babyMinValidation.value,
+                                max_value: babyMaxValidation.value
+                            }));
+                        } else {
+                            ops.push(testService.addReferenceRange({
+                                test_id: selectedTestId,
+                                subcategory_id: editingSubcategoryId,
+                                gender: 'Baby',
+                                age_min: null,
+                                age_max: null,
+                                min_value: babyMinValidation.value,
+                                max_value: babyMaxValidation.value,
+                                unit: null
+                            }));
+                        }
+                    }
+                    if (suggestion) {
+                        ops.push(testService.addSubcategorySuggestion(editingSubcategoryId, { suggestion_text: suggestion }));
+                    }
+                    if (ops.length) await Promise.all(ops);
+
+                    // Clear editing state
+                    editingSubcategoryId = null;
+                } else {
+                    // Create subcategory (using heading as name)
+                    const sub = await testService.addTestSubcategory(selectedTestId, heading, uom, { less_more: lessMore || null, less_more_comment: lessMoreComment || null, less_more_mark: lessMoreMark, decimal_places: decimalPlaces });
+                    // Batch all subsequent writes to speed up inserts
+                    const writeOperations = [];
+                    if (maleMinValidation.value || maleMaxValidation.value) {
+                        writeOperations.push(
+                            testService.addReferenceRange({
+                                test_id: selectedTestId,
+                                subcategory_id: sub.id,
+                                gender: 'Male',
+                                age_min: null,
+                                age_max: null,
+                                min_value: maleMinValidation.value,
+                                max_value: maleMaxValidation.value,
+                                unit: null
+                            })
+                        );
+                    }
+                    if (femaleMinValidation.value || femaleMaxValidation.value) {
+                        writeOperations.push(
+                            testService.addReferenceRange({
+                                test_id: selectedTestId,
+                                subcategory_id: sub.id,
+                                gender: 'Female',
+                                age_min: null,
+                                age_max: null,
+                                min_value: femaleMinValidation.value,
+                                max_value: femaleMaxValidation.value,
+                                unit: null
+                            })
+                        );
+                    }
+                    if (babyMinValidation.value || babyMaxValidation.value) {
+                        writeOperations.push(
+                            testService.addReferenceRange({
+                                test_id: selectedTestId,
+                                subcategory_id: sub.id,
+                                gender: 'Baby',
+                                age_min: null,
+                                age_max: null,
+                                min_value: babyMinValidation.value,
+                                max_value: babyMaxValidation.value,
+                                unit: null
+                            })
+                        );
+                    }
+                    if (suggestion) {
+                        writeOperations.push(
+                            testService.addSubcategorySuggestion(sub.id, { suggestion_text: suggestion })
+                        );
+                    }
+                    if (writeOperations.length) {
+                        await Promise.all(writeOperations);
+                    }
+                }
+
+                // Clear inputs and refresh table
+                document.getElementById('sc-heading').value = '';
+                document.getElementById('sc-uom').value = '';
+                document.getElementById('sc-decimal-places').value = '2';
+                document.getElementById('sc-male-min').value = '';
+                document.getElementById('sc-male-max').value = '';
+                document.getElementById('sc-female-min').value = '';
+                document.getElementById('sc-female-max').value = '';
+                document.getElementById('sc-baby-min').value = '';
+                document.getElementById('sc-baby-max').value = '';
+                document.getElementById('sc-suggestion').value = '';
+                const _lmSel = document.getElementById('sc-less-more');
+                if (_lmSel) _lmSel.value = '';
+                const _lmCmt = document.getElementById('sc-less-more-comment');
+                if (_lmCmt) _lmCmt.value = '';
+                const _lmMark = document.getElementById('sc-less-more-mark');
+                if (_lmMark) _lmMark.value = '';
+
+                await renderSubcategoryTable();
+            } catch (error) {
+                console.error('Error saving subcategory and ranges:', error);
+                alert('Failed to save');
+            }
+        }
+
+        async function editSubcategory(subcategoryId) {
+            try {
+                const subcategories = await testService.getTestSubcategories(selectedTestId);
+                const sub = subcategories.find(s => String(s.id) === String(subcategoryId));
+                if (!sub) return alert('Subcategory not found');
+
+                // Prefill Heading and UOM
+                document.getElementById('sc-heading').value = sub.subcategory_name.startsWith('Blank Row') ? '' : (sub.subcategory_name || '');
+                document.getElementById('sc-uom').value = sub.uom || '';
+                document.getElementById('sc-decimal-places').value = sub.decimal_places ?? 2;
+
+                // Prefill reference ranges if present
+                const refs = await testService.getSubcategoryReferenceRanges(sub.id);
+                const male = refs.find(r => r.gender === 'Male');
+                const female = refs.find(r => r.gender === 'Female');
+                const baby = refs.find(r => r.gender === 'Baby');
+
+                document.getElementById('sc-male-min').value = male?.min_value ?? '';
+                document.getElementById('sc-male-max').value = male?.max_value ?? '';
+                document.getElementById('sc-female-min').value = female?.min_value ?? '';
+                document.getElementById('sc-female-max').value = female?.max_value ?? '';
+                document.getElementById('sc-baby-min').value = baby?.min_value ?? '';
+                document.getElementById('sc-baby-max').value = baby?.max_value ?? '';
+
+                // Prefill less/more fields if present
+                const lmSel = document.getElementById('sc-less-more');
+                if (lmSel) lmSel.value = sub.less_more || '';
+                const lmCmt = document.getElementById('sc-less-more-comment');
+                if (lmCmt) lmCmt.value = sub.less_more_comment || '';
+                const lmMark = document.getElementById('sc-less-more-mark');
+                if (lmMark) lmMark.value = (sub.less_more_mark ?? '')
+
+                // Set editing state
+                editingSubcategoryId = sub.id;
+
+                // Focus the heading field
+                document.getElementById('sc-heading').focus();
+            } catch (error) {
+                console.error('Error editing subcategory:', error);
+                alert('Failed to start edit');
+            }
+        }
+
+        
+
+        // Removed global test-level reference ranges loader
+
+        // Load reference ranges for a specific subcategory
+        /* Removed subcategory reference range UI */
+        /*async function loadSubcategoryReferenceRanges(subcategoryId) {
+            try {
+                const references = await testService.getSubcategoryReferenceRanges(subcategoryId);
+                const container = document.getElementById(`reference-list-${subcategoryId}`);
+
+                if (!container) return;
+
+                if (!references || references.length === 0) {
+                    container.innerHTML = '<div class="text-muted small">No reference ranges yet</div>';
+                    return;
+                }
+
+                container.innerHTML = references.map(ref => `
+                    <div class="suggestion-item d-flex justify-content-between align-items-center p-2 border rounded mb-1">
+                        <span class="small"><strong>${ref.gender}</strong> ${ref.min_value || ref.max_value ? `: ${ref.min_value || '0'} - ${ref.max_value || '∞'} ${ref.unit || ''}` : ''}</span>
+                        <button class="btn btn-danger btn-sm delete-reference-range-btn" data-reference-id="${ref.id}" title="Delete Range">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading subcategory reference ranges:', error);
+            }
+        }*/
+
+        // Add reference range for a specific subcategory
+        /*async function addSubcategoryReferenceRange(e, subcategoryId) {
+            e.preventDefault();
+            const gender = document.getElementById(`ref-gender-${subcategoryId}`).value;
+            const unit = document.getElementById(`ref-unit-${subcategoryId}`).value.trim();
+            const minValue = document.getElementById(`ref-min-${subcategoryId}`).value ? parseFloat(document.getElementById(`ref-min-${subcategoryId}`).value) : null;
+            const maxValue = document.getElementById(`ref-max-${subcategoryId}`).value ? parseFloat(document.getElementById(`ref-max-${subcategoryId}`).value) : null;
+
+            if (!gender) {
+                alert('Please select gender');
+                return;
+            }
+
+            try {
+                await testService.addReferenceRange({
+                    test_id: selectedTestId,
+                    subcategory_id: subcategoryId,
+                    gender: gender,
+                    age_min: null,
+                    age_max: null,
+                    min_value: minValue,
+                    max_value: maxValue,
+                    unit: unit
+                });
+
+                // Reset just the inputs for this subcategory
+                document.getElementById(`ref-gender-${subcategoryId}`).value = '';
+                document.getElementById(`ref-unit-${subcategoryId}`).value = '';
+                document.getElementById(`ref-min-${subcategoryId}`).value = '';
+                document.getElementById(`ref-max-${subcategoryId}`).value = '';
+
+                await loadSubcategoryReferenceRanges(subcategoryId);
+                alert('Reference range added successfully!');
+            } catch (error) {
+                console.error('Error adding subcategory reference range:', error);
+                alert('Failed to add reference range');
+            }
+        }*/
+
+        // Add sub-category
+        async function addSubcategory(e) {
+            e.preventDefault();
+            const subcategoryName = document.getElementById('subcategoryName').value.trim();
+
+            if (!subcategoryName) {
+                alert('Please enter a sub-category name');
+                return;
+            }
+
+            try {
+                await testService.addTestSubcategory(selectedTestId, subcategoryName);
+                document.getElementById('subcategoryName').value = '';
+                await loadSubcategories(selectedTestId);
+
+                // Get updated count for success message
+                const subcategories = await testService.getTestSubcategories(selectedTestId);
+                alert(`Sub-category "${subcategoryName}" added successfully! Total sub-categories: ${subcategories.length}`);
+            } catch (error) {
+                console.error('Error adding sub-category:', error);
+                alert('Failed to add sub-category');
+            }
+        }
+
+        // Add reference range
+        async function addReferenceRange(e) {
+            e.preventDefault();
+            const gender = document.getElementById('referenceGender').value;
+            const unit = document.getElementById('referenceUnit').value.trim();
+            const minValue = document.getElementById('minValue').value ? parseFloat(document.getElementById('minValue').value) : null;
+            const maxValue = document.getElementById('maxValue').value ? parseFloat(document.getElementById('maxValue').value) : null;
+
+            if (!gender) {
+                alert('Please select gender');
+                return;
+            }
+
+            try {
+                await testService.addReferenceRange({
+                    test_id: selectedTestId,
+                    gender: gender,
+                    age_min: null,
+                    age_max: null,
+                    min_value: minValue,
+                    max_value: maxValue,
+                    unit: unit
+                });
+
+                // Reset form
+                document.getElementById('referenceForm').reset();
+                // refresh handled in subcategory loader
+                alert('Reference range added successfully!');
+            } catch (error) {
+                console.error('Error adding reference range:', error);
+                alert('Failed to add reference range');
+            }
+        }
+
+        // Delete sub-category
+        async function deleteSubcategory(subcategoryId) {
+            if (!confirm('Are you sure you want to delete this sub-category?')) return;
+
+            try {
+                await testService.deleteTestSubcategory(subcategoryId);
+                await loadSubcategories(selectedTestId);
+                alert('Sub-category deleted successfully!');
+            } catch (error) {
+                console.error('Error deleting sub-category:', error);
+                alert('Failed to delete sub-category');
+            }
+        }
+
+        // Move subcategory up/down
+        async function moveSubcategory(fromIndex, toIndex) {
+            try {
+                const subcategories = await testService.getTestSubcategories(selectedTestId);
+                // Swap the two subcategories
+                const temp = subcategories[fromIndex];
+                subcategories[fromIndex] = subcategories[toIndex];
+                subcategories[toIndex] = temp;
+
+                // Update sort_order for all subcategories in the new order
+                const sortOrders = subcategories.map((sub, index) => ({
+                    id: sub.id,
+                    sort_order: index + 1
+                }));
+
+                await testService.updateSubcategorySortOrders(selectedTestId, sortOrders);
+                await renderSubcategoryTable(subcategories);
+            } catch (error) {
+                console.error('Error moving subcategory:', error);
+                alert('Failed to move subcategory');
+            }
+        }
+
+        // Delete reference range
+        async function deleteReferenceRange(referenceId) {
+            if (!confirm('Are you sure you want to delete this reference range?')) return;
+
+            try {
+                await testService.deleteReferenceRange(referenceId);
+                // refresh handled in subcategory loader
+                alert('Reference range deleted successfully!');
+            } catch (error) {
+                console.error('Error deleting reference range:', error);
+                alert('Failed to delete reference range');
+            }
+        }
+
+        // Toggle suggestions section
+        function toggleSuggestions(subcategoryId) {
+            const suggestionsRow = document.getElementById(`suggestions-row-${subcategoryId}`);
+            if (suggestionsRow.style.display === 'none') {
+                suggestionsRow.style.display = 'table-row';
+                // Load suggestions when opening
+                loadSuggestions(subcategoryId);
+            } else {
+                suggestionsRow.style.display = 'none';
+            }
+        }
+
+        // Load suggestions for a subcategory (render as tags)
+        async function loadSuggestions(subcategoryId) {
+            try {
+                const suggestions = await testService.getSubcategorySuggestions(subcategoryId);
+                const suggestionsList = document.getElementById(`suggestions-list-${subcategoryId}`);
+                const inline = document.getElementById(`tags-inline-${subcategoryId}`);
+
+                if (suggestions.length === 0) {
+                    suggestionsList.innerHTML = '<div class="text-muted small">No suggestions found</div>';
+                    if (inline) inline.innerHTML = '';
+                    return;
+                }
+
+                suggestionsList.innerHTML = suggestions.map(suggestion => `
+                    <span class="tag-badge">
+                        ${suggestion.suggestion_text}
+                        <button class="tag-remove delete-suggestion-btn" data-suggestion-id="${suggestion.id}" data-subcategory-id="${subcategoryId}" title="Remove">×</button>
+                    </span>
+                `).join('');
+
+                if (inline) {
+                    inline.innerHTML = suggestions.map(suggestion => `
+                        <span class=\"tag-badge\">
+                            ${suggestion.suggestion_text}
+                            <button class=\"tag-remove delete-suggestion-btn\" data-suggestion-id=\"${suggestion.id}\" data-subcategory-id=\"${subcategoryId}\" title=\"Remove\">×</button>
+                        </span>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading suggestions:', error);
+            }
+        }
+
+        // Add multiple suggestion tags (comma separated)
+        async function addSuggestionTags(e, subcategoryId) {
+            e.preventDefault();
+            const input = document.getElementById(`suggestion-text-${subcategoryId}`);
+            const raw = input.value.trim();
+            if (!raw) {
+                alert('Please enter at least one tag');
+                return;
+            }
+            const tags = raw.split(',').map(t => t.trim()).filter(Boolean);
+            if (tags.length === 0) return;
+            try {
+                await Promise.all(tags.map(tag => (
+                    testService.addSubcategorySuggestion(subcategoryId, {
+                        suggestion_text: tag,
+                        suggestion_type: 'tag'
+                    })
+                )));
+                input.value = '';
+                await loadSuggestions(subcategoryId);
+            } catch (error) {
+                console.error('Error adding tags:', error);
+                alert('Failed to add tags');
+            }
+        }
+
+        // --- YouTube-like tag input helpers ---
+        function focusTagsField(subcategoryId) {
+            const field = document.getElementById(`tags-field-${subcategoryId}`);
+            if (field) field.focus();
+        }
+
+        async function handleTagsKey(event, subcategoryId) {
+            const field = event.target;
+            if (event.key === 'Enter' || event.key === ',') {
+                event.preventDefault();
+                const value = field.value.trim().replace(/,$/, '');
+                if (!value) return;
+                await addTagsArray([value], subcategoryId);
+                field.value = '';
+            } else if (event.key === 'Backspace' && field.value === '') {
+                // Optional: remove last tag visually by deleting last suggestion
+                // Skipped to avoid accidental deletes.
+            }
+        }
+
+        async function submitTags(subcategoryId) {
+            const field = document.getElementById(`tags-field-${subcategoryId}`);
+            if (!field) return;
+            const raw = field.value.trim();
+            if (!raw) return;
+            const parts = raw.split(',').map(t => t.trim()).filter(Boolean);
+            if (parts.length === 0) return;
+            await addTagsArray(parts, subcategoryId);
+            field.value = '';
+        }
+
+        async function addTagsArray(tags, subcategoryId) {
+            try {
+                await Promise.all(tags.map(tag => (
+                    testService.addSubcategorySuggestion(subcategoryId, {
+                        suggestion_text: tag,
+                        suggestion_type: 'tag'
+                    })
+                )));
+                await loadSuggestions(subcategoryId);
+            } catch (error) {
+                console.error('Error adding tags array:', error);
+                alert('Failed to add tags');
+            }
+        }
+
+        // Add suggestion
+        async function addSuggestion(e, subcategoryId) {
+            e.preventDefault();
+            const suggestionText = document.getElementById(`suggestion-text-${subcategoryId}`).value.trim();
+
+            if (!suggestionText) {
+                alert('Please enter suggestion text');
+                return;
+            }
+
+            try {
+                await testService.addSubcategorySuggestion(subcategoryId, {
+                    suggestion_text: suggestionText,
+                    suggestion_type: 'general'
+                });
+
+                document.getElementById(`suggestion-text-${subcategoryId}`).value = '';
+                await loadSuggestions(subcategoryId);
+                alert('Suggestion added successfully!');
+            } catch (error) {
+                console.error('Error adding suggestion:', error);
+                alert('Failed to add suggestion');
+            }
+        }
+
+        // Delete suggestion
+        async function deleteSuggestion(suggestionId, subcategoryId) {
+            if (!confirm('Are you sure you want to delete this suggestion?')) return;
+
+            try {
+                await testService.deleteSubcategorySuggestion(suggestionId);
+                await loadSuggestions(subcategoryId);
+                alert('Suggestion deleted successfully!');
+            } catch (error) {
+                console.error('Error deleting suggestion:', error);
+                alert('Failed to delete suggestion');
+            }
+        }
+
+        // Search functionality (client-side filter on loaded tests)
+        document.getElementById('searchInput').addEventListener('input', function () {
+            const term = this.value.trim().toLowerCase();
+            if (!term) {
+                tests = [...allTests];
+                renderTestTable();
+                return;
+            }
+            const words = term.split(/\s+/).filter(Boolean);
+            tests = allTests.filter(t => {
+                const hay = `${t.test_name || ''} ${t.short_name || ''}`.toLowerCase();
+                return words.every(w => hay.includes(w));
+            });
+            renderTestTable();
+        });
+    </script>
+</body>
+
+</html>
