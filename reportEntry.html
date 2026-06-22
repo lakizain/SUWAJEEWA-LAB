@@ -1007,7 +1007,8 @@
                     rows.forEach(row => {
                         const cells = row.querySelectorAll('td');
                         if (cells.length >= 5) {
-                            const valueText = (cells[1].textContent || '').trim();
+                            const valueInput = cells[1].querySelector('input');
+                            const valueText = (valueInput ? valueInput.value : cells[1].textContent || '').trim();
                             const uomText = (cells[2].textContent || '').trim();
                             const refText = (cells[3].textContent || '').trim();
                             const remarkText = (cells[4].textContent || '').trim();

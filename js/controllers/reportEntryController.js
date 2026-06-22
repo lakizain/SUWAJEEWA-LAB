@@ -2307,21 +2307,10 @@ class ReportEntryController {
         if (cells.length < 4) return "";
 
         const category = (cells[0]?.textContent || "").trim();
-        let value = cells[1]?.querySelector("input")?.value || "";
+        const value = (cells[1]?.querySelector("input")?.value || "").trim();
         const uom = (cells[2]?.textContent || "").trim();
         const ref = (cells[3]?.textContent || "").trim();
-        const remark = cells[4]?.querySelector("input")?.value || "";
-
-        // Get subcategory and apply decimal formatting
-        if (this.currentSubcategories && this.currentSubcategories[rowIndex]) {
-          const sub = this.currentSubcategories[rowIndex];
-          const dp = this.getValueDecimalPlacesForSubcategory(sub);
-          // If the value is a number, format it to the correct decimal places
-          const numValue = parseFloat(value);
-          if (!isNaN(numValue) && value.trim() !== "") {
-            value = this.limitValueInputToDecimals(String(numValue), true, dp);
-          }
-        }
+        const remark = (cells[4]?.querySelector("input")?.value || "").trim();
 
         const hasAny =
           category ||
