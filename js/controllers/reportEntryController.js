@@ -564,14 +564,19 @@ class ReportEntryController {
         if (this._autoCalcLock) return;
         this._autoCalcLock = true;
         try {
+          const calcDp = 2;
+          const fmtFixed = (n) =>
+            n == null || !Number.isFinite(n) ? "" : Number(n).toFixed(calcDp);
           const r6 = v3 == null ? null : v3 / 5;
-          if (inputs[i6]) inputs[i6].value = this.formatValueForInput(r6);
+          // Row 6 is calculated; keep trailing zeros to always show 2 decimal places
+          if (inputs[i6]) inputs[i6].value = fmtFixed(r6);
 
           const r4 = (v1 == null || v2 == null || r6 == null) ? null : v1 - v2 - r6;
-          if (inputs[i4]) inputs[i4].value = this.formatValueForInput(r4);
+          // Row 4 is calculated; keep trailing zeros to always show 2 decimal places
+          if (inputs[i4]) inputs[i4].value = fmtFixed(r4);
 
           const r5 = (v1 == null || v2 == null || v2 === 0) ? null : v1 / v2;
-          if (inputs[i5]) inputs[i5].value = this.formatValueForInput(r5);
+          if (inputs[i5]) inputs[i5].value = this.formatValueForInput(r5, true, calcDp);
 
           // Trigger remark updates for affected rows
           [i4, i5, i6].forEach((idx) => {
@@ -616,7 +621,7 @@ class ReportEntryController {
           this._autoCalcLock = false;
         }
       },
-      // ba643e33...: ROW3 = ROW1 - ROW2; ROW4 = ROW2 / ROW3
+      // ba643e33...: ROW5 = ROW6 + ROW7
       "ba643e33-6ec9-4de7-b9d2-e266102cbb40": (inputs) => {
         const parse = (el) => {
           const raw = (el?.value || "").trim();
@@ -624,25 +629,20 @@ class ReportEntryController {
           return Number.isNaN(n) ? null : n;
         };
 
-        if (!Array.isArray(inputs) || inputs.length < 4) return;
+        if (!Array.isArray(inputs) || inputs.length < 7) return;
 
-        const i1 = 0, i2 = 1, i3 = 2, i4 = 3;
-        const v1 = parse(inputs[i1]);
-        const v2 = parse(inputs[i2]);
+        const i5 = 4, i6 = 5, i7 = 6;
+        const v6 = parse(inputs[i6]);
+        const v7 = parse(inputs[i7]);
 
         if (this._autoCalcLock) return;
         this._autoCalcLock = true;
         try {
-          // ROW3 = ROW1 - ROW2
-          const r3 = (v1 == null || v2 == null) ? null : (v1 - v2);
-          if (inputs[i3]) inputs[i3].value = this.formatValueForInput(r3);
-
-          // ROW4 = ROW2 / ROW3
-          const r4 = (v2 == null || r3 == null || r3 === 0) ? null : (v2 / r3);
-          if (inputs[i4]) inputs[i4].value = this.formatValueForInput(r4);
+          const r5 = (v6 == null || v7 == null) ? null : (v6 + v7);
+          if (inputs[i5]) inputs[i5].value = this.formatValueForInput(r5);
 
           // Trigger remark updates for affected rows
-          [i3, i4].forEach((idx) => {
+          [i5].forEach((idx) => {
             const el = inputs[idx];
             if (el) el.dispatchEvent(new Event("input", { bubbles: true }));
           });
@@ -745,8 +745,16 @@ class ReportEntryController {
 
     const runCalc = () => calculators[testId].call(this, inputs);
 
-    // Recalculate when source rows change: rows 1,2,3 (safe superset)
-    [0, 1, 2].forEach((idx) => {
+    const sourceRowIndicesByTestId = {
+      "d683c8f0-f901-465d-bb3d-1fee6282ebca": [0, 1, 2],
+      "b3ca9595-a144-4bea-a219-c315b6f95a59": [0, 1],
+      "ba643e33-6ec9-4de7-b9d2-e266102cbb40": [5, 6],
+      "9517c4cb-95fa-4aa5-86bd-2babfe6d59ce": [0, 1],
+      "3b5166cc-755f-433e-833c-7e8c746c13ce": [1, 2],
+    };
+
+    // Recalculate when source rows change
+    (sourceRowIndicesByTestId[testId] || [0, 1, 2]).forEach((idx) => {
       const el = inputs[idx];
       if (!el) return;
       el.addEventListener("input", runCalc);
@@ -757,7 +765,7 @@ class ReportEntryController {
     const outputsByTest = {
       "d683c8f0-f901-465d-bb3d-1fee6282ebca": [3, 4, 5], // rows 4,5,6
       "b3ca9595-a144-4bea-a219-c315b6f95a59": [2, 3],     // rows 3,4
-      "ba643e33-6ec9-4de7-b9d2-e266102cbb40": [2, 3],     // rows 3,4
+      "ba643e33-6ec9-4de7-b9d2-e266102cbb40": [4],        // row 5
       "9517c4cb-95fa-4aa5-86bd-2babfe6d59ce": [2, 3],     // rows 3,4
       "3b5166cc-755f-433e-833c-7e8c746c13ce": [3, 4],     // rows 4,5: BMI, Ideal Weight Range
     };
