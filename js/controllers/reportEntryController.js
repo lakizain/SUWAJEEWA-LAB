@@ -3053,7 +3053,7 @@ class ReportEntryController {
         if (r && r.subcategory_id) bySubId.set(r.subcategory_id, r);
       });
 
-      subcategories.forEach((sub) => {
+      subcategories.forEach((sub, rowIndex) => {
         const row = this.resultsItemsBody?.querySelector(
           `tr[data-subcategory-id="${sub.id}"]`
         );
@@ -3063,11 +3063,20 @@ class ReportEntryController {
         const valueInput = row.querySelector("td:nth-child(2) input");
         const remarkInput = row.querySelector("td:nth-child(5) input");
         if (valueInput && saved.value != null) {
-          valueInput.value = this.limitValueInputToDecimals(
-            String(saved.value),
-            true,
-            valueDp
-          );
+          const isLipidProfile =
+            savedTestId === "d683c8f0-f901-465d-bb3d-1fee6282ebca";
+          const shouldForceTwoDp =
+            isLipidProfile && (rowIndex === 3 || rowIndex === 5);
+          if (shouldForceTwoDp) {
+            const n = Number(saved.value);
+            valueInput.value = Number.isFinite(n) ? n.toFixed(2) : String(saved.value);
+          } else {
+            valueInput.value = this.limitValueInputToDecimals(
+              String(saved.value),
+              true,
+              valueDp
+            );
+          }
           // trigger remark recalculation
           valueInput.dispatchEvent(new Event("input", { bubbles: true }));
         }
