@@ -34,6 +34,9 @@ class ReportEntryController {
     this.referenceRangesCache = new Map();
     this.suggestionsCache = new Map();
 
+    this.readySelectionKeys = new Set();
+    this.readySelectionItems = new Map();
+
     this.initializeElements();
     this.bindEvents();
     this.loadInitialData();
@@ -138,6 +141,14 @@ class ReportEntryController {
       this.resultsTableHead = null;
       this.resultsTableHeadReady = null;
     }
+
+    this.readyReportsEmailInput = document.getElementById("readyReportsEmail");
+    this.sendReadyReportsBtn = document.getElementById("sendReadyReportsBtn");
+    this.clearReadySelectionBtn = document.getElementById(
+      "clearReadySelectionBtn"
+    );
+    this.readySelectedCountEl = document.getElementById("readySelectedCount");
+    this.readySelectAllCheckbox = document.getElementById("readySelectAll");
 
     // Summary form elements (order in DOM within Summary tab)
     // 0: Report ID, 1: Bill No, 2: Patient, 3: Age, 4: Gender,
@@ -270,6 +281,27 @@ class ReportEntryController {
           this.navigateSubcategory(-1);
         }
       });
+    }
+
+    if (this.readyReportsEmailInput) {
+      this.readyReportsEmailInput.addEventListener("input", () =>
+        this.updateReadySendControls()
+      );
+    }
+    if (this.sendReadyReportsBtn) {
+      this.sendReadyReportsBtn.addEventListener("click", () =>
+        this.handleSendReadyReports()
+      );
+    }
+    if (this.clearReadySelectionBtn) {
+      this.clearReadySelectionBtn.addEventListener("click", () =>
+        this.clearReadySelection()
+      );
+    }
+    if (this.readySelectAllCheckbox) {
+      this.readySelectAllCheckbox.addEventListener("change", () =>
+        this.toggleSelectAllReadyRows(Boolean(this.readySelectAllCheckbox.checked))
+      );
     }
   }
 
@@ -447,12 +479,15 @@ class ReportEntryController {
     // Clear both tables
     this.resultsTableBody.innerHTML = "";
     if (this.resultsTableBodyReady) this.resultsTableBodyReady.innerHTML = "";
+    this.readySelectionItems.clear();
 
     if (this.currentBills.length === 0) {
       const row = document.createElement("tr");
       row.innerHTML =
         '<td colspan="4" class="text-muted">No bills found for today</td>';
       this.resultsTableBody.appendChild(row);
+      this.pruneReadySelectionToVisible();
+      this.updateReadySendControls();
       return;
     }
 
@@ -502,14 +537,58 @@ class ReportEntryController {
 
       const row = document.createElement("tr");
       row.className = statusClass;
-      row.innerHTML = `
-        <td>${this.safeText(bill.bill_no)}</td>
-        <td>${this.safeText(bill.patient_name)}</td>
-        <td>${this.safeText(testName)}</td>
-        <td>${statusBadge}</td>
-      `;
+      const isReadyRow = Boolean(
+        this.resultsTableBodyReady && targetBody === this.resultsTableBodyReady
+      );
+      if (isReadyRow) {
+        const key = this.getReadySelectionKey(bill, item);
+        row.dataset.readyKey = key;
+        this.readySelectionItems.set(key, {
+          key,
+          billId: bill?.id == null ? null : String(bill.id),
+          billNo: bill?.bill_no == null ? "" : String(bill.bill_no),
+          patientName: bill?.patient_name == null ? "" : String(bill.patient_name),
+          billItemId: item?.id == null ? null : String(item.id),
+          testName: testName == null ? "" : String(testName),
+          status: effectiveStatus,
+        });
+        row.innerHTML = `
+          <td>
+            <input class="form-check-input ready-row-check" type="checkbox" ${
+              this.readySelectionKeys.has(key) ? "checked" : ""
+            } data-ready-key="${this.safeText(key)}">
+          </td>
+          <td>${this.safeText(bill.bill_no)}</td>
+          <td>${this.safeText(bill.patient_name)}</td>
+          <td>${this.safeText(testName)}</td>
+          <td>${statusBadge}</td>
+        `;
+      } else {
+        row.innerHTML = `
+          <td>${this.safeText(bill.bill_no)}</td>
+          <td>${this.safeText(bill.patient_name)}</td>
+          <td>${this.safeText(testName)}</td>
+          <td>${statusBadge}</td>
+        `;
+      }
       row.addEventListener("click", () => this.selectBill(bill, item || null));
       targetBody.appendChild(row);
+
+      if (isReadyRow) {
+        const cb = row.querySelector("input.ready-row-check");
+        if (cb) {
+          cb.addEventListener("click", (e) => e.stopPropagation());
+          cb.addEventListener("change", (e) => {
+            e.stopPropagation();
+            const k = cb.getAttribute("data-ready-key") || "";
+            if (!k) return;
+            if (cb.checked) this.readySelectionKeys.add(k);
+            else this.readySelectionKeys.delete(k);
+            this.syncReadySelectAllCheckboxState();
+            this.updateReadySendControls();
+          });
+        }
+      }
     };
 
     this.currentBills.forEach((bill) => {
@@ -537,6 +616,139 @@ class ReportEntryController {
         }
       });
     });
+
+    this.pruneReadySelectionToVisible();
+    this.syncReadySelectAllCheckboxState();
+    this.updateReadySendControls();
+  }
+
+  getReadySelectionKey(bill, item) {
+    const billItemId = item?.id != null ? String(item.id) : "";
+    if (billItemId) return `bill_item:${billItemId}`;
+    const billId = bill?.id != null ? String(bill.id) : "";
+    if (billId) return `bill:${billId}`;
+    const billNo = bill?.bill_no != null ? String(bill.bill_no) : "";
+    return billNo ? `bill_no:${billNo}` : "bill_no:-";
+  }
+
+  pruneReadySelectionToVisible() {
+    if (!this.resultsTableBodyReady) {
+      this.readySelectionKeys.clear();
+      return;
+    }
+    const visibleKeys = new Set(
+      Array.from(this.resultsTableBodyReady.querySelectorAll("tr"))
+        .map((tr) => tr.dataset.readyKey)
+        .filter(Boolean)
+    );
+    Array.from(this.readySelectionKeys).forEach((k) => {
+      if (!visibleKeys.has(k)) this.readySelectionKeys.delete(k);
+    });
+  }
+
+  syncReadySelectAllCheckboxState() {
+    if (!this.readySelectAllCheckbox || !this.resultsTableBodyReady) return;
+    const boxes = Array.from(
+      this.resultsTableBodyReady.querySelectorAll("input.ready-row-check")
+    );
+    if (boxes.length === 0) {
+      this.readySelectAllCheckbox.checked = false;
+      this.readySelectAllCheckbox.indeterminate = false;
+      return;
+    }
+    const checkedCount = boxes.filter((b) => b.checked).length;
+    this.readySelectAllCheckbox.checked = checkedCount === boxes.length;
+    this.readySelectAllCheckbox.indeterminate =
+      checkedCount > 0 && checkedCount < boxes.length;
+  }
+
+  toggleSelectAllReadyRows(checked) {
+    if (!this.resultsTableBodyReady) return;
+    const boxes = Array.from(
+      this.resultsTableBodyReady.querySelectorAll("input.ready-row-check")
+    );
+    boxes.forEach((cb) => {
+      const key = cb.getAttribute("data-ready-key") || "";
+      cb.checked = checked;
+      if (key) {
+        if (checked) this.readySelectionKeys.add(key);
+        else this.readySelectionKeys.delete(key);
+      }
+    });
+    this.syncReadySelectAllCheckboxState();
+    this.updateReadySendControls();
+  }
+
+  clearReadySelection() {
+    this.readySelectionKeys.clear();
+    if (this.resultsTableBodyReady) {
+      Array.from(
+        this.resultsTableBodyReady.querySelectorAll("input.ready-row-check")
+      ).forEach((cb) => {
+        cb.checked = false;
+      });
+    }
+    this.syncReadySelectAllCheckboxState();
+    this.updateReadySendControls();
+  }
+
+  updateReadySendControls() {
+    const selectedCount = Array.from(this.readySelectionKeys).filter((k) =>
+      this.readySelectionItems.has(k)
+    ).length;
+    if (this.readySelectedCountEl)
+      this.readySelectedCountEl.textContent = String(selectedCount);
+
+    const hasSelection = selectedCount > 0;
+    const emailValue = (this.readyReportsEmailInput?.value || "").trim();
+    const emailLooksValid =
+      this.readyReportsEmailInput?.type === "email"
+        ? this.readyReportsEmailInput.checkValidity()
+        : emailValue.includes("@");
+    if (this.sendReadyReportsBtn)
+      this.sendReadyReportsBtn.disabled = !(hasSelection && emailLooksValid);
+    if (this.clearReadySelectionBtn)
+      this.clearReadySelectionBtn.disabled = !hasSelection;
+  }
+
+  async handleSendReadyReports() {
+    try {
+      const email = (this.readyReportsEmailInput?.value || "").trim();
+      if (!email) {
+        this.showError("Please enter an email address");
+        return;
+      }
+      if (this.readyReportsEmailInput && !this.readyReportsEmailInput.checkValidity()) {
+        this.readyReportsEmailInput.reportValidity();
+        return;
+      }
+
+      const items = Array.from(this.readySelectionKeys)
+        .map((k) => this.readySelectionItems.get(k))
+        .filter(Boolean);
+
+      if (items.length === 0) {
+        this.showError("Please select at least one test from Ready Reports");
+        return;
+      }
+
+      if (this.sendReadyReportsBtn) this.sendReadyReportsBtn.disabled = true;
+      const res = await this.reportEntryService.sendReadyReportsByEmail(
+        email,
+        items
+      );
+      if (res && res.success) {
+        this.showSuccess(res.message || "Email sent");
+        this.clearReadySelection();
+      } else {
+        this.showError(res?.message || "Failed to send email");
+      }
+    } catch (e) {
+      console.error("Failed to send ready reports", e);
+      this.showError("Failed to send email");
+    } finally {
+      this.updateReadySendControls();
+    }
   }
 
   // Auto-calc for specific tests by ID (UUID). Add rules here as needed.
@@ -1270,8 +1482,9 @@ class ReportEntryController {
         ...Array.from(rowsReady),
       ];
       allRows.forEach((row) => {
-        const billNo = row.cells[0]?.textContent;
-        const testName = row.cells[2]?.textContent;
+        const isReadyRow = Boolean(row.querySelector("input.ready-row-check"));
+        const billNo = row.cells[isReadyRow ? 1 : 0]?.textContent;
+        const testName = row.cells[isReadyRow ? 3 : 2]?.textContent;
         const selectedTestName =
           this.selectedTestItem.tests?.test_name ||
           this.selectedTestItem.packages?.package_name ||
@@ -1291,7 +1504,8 @@ class ReportEntryController {
         ...Array.from(rowsReady),
       ];
       allRows.forEach((row) => {
-        const billNo = row.cells[0]?.textContent;
+        const isReadyRow = Boolean(row.querySelector("input.ready-row-check"));
+        const billNo = row.cells[isReadyRow ? 1 : 0]?.textContent;
         if (billNo === this.selectedBill.bill_no) {
           row.classList.add("table-active");
         }

@@ -557,6 +557,79 @@ class ReportEntryService {
     }
   }
 
+  async sendReadyReportsByEmail(email, items) {
+    try {
+      const to = (email || "").toString().trim();
+      if (!to) {
+        return { success: false, message: "Email is required" };
+      }
+      if (!Array.isArray(items) || items.length === 0) {
+        return { success: false, message: "No tests selected" };
+      }
+
+      const endpoint = window.APP_CONFIG?.email?.endpoint || "";
+      if (endpoint) {
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: to, items }),
+          });
+          const payload = await res.json().catch(() => null);
+          if (res.ok) {
+            return {
+              success: true,
+              message: payload?.message || "Email sent successfully",
+              data: payload,
+            };
+          }
+          return {
+            success: false,
+            message: payload?.message || "Failed to send email",
+            data: payload,
+          };
+        } catch (e) {
+          console.warn("Email endpoint failed, falling back:", e);
+        }
+      }
+
+      if (!this.isSupabaseAvailable()) {
+        return { success: true, message: "Queued to send (offline mode)" };
+      }
+
+      const fn =
+        window.APP_CONFIG?.supabase?.functions?.sendReadyReports ||
+        "send-ready-reports";
+
+      const invoke = this.supabase?.functions?.invoke;
+      if (typeof invoke !== "function") {
+        return {
+          success: true,
+          message: "Queued to send (functions not available)",
+        };
+      }
+
+      const payload = { email: to, items };
+      const { data, error } = await this.supabase.functions.invoke(fn, {
+        body: payload,
+      });
+
+      if (error) {
+        const msg = error?.message || "Failed to send email";
+        return { success: false, message: msg, error };
+      }
+
+      const message =
+        (data && (data.message || data.status || data.result)) ||
+        "Email sent successfully";
+      return { success: true, message, data };
+    } catch (error) {
+      console.error("Error sending ready reports by email:", error);
+      const msg = error?.message || "Failed to send email";
+      return { success: false, message: msg, error };
+    }
+  }
+
   // Get sample data for offline mode
   getSampleTodaysBills() {
     return [

@@ -1,0 +1,12 @@
+{
+  "name": "suwajeewa-lab",
+  "private": true,
+  "devDependencies": {
+    "@types/nodemailer": "^6.4.17",
+    "@vercel/node": "^3.2.26",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "nodemailer": "^6.10.0"
+  }
+}
