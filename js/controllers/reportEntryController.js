@@ -2334,7 +2334,7 @@ class ReportEntryController {
           .investigation-line .label, .investigation-line .colon { white-space: nowrap; }
           .hr { margin-top: 8px; border-top: 1px solid #999; }
           table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; line-height: 1.4; }
-          .results-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 2px; }
+          .results-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 1.5px; }
           .results-table th, .results-table td { border: none; padding: 3px 6px; vertical-align: top; }
           .results-table thead th { background: #fff; font-weight: 700; text-align: left; }
           .results-table thead th:nth-child(2) { transform: translateX(-5mm); }
