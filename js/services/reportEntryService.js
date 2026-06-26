@@ -567,32 +567,6 @@ class ReportEntryService {
         return { success: false, message: "No tests selected" };
       }
 
-      const endpoint = window.APP_CONFIG?.email?.endpoint || "";
-      if (endpoint) {
-        try {
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email: to, items }),
-          });
-          const payload = await res.json().catch(() => null);
-          if (res.ok) {
-            return {
-              success: true,
-              message: payload?.message || "Email sent successfully",
-              data: payload,
-            };
-          }
-          return {
-            success: false,
-            message: payload?.message || "Failed to send email",
-            data: payload,
-          };
-        } catch (e) {
-          console.warn("Email endpoint failed, falling back:", e);
-        }
-      }
-
       if (!this.isSupabaseAvailable()) {
         return { success: true, message: "Queued to send (offline mode)" };
       }

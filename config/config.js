@@ -34,10 +34,6 @@ window.APP_CONFIG = {
     retryDelay: 1000, // 1 second
   },
 
-  email: {
-    endpoint: "/api/send-ready-reports",
-  },
-
   // Optional credentials for admin bootstrap (used to satisfy RLS policies)
   auth: {
     admin: {
