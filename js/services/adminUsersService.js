@@ -16,7 +16,7 @@ class AdminUsersService {
     try {
       const { data, error } = await this.supabase
         .from('admin_users')
-        .select('*')
+        .select('*, centers(*)')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -42,7 +42,7 @@ class AdminUsersService {
    */
   async createUser(userData) {
     try {
-      const { username, email, password, role = 'staff' } = userData;
+      const { username, email, password, role = 'staff', center_id } = userData;
 
       // Validate required fields
       if (!username || !email || !password) {
@@ -84,6 +84,7 @@ class AdminUsersService {
           email,
           password, // Store as plain text as requested
           role,
+          center_id,
           is_active: true
         }])
         .select()
@@ -204,7 +205,7 @@ class AdminUsersService {
     try {
       const { data, error } = await this.supabase
         .from('admin_users')
-        .select('*')
+        .select('*, centers(*)')
         .eq('id', userId)
         .single();
 
@@ -303,7 +304,7 @@ class AdminUsersService {
     try {
       const { data, error } = await this.supabase
         .from('admin_users')
-        .select('*')
+        .select('*, centers(*)')
         .eq('username', username)
         .eq('password', password)
         .eq('is_active', true)

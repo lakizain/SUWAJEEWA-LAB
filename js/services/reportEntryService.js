@@ -11,6 +11,29 @@ class ReportEntryService {
     }
   }
 
+  // Helper to get current user
+  getCurrentUser() {
+    try {
+      const userStr = sessionStorage.getItem('loggedInUser');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (e) {
+      console.warn('Error parsing current user:', e);
+      return null;
+    }
+  }
+
+  // Helper to check if user is admin
+  isUserAdmin() {
+    const user = this.getCurrentUser();
+    return user?.role === 'admin';
+  }
+
+  // Helper to get user's center id
+  getUserCenterId() {
+    const user = this.getCurrentUser();
+    return user?.center_id;
+  }
+
   // Simple UUID v4-ish validator (loose)
   isValidUuid(value) {
     if (typeof value !== "string") return false;
@@ -115,6 +138,14 @@ class ReportEntryService {
     return this.supabase !== null;
   }
 
+  // Helper to apply center filter to a query
+  applyCenterFilter(query) {
+    if (!this.isUserAdmin() && this.getUserCenterId()) {
+      query = query.eq("center_id", this.getUserCenterId());
+    }
+    return query;
+  }
+
   // Get today's bills with all test details
   async getTodaysBills() {
     try {
@@ -138,7 +169,7 @@ class ReportEntryService {
         59
       ).toISOString();
 
-      const { data: bills, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select(
           `
@@ -154,6 +185,10 @@ class ReportEntryService {
         .gte("created_at", startOfDay)
         .lte("created_at", endOfDay)
         .order("created_at", { ascending: false });
+
+      query = this.applyCenterFilter(query);
+
+      const { data: bills, error } = await query;
 
       if (error) throw error;
       return bills || [];
@@ -171,7 +206,7 @@ class ReportEntryService {
         return this.getSampleTodaysBills();
       }
 
-      const { data: bills, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select(
           `
@@ -187,6 +222,10 @@ class ReportEntryService {
         .gte("bill_date", fromDate)
         .lte("bill_date", toDate)
         .order("created_at", { ascending: false });
+
+      query = this.applyCenterFilter(query);
+
+      const { data: bills, error } = await query;
 
       if (error) throw error;
       return bills || [];
@@ -204,7 +243,7 @@ class ReportEntryService {
         return this.getSampleTodaysBills();
       }
 
-      const { data: bills, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select(
           `
@@ -219,6 +258,10 @@ class ReportEntryService {
         )
         .eq("bill_items.test_id", testId)
         .order("created_at", { ascending: false });
+
+      query = this.applyCenterFilter(query);
+
+      const { data: bills, error } = await query;
 
       if (error) throw error;
       return bills || [];
@@ -236,7 +279,7 @@ class ReportEntryService {
         return this.getSampleTodaysBills();
       }
 
-      const { data: bills, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select(
           `
@@ -251,6 +294,11 @@ class ReportEntryService {
         )
         .eq("center_id", centerId)
         .order("created_at", { ascending: false });
+
+      // If user is not admin, we still apply the user's center filter
+      query = this.applyCenterFilter(query);
+
+      const { data: bills, error } = await query;
 
       if (error) throw error;
       return bills || [];
@@ -268,7 +316,7 @@ class ReportEntryService {
         return this.getSampleTodaysBills();
       }
 
-      const { data: bills, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select(
           `
@@ -283,6 +331,10 @@ class ReportEntryService {
         )
         .or(`bill_no.ilike.%${searchTerm}%,patient_name.ilike.%${searchTerm}%`)
         .order("created_at", { ascending: false });
+
+      query = this.applyCenterFilter(query);
+
+      const { data: bills, error } = await query;
 
       if (error) throw error;
       return bills || [];
@@ -300,7 +352,7 @@ class ReportEntryService {
         return this.getSampleBill();
       }
 
-      const { data: bill, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select(
           `
@@ -313,8 +365,11 @@ class ReportEntryService {
           centers (center_name)
         `
         )
-        .eq("bill_no", billNo)
-        .single();
+        .eq("bill_no", billNo);
+
+      query = this.applyCenterFilter(query);
+
+      const { data: bill, error } = await query.single();
 
       if (error) throw error;
       return bill;

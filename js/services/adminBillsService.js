@@ -9,6 +9,29 @@ class AdminBillsService {
     }
   }
 
+  // Helper to get current user
+  getCurrentUser() {
+    try {
+      const userStr = sessionStorage.getItem('loggedInUser');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (e) {
+      console.warn('Error parsing current user:', e);
+      return null;
+    }
+  }
+
+  // Helper to check if user is admin
+  isUserAdmin() {
+    const user = this.getCurrentUser();
+    return user?.role === 'admin';
+  }
+
+  // Helper to get user's center id
+  getUserCenterId() {
+    const user = this.getCurrentUser();
+    return user?.center_id;
+  }
+
   // Check if Supabase is available
   isSupabaseAvailable() {
     return this.supabase !== null;
@@ -22,7 +45,7 @@ class AdminBillsService {
         return this.getSampleBillsData();
       }
 
-      const { data: bills, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select(`
           id,
@@ -41,6 +64,12 @@ class AdminBillsService {
         `)
         .order("created_at", { ascending: false })
         .limit(limit);
+
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        query = query.eq("center_id", this.getUserCenterId());
+      }
+
+      const { data: bills, error } = await query;
 
       if (error) throw error;
       return bills || [];
@@ -63,7 +92,7 @@ class AdminBillsService {
       }
 
       const term = searchTerm.trim();
-      const { data: bills, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select(`
           id,
@@ -83,6 +112,12 @@ class AdminBillsService {
         .or(`bill_no.ilike.%${term}%,patient_name.ilike.%${term}%`)
         .order("created_at", { ascending: false })
         .limit(50);
+
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        query = query.eq("center_id", this.getUserCenterId());
+      }
+
+      const { data: bills, error } = await query;
 
       if (error) throw error;
       return bills || [];
@@ -151,6 +186,10 @@ class AdminBillsService {
         query = query.ilike("patient_name", `%${patientName.trim()}%`);
       }
 
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        query = query.eq("center_id", this.getUserCenterId());
+      }
+
       const { data: bills, error } = await query;
       if (error) throw error;
       return bills || [];
@@ -172,27 +211,45 @@ class AdminBillsService {
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59).toISOString();
 
-      const { data: todayBills, error: todayError } = await this.supabase
+      let todayQuery = this.supabase
         .from("bills")
         .select("final_amount, paid_amount, status")
         .gte("created_at", startOfDay)
         .lte("created_at", endOfDay);
 
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        todayQuery = todayQuery.eq("center_id", this.getUserCenterId());
+      }
+
+      const { data: todayBills, error: todayError } = await todayQuery;
+
       if (todayError) throw todayError;
 
       // Get this month's bills
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
-      const { data: monthBills, error: monthError } = await this.supabase
+      let monthQuery = this.supabase
         .from("bills")
         .select("final_amount, paid_amount, status")
         .gte("created_at", startOfMonth);
 
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        monthQuery = monthQuery.eq("center_id", this.getUserCenterId());
+      }
+
+      const { data: monthBills, error: monthError } = await monthQuery;
+
       if (monthError) throw monthError;
 
       // Get all time bills
-      const { data: allBills, error: allError } = await this.supabase
+      let allQuery = this.supabase
         .from("bills")
         .select("final_amount, paid_amount, status");
+
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        allQuery = allQuery.eq("center_id", this.getUserCenterId());
+      }
+
+      const { data: allBills, error: allError } = await allQuery;
 
       if (allError) throw allError;
 
@@ -313,6 +370,13 @@ class AdminBillsService {
         throw new Error("Bill not found");
       }
 
+      // Check authorization
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        if (billDetails.center_id !== this.getUserCenterId()) {
+          throw new Error("You are not authorized to delete this bill");
+        }
+      }
+
       // Delete bill items first (foreign key constraint)
       const { error: itemsError } = await this.supabase
         .from("bill_items")
@@ -355,6 +419,18 @@ class AdminBillsService {
         throw new Error("Database connection not available. Cannot delete bill.");
       }
 
+      const billDetails = await this.getBillDetails(billId);
+      if (!billDetails) {
+        throw new Error("Bill not found");
+      }
+
+      // Check authorization
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        if (billDetails.center_id !== this.getUserCenterId()) {
+          throw new Error("You are not authorized to delete this bill");
+        }
+      }
+
       const { data: bill, error } = await this.supabase
         .from("bills")
         .update({
@@ -392,6 +468,13 @@ class AdminBillsService {
       const billDetails = await this.getBillDetails(billId);
       if (!billDetails) {
         return { canDelete: false, reason: "Bill not found" };
+      }
+
+      // Check authorization
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        if (billDetails.center_id !== this.getUserCenterId()) {
+          return { canDelete: false, reason: "You are not authorized to delete this bill" };
+        }
       }
 
       // Bill can be deleted - no restrictions

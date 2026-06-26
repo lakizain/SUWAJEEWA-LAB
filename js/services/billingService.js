@@ -9,6 +9,29 @@ class BillingService {
     }
   }
 
+  // Helper to get current user
+  getCurrentUser() {
+    try {
+      const userStr = sessionStorage.getItem('loggedInUser');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (e) {
+      console.warn('Error parsing current user:', e);
+      return null;
+    }
+  }
+
+  // Helper to check if user is admin
+  isUserAdmin() {
+    const user = this.getCurrentUser();
+    return user?.role === 'admin';
+  }
+
+  // Helper to get user's center id
+  getUserCenterId() {
+    const user = this.getCurrentUser();
+    return user?.center_id;
+  }
+
   // Check if Supabase is available
   isSupabaseAvailable() {
     return this.supabase !== null;
@@ -68,11 +91,17 @@ class BillingService {
         };
       }
 
+      // Auto-fill center_id if not provided and user has a center
+      let centerId = billData.center_id;
+      if ((centerId === "" || centerId === undefined || centerId === null) && this.getUserCenterId()) {
+        centerId = this.getUserCenterId();
+      }
+
       const billPayload = {
         bill_no: billNumber,
         bill_date: new Date().toISOString(),
         bill_type: billData.bill_type || "Main Lab",
-        center_id: billData.center_id !== "" ? billData.center_id : null,
+        center_id: centerId !== "" ? centerId : null,
         patient_phone: billData.patient_phone,
         patient_name: billData.patient_name,
         patient_title: billData.patient_title,
@@ -391,7 +420,7 @@ class BillingService {
         return [];
       }
 
-      const { data: bills, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select(
           `
@@ -406,6 +435,12 @@ class BillingService {
         .order("created_at", { ascending: false })
         .limit(limit);
 
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        query = query.eq("center_id", this.getUserCenterId());
+      }
+
+      const { data: bills, error } = await query;
+
       if (error) throw error;
       return bills || [];
     } catch (error) {
@@ -417,7 +452,7 @@ class BillingService {
   // Search bills
   async searchBills(searchTerm) {
     try {
-      const { data: bills, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select(
           `
@@ -431,6 +466,12 @@ class BillingService {
         )
         .or(`bill_no.ilike.%${searchTerm}%,patient_name.ilike.%${searchTerm}%`)
         .order("created_at", { ascending: false });
+
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        query = query.eq("center_id", this.getUserCenterId());
+      }
+
+      const { data: bills, error } = await query;
 
       if (error) throw error;
       return bills;
@@ -478,6 +519,9 @@ class BillingService {
 
       if (centerId && centerId !== "all") {
         q = q.eq("center_id", centerId);
+      } else if (!this.isUserAdmin() && this.getUserCenterId()) {
+        // If user is not admin and no centerId provided, use user's center
+        q = q.eq("center_id", this.getUserCenterId());
       }
 
       if (memberName && memberName !== "all") {
@@ -498,6 +542,14 @@ class BillingService {
   async updateBill(billId, updateData) {
     try {
       console.log("Updating bill with data:", { billId, updateData });
+
+      // Check if user is authorized to update this bill (only admin or same center)
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        const bill = await this.getBillById(billId);
+        if (bill && bill.center_id !== this.getUserCenterId()) {
+          throw new Error("You are not authorized to update this bill");
+        }
+      }
 
       const { data: bill, error } = await this.supabase
         .from("bills")
@@ -529,6 +581,14 @@ class BillingService {
   // Update bill payment
   async updateBillPayment(billId, paidAmount) {
     try {
+      // Check authorization
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        const bill = await this.getBillById(billId);
+        if (bill && bill.center_id !== this.getUserCenterId()) {
+          throw new Error("You are not authorized to update this bill");
+        }
+      }
+
       const bill = await this.getBillById(billId);
       const remainingAmount = bill.final_amount - paidAmount;
       const status = remainingAmount <= 0 ? "paid" : "partial";
@@ -547,6 +607,14 @@ class BillingService {
   // Delete bill
   async deleteBill(billId) {
     try {
+      // Check authorization
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        const bill = await this.getBillById(billId);
+        if (bill && bill.center_id !== this.getUserCenterId()) {
+          throw new Error("You are not authorized to delete this bill");
+        }
+      }
+
       // First delete bill items
       await this.supabase.from("bill_items").delete().eq("bill_id", billId);
 
@@ -582,17 +650,26 @@ class BillingService {
         59
       ).toISOString();
 
-      const { data: todayBills, error: todayError } = await this.supabase
+      let todayQuery = this.supabase
         .from("bills")
         .select("final_amount, status")
         .gte("created_at", startOfDay)
         .lte("created_at", endOfDay);
 
-      if (todayError) throw todayError;
-
-      const { data: totalBills, error: totalError } = await this.supabase
+      let totalQuery = this.supabase
         .from("bills")
         .select("final_amount, status");
+
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        todayQuery = todayQuery.eq("center_id", this.getUserCenterId());
+        totalQuery = totalQuery.eq("center_id", this.getUserCenterId());
+      }
+
+      const { data: todayBills, error: todayError } = await todayQuery;
+
+      if (todayError) throw todayError;
+
+      const { data: totalBills, error: totalError } = await totalQuery;
 
       if (totalError) throw totalError;
 
@@ -621,7 +698,7 @@ class BillingService {
     try {
       if (!patientName || !patientPhone) return [];
 
-      const { data: bills, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select("id, bill_no, bill_date, total_amount, status")
         .or(
@@ -629,6 +706,12 @@ class BillingService {
         )
         .order("created_at", { ascending: false })
         .limit(5);
+
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        query = query.eq("center_id", this.getUserCenterId());
+      }
+
+      const { data: bills, error } = await query;
 
       if (error) throw error;
       return bills || [];
@@ -670,6 +753,9 @@ class BillingService {
       }
       if (filters.centerId && filters.centerId !== "all") {
         query = query.eq("center_id", filters.centerId);
+      } else if (!this.isUserAdmin() && this.getUserCenterId()) {
+        // If user is not admin and no centerId provided, use user's center
+        query = query.eq("center_id", this.getUserCenterId());
       }
       if (filters.referenceId && filters.referenceId !== "all") {
         // Get reference name by ID and filter by ref_by field
@@ -742,6 +828,9 @@ class BillingService {
       }
       if (filters.centerId && filters.centerId !== "all") {
         query = query.eq("center_id", filters.centerId);
+      } else if (!this.isUserAdmin() && this.getUserCenterId()) {
+        // If user is not admin and no centerId provided, use user's center
+        query = query.eq("center_id", this.getUserCenterId());
       }
 
       const { data, error } = await query;

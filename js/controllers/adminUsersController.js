@@ -4,6 +4,7 @@
   const state = {
     sb: null,
     adminUsersService: null,
+    centerService: null,
     editingUserId: null,
     isEditMode: false,
   };
@@ -26,21 +27,42 @@
     });
   }
 
+  async function populateCenterDropdown() {
+    try {
+      const centers = await state.centerService.getCentersForDropdown();
+      const centerSelect = $('center');
+      if (!centerSelect) return;
+      
+      centerSelect.innerHTML = '<option value="">-- Select Center --</option>';
+      
+      centers.forEach(center => {
+        const option = document.createElement('option');
+        option.value = center.id;
+        option.textContent = center.center_name;
+        centerSelect.appendChild(option);
+      });
+    } catch (error) {
+      console.error('Error populating center dropdown:', error);
+    }
+  }
+
   function renderUsers(rows) {
     const body = $('usersBody');
     if (!body) return;
     if (!rows || rows.length === 0) {
-      body.innerHTML = '<tr><td colspan="5" class="empty">No users yet</td></tr>';
+      body.innerHTML = '<tr><td colspan="6" class="empty">No users yet</td></tr>';
       return;
     }
     const html = rows.map(function (u) {
       const roleBadge = '<span class="badge ' + (u.role === 'admin' ? 'admin' : 'staff') + '">' + (u.role || 'staff') + '</span>';
+      const centerName = u.centers ? u.centers.center_name : '<span class="muted">--</span>';
       return (
         '<tr>' +
           '<td>' + (u.username || '') + '</td>' +
           '<td>' + (u.email || '') + '</td>' +
           '<td class="muted">••••••••</td>' +
           '<td>' + roleBadge + '</td>' +
+          '<td>' + centerName + '</td>' +
           '<td class="actions">' +
             '<button class="btn secondary" data-action="edit" data-id="' + u.id + '">Edit</button>' +
             '<button class="btn danger" data-action="deactivate" data-id="' + u.id + '">Delete</button>' +
@@ -84,6 +106,7 @@
         $('email').value = userData.email || '';
         $('password').value = ''; // Don't show existing password
         $('role').value = userData.role || 'staff';
+        $('center').value = userData.center_id || '';
         
         // Username is editable in edit mode
         $('username').readOnly = false;
@@ -98,6 +121,7 @@
         $('email').value = '';
         $('password').value = '';
         $('role').value = 'staff';
+        $('center').value = '';
         
         // Make username editable
         $('username').readOnly = false;
@@ -126,6 +150,8 @@
     const email = String(($('email') && $('email').value) || '').trim();
     const password = String(($('password') && $('password').value) || '');
     const role = String(($('role') && $('role').value) || 'staff');
+    const centerValue = $('center').value;
+    const center_id = centerValue || null;
     
     // Validation
     if (!username || !email) { 
@@ -146,7 +172,8 @@
         const updateData = {
           username,
           email,
-          role
+          role,
+          center_id
         };
         
         // Only update password if provided
@@ -162,7 +189,8 @@
           username,
           email,
           password,
-          role
+          role,
+          center_id
         };
         
         await state.adminUsersService.createUser(userData);
@@ -174,6 +202,7 @@
       $('email').value = '';
       $('password').value = '';
       $('role').value = 'staff';
+      $('center').value = '';
       
       closeDialog();
       await fetchUsers();
@@ -488,9 +517,13 @@
     
     // Initialize admin users service
     state.adminUsersService = new window.AdminUsersService(state.sb);
-    
+    // Initialize center service
+    state.centerService = new window.CenterService();
     // Initialize admin bills service
     state.adminBillsService = new window.AdminBillsService();
+    
+    // Populate center dropdown
+    await populateCenterDropdown();
     
     // Load users and enable add functionality regardless of auth status
     fetchUsers();

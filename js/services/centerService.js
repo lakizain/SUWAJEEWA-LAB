@@ -10,6 +10,29 @@ class CenterService {
     this._centersDropdownCache = { data: null, ts: 0 };
   }
 
+  // Helper to get current user
+  getCurrentUser() {
+    try {
+      const userStr = sessionStorage.getItem('loggedInUser');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (e) {
+      console.warn('Error parsing current user:', e);
+      return null;
+    }
+  }
+
+  // Helper to check if user is admin
+  isUserAdmin() {
+    const user = this.getCurrentUser();
+    return user?.role === 'admin';
+  }
+
+  // Helper to get user's center id
+  getUserCenterId() {
+    const user = this.getCurrentUser();
+    return user?.center_id;
+  }
+
   // Check if Supabase is available
   isSupabaseAvailable() {
     return this.supabase !== null;
@@ -74,10 +97,16 @@ class CenterService {
   // Get all centers
   async getAllCenters() {
     try {
-      const { data: centers, error } = await this.supabase
+      let query = this.supabase
         .from("centers")
         .select("*")
         .order("center_name", { ascending: true });
+
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        query = query.eq("id", this.getUserCenterId());
+      }
+
+      const { data: centers, error } = await query;
 
       if (error) throw error;
       return centers;
@@ -98,11 +127,17 @@ class CenterService {
         return this._centersDropdownCache.data;
       }
 
-      const { data: centers, error } = await this.supabase
+      let query = this.supabase
         .from("centers")
         .select("id, center_name")
         .eq("is_active", true)
         .order("center_name", { ascending: true });
+
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        query = query.eq("id", this.getUserCenterId());
+      }
+
+      const { data: centers, error } = await query;
 
       if (error) throw error;
       this._centersDropdownCache = { data: centers || [], ts: now };
@@ -140,11 +175,17 @@ class CenterService {
         ];
       }
 
-      const { data: centers, error } = await this.supabase
+      let query = this.supabase
         .from("centers")
         .select("*")
         .eq("is_active", true)
         .order("center_name", { ascending: true });
+
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        query = query.eq("id", this.getUserCenterId());
+      }
+
+      const { data: centers, error } = await query;
 
       if (error) throw error;
       return centers || [];
@@ -211,11 +252,17 @@ class CenterService {
   // Search centers
   async searchCenters(searchTerm) {
     try {
-      const { data: centers, error } = await this.supabase
+      let query = this.supabase
         .from("centers")
         .select("*")
         .or(`center_name.ilike.%${searchTerm}%,cid.ilike.%${searchTerm}%`)
         .order("center_name", { ascending: true });
+
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        query = query.eq("id", this.getUserCenterId());
+      }
+
+      const { data: centers, error } = await query;
 
       if (error) throw error;
       return centers;

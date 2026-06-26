@@ -154,11 +154,12 @@
                   <th>EMAIL</th>
                   <th>PASSWORD</th>
                   <th>ROLE</th>
+                  <th>CENTER</th>
                   <th>ACTIONS</th>
                 </tr>
               </thead>
               <tbody id="usersBody">
-                <tr><td colspan="5" class="empty">Loading…</td></tr>
+                <tr><td colspan="6" class="empty">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -232,13 +233,19 @@
         </div>
         <div class="field">
           <label for="password">Password</label>
-          <input id="password" name="password" type="password" autocomplete="new-password" required />
+          <input id="password" name="password" type="password" autocomplete="new-password" />
         </div>
         <div class="field">
           <label for="role">Role</label>
           <select id="role" name="role" required>
             <option value="staff">Staff</option>
             <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="center">Center</label>
+          <select id="center" name="center">
+            <option value="">-- Select Center --</option>
           </select>
         </div>
         <div id="formMsg" class="muted"></div>
@@ -257,6 +264,8 @@
   <script src="config/supabase.js"></script>
   <!-- Admin Users Service -->
   <script src="js/services/adminUsersService.js"></script>
+  <!-- Center Service -->
+  <script src="js/services/centerService.js"></script>
   <!-- Billing Service for bills history -->
   <script src="js/services/billingService.js"></script>
   <!-- Admin Bills Service -->
