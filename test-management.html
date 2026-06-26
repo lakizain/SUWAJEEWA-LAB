@@ -1516,7 +1516,15 @@
                 await renderSubcategoryTable();
             } catch (error) {
                 console.error('Error saving subcategory and ranges:', error);
-                alert('Failed to save');
+                let message = 'Failed to save';
+                if (error?.code === 'DUPLICATE_SUBCATEGORY_NAME') {
+                    message = error.message || message;
+                } else if (error?.code === '23505' || error?.status === 409) {
+                    message = 'Conflict while saving. This usually means the Heading already exists for this test.';
+                } else if (typeof error?.message === 'string' && error.message.trim()) {
+                    message = error.message;
+                }
+                alert(message);
             }
         }
 

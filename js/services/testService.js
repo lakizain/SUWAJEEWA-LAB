@@ -565,6 +565,39 @@ class TestService {
         ...(updateData.less_more_mark !== undefined ? { less_more_mark: updateData.less_more_mark } : {}),
         ...(updateData.decimal_places !== undefined ? { decimal_places: updateData.decimal_places } : {}),
       };
+
+      if (payload.subcategory_name !== undefined && typeof payload.subcategory_name === "string") {
+        payload.subcategory_name = payload.subcategory_name.trim();
+      }
+
+      if (payload.subcategory_name) {
+        const { data: current, error: currentError } = await this.supabase
+          .from("test_subcategories")
+          .select("id,test_id,subcategory_name")
+          .eq("id", subcategoryId)
+          .single();
+        if (currentError) throw currentError;
+
+        if (
+          current?.test_id &&
+          payload.subcategory_name !== current.subcategory_name
+        ) {
+          const { data: existingList, error: findError } = await this.supabase
+            .from("test_subcategories")
+            .select("id")
+            .eq("test_id", current.test_id)
+            .eq("subcategory_name", payload.subcategory_name)
+            .neq("id", subcategoryId)
+            .limit(1);
+
+          if (findError) throw findError;
+          if (Array.isArray(existingList) && existingList.length > 0) {
+            const duplicateError = new Error("Subcategory name already exists for this test.");
+            duplicateError.code = "DUPLICATE_SUBCATEGORY_NAME";
+            throw duplicateError;
+          }
+        }
+      }
       const { data, error } = await this.supabase
         .from("test_subcategories")
         .update(payload)
