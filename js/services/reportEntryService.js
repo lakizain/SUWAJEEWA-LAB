@@ -146,6 +146,36 @@ class ReportEntryService {
     return query;
   }
 
+  normalizeBillForReportEntry(bill) {
+    if (!bill || !Array.isArray(bill.bill_items)) return bill;
+
+    const packageIdsWithComponents = new Set(
+      bill.bill_items
+        .filter((item) => item?.is_package_component && item?.package_id)
+        .map((item) => String(item.package_id))
+    );
+
+    if (packageIdsWithComponents.size === 0) return bill;
+
+    return {
+      ...bill,
+      bill_items: bill.bill_items.filter((item) => {
+        const packageId = item?.package_id == null ? null : String(item.package_id);
+        const isPackageSummaryRow =
+          Boolean(packageId) &&
+          !item?.test_id &&
+          !item?.is_package_component;
+
+        if (!isPackageSummaryRow) return true;
+        return !packageIdsWithComponents.has(packageId);
+      }),
+    };
+  }
+
+  normalizeBillsForReportEntry(bills) {
+    return (bills || []).map((bill) => this.normalizeBillForReportEntry(bill));
+  }
+
   // Get today's bills with all test details
   async getTodaysBills() {
     try {
@@ -191,7 +221,7 @@ class ReportEntryService {
       const { data: bills, error } = await query;
 
       if (error) throw error;
-      return bills || [];
+      return this.normalizeBillsForReportEntry(bills);
     } catch (error) {
       console.error("Error getting today's bills:", error);
       return this.getSampleTodaysBills();
@@ -228,7 +258,7 @@ class ReportEntryService {
       const { data: bills, error } = await query;
 
       if (error) throw error;
-      return bills || [];
+      return this.normalizeBillsForReportEntry(bills);
     } catch (error) {
       console.error("Error getting bills by date range:", error);
       return [];
@@ -264,7 +294,7 @@ class ReportEntryService {
       const { data: bills, error } = await query;
 
       if (error) throw error;
-      return bills || [];
+      return this.normalizeBillsForReportEntry(bills);
     } catch (error) {
       console.error("Error getting bills by test:", error);
       return [];
@@ -301,7 +331,7 @@ class ReportEntryService {
       const { data: bills, error } = await query;
 
       if (error) throw error;
-      return bills || [];
+      return this.normalizeBillsForReportEntry(bills);
     } catch (error) {
       console.error("Error getting bills by center:", error);
       return [];
@@ -337,7 +367,7 @@ class ReportEntryService {
       const { data: bills, error } = await query;
 
       if (error) throw error;
-      return bills || [];
+      return this.normalizeBillsForReportEntry(bills);
     } catch (error) {
       console.error("Error searching bills:", error);
       return [];
@@ -372,7 +402,7 @@ class ReportEntryService {
       const { data: bill, error } = await query.single();
 
       if (error) throw error;
-      return bill;
+      return this.normalizeBillForReportEntry(bill);
     } catch (error) {
       console.error("Error getting bill by number:", error);
       return null;

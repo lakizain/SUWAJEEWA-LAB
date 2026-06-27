@@ -2,6 +2,7 @@
 class BillingController {
   constructor() {
     this.billingService = null;
+    this.pricingService = null;
     this.currentBill = null;
     this.selectedTests = [];
     this.selectedPackages = [];
@@ -19,12 +20,13 @@ class BillingController {
       await this.waitForApp();
 
       this.billingService = window.app.getService("billing");
+      this.pricingService = window.app.getService("pricing");
       console.log("Billing service:", this.billingService);
 
       this.setupEventListeners();
       this.setupKeyboardNavigation();
+      await this.populateCentersDropdown();
       await Promise.all([
-        this.populateCentersDropdown(),
         this.populateReferencesDropdown(),
         this.populatePackagesDropdown(),
       ]);
@@ -89,6 +91,16 @@ class BillingController {
           // Trigger add for the currently selected package
           this.handlePackageSelection({ target: packageSelect });
         }
+      });
+    }
+
+    const centerSelect = document.getElementById("center-dropdown");
+    if (centerSelect) {
+      centerSelect.addEventListener("change", (event) => {
+        this.handleCenterChange(event).catch((error) => {
+          console.error("Error handling center change:", error);
+          window.app.showError("Failed to refresh center prices");
+        });
       });
     }
 
@@ -716,10 +728,12 @@ class BillingController {
     }
 
     try {
-      const packageService = window.app.getService("package");
-      const packageData = await packageService.getPackageById(packageId);
-      // Add all tests from the selected package into the bill
-      this.addPackageTestsToBill(packageData);
+      const pricingService = this.pricingService || window.app.getService("pricing");
+      const packageData = await pricingService.getResolvedPackageById(
+        packageId,
+        this.getSelectedCenterId()
+      );
+      this.addPackageToBill(packageData);
     } catch (error) {
       console.error("Error loading package:", error);
       window.app.showError("Failed to load package");
@@ -734,14 +748,26 @@ class BillingController {
       id: packageData.id,
       test_name: packageData.package_name,
       short_name: packageData.short_name || packageData.package_name,
-      price: packageData.price || 0,
+      price: parseFloat(packageData.resolved_price ?? packageData.price) || 0,
       qty: 1,
       category: "Package",
+      itemType: "package",
+      global_price: parseFloat(packageData.global_price ?? packageData.price) || 0,
+      center_price:
+        packageData.center_price == null
+          ? null
+          : parseFloat(packageData.center_price) || 0,
+      resolved_price:
+        parseFloat(packageData.resolved_price ?? packageData.price) || 0,
+      has_center_price: Boolean(packageData.has_center_price),
+      package_tests: Array.isArray(packageData.package_tests)
+        ? packageData.package_tests
+        : [],
     };
 
-    // Avoid duplicates by id and name
+    // Avoid duplicate package lines
     const exists = this.selectedTests.some(
-      (t) => t.id === item.id && t.test_name === item.test_name
+      (t) => t.itemType === "package" && t.id === item.id
     );
     if (!exists) {
       this.selectedTests.push(item);
@@ -762,58 +788,9 @@ class BillingController {
     );
   }
 
-  // Add all tests from a package into the bill (preferred behavior)
+  // Legacy helper retained for compatibility with older call paths.
   addPackageTestsToBill(packageData) {
-    if (!packageData) return;
-
-    const pkgTests = Array.isArray(packageData.package_tests)
-      ? packageData.package_tests
-      : [];
-
-    if (pkgTests.length === 0) {
-      // Fallback: if package has no tests linked, add the package as a single item
-      this.addPackageToBill(packageData);
-      return;
-    }
-
-    let addedCount = 0;
-    for (const pt of pkgTests) {
-      const testId = pt.test_id;
-      const t = pt.tests || {};
-      if (
-        testId &&
-        !this.selectedTests.some((x) => x.id === testId)
-      ) {
-        this.selectedTests.push({
-          id: testId,
-          test_name: t.test_name || "",
-          short_name: t.short_name || "",
-          price: parseFloat(t.price) || 0,
-          qty: 1,
-        });
-        addedCount++;
-      }
-    }
-
-    // After batch add, update totals and table once
-    this.updateBillTotals();
-    this.updateTestTable();
-
-    // Reset dropdown to placeholder after adding
-    const dropdown = document.getElementById("package-dropdown");
-    if (dropdown) {
-      dropdown.selectedIndex = 0;
-    }
-
-    if (addedCount > 0) {
-      window.app.showSuccess(
-        `Added ${addedCount} test(s) from package "${packageData.package_name}"`
-      );
-    } else {
-      window.app.showInfo(
-        `All tests from package "${packageData.package_name}" are already added`
-      );
-    }
+    this.addPackageToBill(packageData);
   }
 
   // Handle discount change
@@ -896,6 +873,22 @@ class BillingController {
     }
     // TODO: add selectedPackages if needed
     return total;
+  }
+
+  getPriceSourceLabel(item) {
+    if (item?.pricing_source === "saved_bill") {
+      return "Saved bill price";
+    }
+    return item?.has_center_price ? "Center price" : "Global default";
+  }
+
+  renderPriceCell(item) {
+    const price = parseFloat(item?.price) || 0;
+    const source = this.getPriceSourceLabel(item);
+    return `
+      <div>${price.toFixed(2)}</div>
+      <div class="small text-muted">${source}</div>
+    `;
   }
 
   // Update remaining amount
@@ -1215,14 +1208,19 @@ class BillingController {
     if (!dropdown) return;
     dropdown.innerHTML = "<option>Loading packages...</option>";
     try {
-      const packageService = window.app.getService("package");
-      const packages = await packageService.getPackagesForDropdown();
+      const pricingService = this.pricingService || window.app.getService("pricing");
+      const packages = pricingService
+        ? await pricingService.getPackagesForBilling(this.getSelectedCenterId())
+        : [];
       dropdown.innerHTML = "<option>Select Package</option>";
       if (packages && packages.length > 0) {
         packages.forEach((pkg) => {
           const option = document.createElement("option");
           option.value = pkg.id;
-          option.textContent = `${pkg.package_name} (${pkg.pgid})`;
+          const source = pkg.has_center_price ? "Center" : "Global";
+          option.textContent = `${pkg.package_name} (${pkg.pgid}) - Rs. ${(
+            parseFloat(pkg.resolved_price ?? pkg.price) || 0
+          ).toFixed(2)} [${source}]`;
           dropdown.appendChild(option);
         });
       } else {
@@ -1240,6 +1238,76 @@ class BillingController {
       return dropdown.value;
     }
     return null;
+  }
+
+  async handleCenterChange() {
+    await this.populatePackagesDropdown();
+    await this.repriceSelectedItems();
+  }
+
+  async repriceSelectedItems() {
+    if (!this.pricingService || !Array.isArray(this.selectedTests) || this.selectedTests.length === 0) {
+      this.updateBillTotals();
+      this.updateTestTable();
+      return;
+    }
+
+    const centerId = this.getSelectedCenterId();
+    const testIds = this.selectedTests
+      .filter((item) => item.itemType !== "package")
+      .map((item) => item.id)
+      .filter(Boolean);
+    const packageIds = this.selectedTests
+      .filter((item) => item.itemType === "package")
+      .map((item) => item.id)
+      .filter(Boolean);
+
+    const [resolvedTests, resolvedPackages] = await Promise.all([
+      testIds.length > 0
+        ? this.pricingService.getResolvedTestsByIds(testIds, centerId)
+        : Promise.resolve([]),
+      packageIds.length > 0
+        ? this.pricingService.getResolvedPackagesByIds(packageIds, centerId)
+        : Promise.resolve([]),
+    ]);
+
+    const resolvedTestMap = new Map(
+      resolvedTests.map((item) => [item.id, item])
+    );
+    const resolvedPackageMap = new Map(
+      resolvedPackages.map((item) => [item.id, item])
+    );
+
+    this.selectedTests = this.selectedTests.map((item) => {
+      if (item.itemType === "package") {
+        const resolved = resolvedPackageMap.get(item.id);
+        return resolved
+          ? {
+              ...item,
+              price: parseFloat(resolved.resolved_price ?? resolved.price) || 0,
+              global_price: resolved.global_price,
+              center_price: resolved.center_price,
+              resolved_price: resolved.resolved_price,
+              has_center_price: resolved.has_center_price,
+            }
+          : item;
+      }
+
+      const resolved = resolvedTestMap.get(item.id);
+      return resolved
+        ? {
+            ...item,
+            price: parseFloat(resolved.resolved_price ?? resolved.price) || 0,
+            global_price: resolved.global_price,
+            center_price: resolved.center_price,
+            resolved_price: resolved.resolved_price,
+            has_center_price: resolved.has_center_price,
+          }
+        : item;
+    });
+
+    this.updateBillTotals();
+    this.updateTestTable();
   }
 
   // Get selected reference ID
@@ -1373,17 +1441,52 @@ class BillingController {
 
   // Get bill items
   getBillItems() {
-    // Return selected tests as bill items
-    return this.selectedTests.map((t) => {
-      const quantity = parseFloat(t.qty || t.quantity) || 1;
-      const price = parseFloat(t.price) || 0;
-      return {
-        test_id: t.id,
+    const billItems = [];
+
+    this.selectedTests.forEach((item) => {
+      const quantity = parseFloat(item.qty || item.quantity) || 1;
+      const price = parseFloat(item.price) || 0;
+
+      if (item.itemType === "package") {
+        billItems.push({
+          package_id: item.id,
+          quantity: quantity,
+          unit_price: price,
+          total_price: quantity * price,
+          is_package_component: false,
+        });
+
+        const packageTests = Array.isArray(item.package_tests)
+          ? item.package_tests
+          : [];
+
+        packageTests.forEach((packageTest) => {
+          const componentTestId =
+            packageTest.test_id || packageTest.tests?.id || null;
+          if (!componentTestId) return;
+
+          billItems.push({
+            test_id: componentTestId,
+            package_id: item.id,
+            quantity: quantity,
+            unit_price: 0,
+            total_price: 0,
+            is_package_component: true,
+          });
+        });
+        return;
+      }
+
+      billItems.push({
+        test_id: item.id,
         quantity: quantity,
         unit_price: price,
         total_price: quantity * price,
-      };
+        is_package_component: false,
+      });
     });
+
+    return billItems;
   }
 
   // Validate bill data
@@ -2158,8 +2261,9 @@ class BillingController {
               id: item.tests.id,
               test_name: item.tests.test_name,
               short_name: item.tests.short_name,
-              price: item.tests.price,
+              price: parseFloat(item.unit_price) || 0,
               qty: item.quantity || 1,
+              itemType: "test",
             };
           } else if (item.packages) {
             return {
@@ -2167,8 +2271,9 @@ class BillingController {
               test_name: item.packages.package_name,
               short_name:
                 item.packages.short_name || item.packages.package_name,
-              price: item.packages.price,
+              price: parseFloat(item.unit_price) || 0,
               qty: item.quantity || 1,
+              itemType: "package",
             };
           }
           return null;
@@ -2437,18 +2542,38 @@ class BillingController {
               id: item.tests.id,
               test_name: item.tests.test_name,
               short_name: item.tests.short_name,
-              price: item.tests.price,
+              price: parseFloat(item.unit_price) || 0,
               category: item.tests.category,
-              quantity: item.quantity || 1,
+              qty: item.quantity || 1,
+              itemType: "test",
+              pricing_source: "saved_bill",
             });
           } else if (item.packages) {
+            let packageTests = [];
+            try {
+              if (this.pricingService) {
+                const packageData = await this.pricingService.getResolvedPackageById(
+                  item.packages.id,
+                  this.getSelectedCenterId()
+                );
+                packageTests = Array.isArray(packageData?.package_tests)
+                  ? packageData.package_tests
+                  : [];
+              }
+            } catch (packageError) {
+              console.warn("Failed to load package component tests for editing:", packageError);
+            }
+
             this.selectedTests.push({
               id: item.packages.id,
               test_name: item.packages.package_name,
               short_name: item.packages.short_name,
-              price: item.packages.price,
+              price: parseFloat(item.unit_price) || 0,
               category: "Package",
-              quantity: item.quantity || 1,
+              qty: item.quantity || 1,
+              itemType: "package",
+              package_tests: packageTests,
+              pricing_source: "saved_bill",
             });
           }
         }
@@ -2529,8 +2654,10 @@ class BillingController {
       tests = this._lastTestSuggestions;
     } else {
       // fallback: search again
-      const testService = window.app.getService("test");
-      tests = await testService.searchTests(value);
+      const pricingService = this.pricingService || window.app.getService("pricing");
+      tests = pricingService
+        ? await pricingService.searchTestsForBilling(value, this.getSelectedCenterId())
+        : [];
       if ((!tests || tests.length === 0) && window.Config) {
         const sampleTests = window.Config.getSampleData("tests") || [];
         tests = sampleTests.filter(
@@ -2645,8 +2772,13 @@ class BillingController {
       return;
     }
     try {
-      const testService = window.app.getService("test");
-      let tests = await testService.searchTests(searchTerm);
+      const pricingService = this.pricingService || window.app.getService("pricing");
+      let tests = pricingService
+        ? await pricingService.searchTestsForBilling(
+            searchTerm,
+            this.getSelectedCenterId()
+          )
+        : [];
       console.log("Tests from service:", tests);
 
       // Fallback to sample data if no results from DB
@@ -2701,8 +2833,10 @@ class BillingController {
             JSON.stringify(test)
           )}')">
         <strong>${test.test_name}</strong> (${test.short_name}) - Rs. ${
-            test.price
-          }
+            (parseFloat(test.resolved_price ?? test.price) || 0).toFixed(2)
+          } <span class="small text-muted">[${
+            test.has_center_price ? "Center" : "Global"
+          }]</span>
       </div>`
       )
       .join("");
@@ -2723,10 +2857,18 @@ class BillingController {
     // Add to selectedTests if not already present
     if (
       !this.selectedTests.some(
-        (t) => t.id === test.id && t.test_name === test.test_name
+        (t) =>
+          t.itemType !== "package" &&
+          t.id === test.id &&
+          t.test_name === test.test_name
       )
     ) {
-      this.selectedTests.push({ ...test, qty: 1 });
+      this.selectedTests.push({
+        ...test,
+        itemType: "test",
+        price: parseFloat(test.resolved_price ?? test.price) || 0,
+        qty: 1,
+      });
       console.log("Added test to selectedTests:", this.selectedTests);
       this.updateBillTotals();
       this.updateTestTable();
@@ -2776,7 +2918,7 @@ class BillingController {
         return `<tr>
             <td>${t.test_name || ""}</td>
             <td>${t.short_name || ""}</td>
-            <td>${price.toFixed(2)}</td>
+            <td>${this.renderPriceCell(t)}</td>
             <td>${qty}</td>
             <td>${total.toFixed(2)}</td>
             <td><button class="btn btn-danger btn-sm" data-action="delete-test" data-index="${idx}"><i class="fas fa-trash"></i></button></td>

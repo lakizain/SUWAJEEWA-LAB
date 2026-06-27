@@ -116,6 +116,29 @@ class CenterService {
     }
   }
 
+  async queryCenters({ selectClause = "*", activeOnly = false } = {}) {
+    if (!this.isSupabaseAvailable()) {
+      throw new Error("Supabase connection is not available");
+    }
+
+    let query = this.supabase
+      .from("centers")
+      .select(selectClause)
+      .order("center_name", { ascending: true });
+
+    if (activeOnly) {
+      query = query.eq("is_active", true);
+    }
+
+    if (!this.isUserAdmin() && this.getUserCenterId()) {
+      query = query.eq("id", this.getUserCenterId());
+    }
+
+    const { data: centers, error } = await query;
+    if (error) throw error;
+    return centers || [];
+  }
+
   async getCentersForDropdown() {
     try {
       if (!this.isSupabaseAvailable()) {
@@ -127,25 +150,30 @@ class CenterService {
         return this._centersDropdownCache.data;
       }
 
-      let query = this.supabase
-        .from("centers")
-        .select("id, center_name")
-        .eq("is_active", true)
-        .order("center_name", { ascending: true });
-
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
-        query = query.eq("id", this.getUserCenterId());
-      }
-
-      const { data: centers, error } = await query;
-
-      if (error) throw error;
+      const centers = await this.queryCenters({
+        selectClause: "id, center_name, cid",
+        activeOnly: true,
+      });
       this._centersDropdownCache = { data: centers || [], ts: now };
       return centers || [];
     } catch (error) {
       console.error("Error getting centers for dropdown:", error);
       return this.getActiveCenters();
     }
+  }
+
+  async getCentersForDropdownStrict() {
+    const now = Date.now();
+    if (this._centersDropdownCache.data && now - this._centersDropdownCache.ts < 60000) {
+      return this._centersDropdownCache.data;
+    }
+
+    const centers = await this.queryCenters({
+      selectClause: "id, center_name, cid",
+      activeOnly: true,
+    });
+    this._centersDropdownCache = { data: centers, ts: now };
+    return centers;
   }
 
   // Get active centers
@@ -175,20 +203,7 @@ class CenterService {
         ];
       }
 
-      let query = this.supabase
-        .from("centers")
-        .select("*")
-        .eq("is_active", true)
-        .order("center_name", { ascending: true });
-
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
-        query = query.eq("id", this.getUserCenterId());
-      }
-
-      const { data: centers, error } = await query;
-
-      if (error) throw error;
-      return centers || [];
+      return await this.queryCenters({ selectClause: "*", activeOnly: true });
     } catch (error) {
       console.error("Error getting active centers:", error);
       // Return sample data on error
@@ -213,6 +228,10 @@ class CenterService {
         },
       ];
     }
+  }
+
+  async getActiveCentersStrict() {
+    return this.queryCenters({ selectClause: "*", activeOnly: true });
   }
 
   // Get center by ID

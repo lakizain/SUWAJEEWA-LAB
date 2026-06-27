@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUWAJEEWA LABORATORIES - Pricing Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://*.supabase.co; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self';">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .header {
+            background: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 1rem 0;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #111;
+            font-size: 1.2rem;
+        }
+
+        .company-name {
+            color: #007bff;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin: 0;
+        }
+
+        .company-subtitle {
+            color: #6c757d;
+            font-size: 0.8rem;
+            margin: 0;
+        }
+
+        .btn-logout {
+            background: #dc3545;
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-logout:hover {
+            background: #c82333;
+            color: white;
+        }
+
+        .main-title {
+            text-align: center;
+            color: #495057;
+            font-size: 2rem;
+            font-weight: 600;
+            margin: 2rem 0;
+        }
+
+        .content-section {
+            padding: 2rem 0;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            color: #495057;
+            font-weight: 600;
+        }
+
+        .panel-header i {
+            color: #007bff;
+        }
+
+        .form-label {
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .form-control {
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+
+        .form-control:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+
+        .btn-primary {
+            background: #007bff;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+        }
+
+        .btn-success {
+            background: #28a745;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            color: #212529;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            color: white;
+        }
+
+        .table {
+            margin-bottom: 0;
+        }
+
+        .table th {
+            background: #343a40;
+            color: white;
+            border: none;
+            font-weight: 500;
+        }
+
+        .table td {
+            vertical-align: middle;
+        }
+
+        .badge-global {
+            background: #6c757d;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+
+        .badge-center {
+            background: #007bff;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+
+        .price-input {
+            width: 100px;
+            text-align: right;
+        }
+
+        .price-cell {
+            position: relative;
+        }
+
+        .price-indicator {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.7rem;
+            pointer-events: none;
+        }
+
+        .tab-content {
+            padding: 1.5rem 0;
+        }
+
+        .nav-tabs .nav-link {
+            color: #495057;
+        }
+
+        .nav-tabs .nav-link.active {
+            color: #007bff;
+            font-weight: 500;
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .loading-spinner.show {
+            display: block;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #6c757d;
+            padding: 2rem;
+        }
+
+        .price-diff {
+            font-size: 0.8rem;
+            color: #28a745;
+        }
+
+        .price-diff.increase {
+            color: #dc3545;
+        }
+
+        .price-diff.decrease {
+            color: #28a745;
+        }
+
+        .pricing-summary {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .summary-chip {
+            background: #f1f3f5;
+            border-radius: 999px;
+            padding: 0.45rem 0.9rem;
+            font-size: 0.9rem;
+            color: #495057;
+        }
+
+        .pricing-note {
+            border-left: 4px solid #0d6efd;
+            background: #f8fbff;
+            padding: 0.9rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.25rem;
+            color: #495057;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation will be loaded here by nav.js -->
+
+    <!-- Main Content -->
+    <div class="content-section">
+        <div class="container-fluid">
+            <h1 class="main-title">
+                <i class="fas fa-tags"></i>
+                Center-Wise Pricing Management
+            </h1>
+
+            <div class="pricing-note">
+                Global prices in the tests and packages tables remain the system default. Save a center price only when that center needs an override.
+            </div>
+
+            <div id="pricingPageAlert"></div>
+
+            <!-- Center Selection Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <i class="fas fa-building"></i>
+                    <span>Select Center</span>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Center *</label>
+                        <select id="centerSelect" class="form-control">
+                            <option value="">Loading centers...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <button id="loadPricingBtn" class="btn btn-primary w-100">
+                            <i class="fas fa-sync-alt"></i>
+                            Load Pricing
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pricing Tabs -->
+            <ul class="nav nav-tabs" id="pricingTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="test-pricing-tab" data-bs-toggle="tab" data-bs-target="#test-pricing" type="button" role="tab">
+                        <i class="fas fa-vial"></i>
+                        Test Pricing
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="package-pricing-tab" data-bs-toggle="tab" data-bs-target="#package-pricing" type="button" role="tab">
+                        <i class="fas fa-box"></i>
+                        Package Pricing
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content">
+                <!-- Test Pricing Tab -->
+                <div class="tab-pane fade show active" id="test-pricing" role="tabpanel">
+                    <div class="panel">
+                        <div class="panel-header d-flex justify-content-between">
+                            <div>
+                                <i class="fas fa-vial"></i>
+                                <span>Test Pricing Matrix</span>
+                            </div>
+                            <div>
+                                <button id="saveTestPricesBtn" class="btn btn-success">
+                                    <i class="fas fa-save"></i>
+                                    Save All Prices
+                                </button>
+                                <button id="resetTestPricesBtn" class="btn btn-warning">
+                                    <i class="fas fa-undo"></i>
+                                    Reset to Global
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 align-items-end mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Search Tests</label>
+                                <input type="text" id="testPricingSearch" class="form-control"
+                                    placeholder="Search by test name or short name">
+                            </div>
+                        </div>
+
+                        <div class="pricing-summary" id="testPricingSummary"></div>
+
+                        <div class="loading-spinner" id="testLoadingSpinner">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p>Loading test pricing...</p>
+                        </div>
+
+                        <div id="testPricingContent">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Test Name</th>
+                                            <th>Short Name</th>
+                                            <th>Global Price</th>
+                                            <th>Center Price</th>
+                                            <th>Difference</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="testPricingTableBody">
+                                        <tr>
+                                            <td colspan="6" class="text-center">
+                                                Select a center and click "Load Pricing"
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Package Pricing Tab -->
+                <div class="tab-pane fade" id="package-pricing" role="tabpanel">
+                    <div class="panel">
+                        <div class="panel-header d-flex justify-content-between">
+                            <div>
+                                <i class="fas fa-box"></i>
+                                <span>Package Pricing Matrix</span>
+                            </div>
+                            <div>
+                                <button id="savePackagePricesBtn" class="btn btn-success">
+                                    <i class="fas fa-save"></i>
+                                    Save All Prices
+                                </button>
+                                <button id="resetPackagePricesBtn" class="btn btn-warning">
+                                    <i class="fas fa-undo"></i>
+                                    Reset to Global
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 align-items-end mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Search Packages</label>
+                                <input type="text" id="packagePricingSearch" class="form-control"
+                                    placeholder="Search by package name or PGID">
+                            </div>
+                        </div>
+
+                        <div class="pricing-summary" id="packagePricingSummary"></div>
+
+                        <div class="loading-spinner" id="packageLoadingSpinner">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p>Loading package pricing...</p>
+                        </div>
+
+                        <div id="packagePricingContent">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Package Name</th>
+                                            <th>PGID</th>
+                                            <th>Global Price</th>
+                                            <th>Center Price</th>
+                                            <th>Difference</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="packagePricingTableBody">
+                                        <tr>
+                                            <td colspan="6" class="text-center">
+                                                Select a center and click "Load Pricing"
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="config/config.js"></script>
+    <script src="config/supabase.js"></script>
+    <script src="js/services/centerService.js"></script>
+    <script src="js/services/testService.js"></script>
+    <script src="js/services/packageService.js"></script>
+    <script src="js/services/pricingService.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/controllers/pricingManagementController.js"></script>
+    <script src="js/nav.js"></script>
+</body>
+
+</html>

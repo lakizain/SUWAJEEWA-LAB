@@ -179,6 +179,12 @@ class LaboratoryApp {
         console.warn("PackageService not available");
       }
 
+      if (typeof PricingService !== "undefined") {
+        this.services.pricing = new PricingService();
+      } else {
+        console.warn("PricingService not available");
+      }
+
       console.log("Services initialized:", Object.keys(this.services));
     } catch (error) {
       console.error("Error initializing services:", error);

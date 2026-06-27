@@ -37,6 +37,18 @@ class BillingService {
     return this.supabase !== null;
   }
 
+  filterBillItemsForDisplay(items) {
+    return (items || []).filter((item) => !item?.is_package_component);
+  }
+
+  normalizeBillForDisplay(bill) {
+    if (!bill || !Array.isArray(bill.bill_items)) return bill;
+    return {
+      ...bill,
+      bill_items: this.filterBillItemsForDisplay(bill.bill_items),
+    };
+  }
+
   // Generate unique bill number
   async generateBillNumber() {
     if (!this.isSupabaseAvailable()) {
@@ -265,6 +277,7 @@ class BillingService {
           quantity: quantity,
           unit_price: unitPrice,
           total_price: item.total_price || quantity * unitPrice,
+          is_package_component: Boolean(item.is_package_component),
         };
       });
 
@@ -318,7 +331,7 @@ class BillingService {
         .single();
 
       if (error) throw error;
-      return bill;
+      return this.normalizeBillForDisplay(bill);
     } catch (error) {
       console.error("Error getting bill:", error);
       throw error;
@@ -345,7 +358,7 @@ class BillingService {
         .single();
 
       if (error) throw error;
-      return bill;
+      return this.normalizeBillForDisplay(bill);
     } catch (error) {
       console.error("Error getting bill by number:", error);
       throw error;
@@ -353,8 +366,9 @@ class BillingService {
   }
 
   // Get bill items by bill ID
-  async getBillItems(billId) {
+  async getBillItems(billId, options = {}) {
     try {
+      const includeComponents = options.includeComponents === true;
       const { data: billItems, error } = await this.supabase
         .from("bill_items")
         .select(
@@ -367,7 +381,9 @@ class BillingService {
         .eq("bill_id", billId);
 
       if (error) throw error;
-      return billItems;
+      return includeComponents
+        ? billItems || []
+        : this.filterBillItemsForDisplay(billItems);
     } catch (error) {
       console.error("Error getting bill items:", error);
       throw error;
@@ -396,6 +412,7 @@ class BillingService {
                     paid_amount,
                     remaining_amount,
                     bill_items (
+                      is_package_component,
                       tests (test_name),
                       packages (package_name)
                     )
@@ -405,7 +422,7 @@ class BillingService {
         .order("bill_date", { ascending: false });
 
       if (error) throw error;
-      return bills;
+      return (bills || []).map((bill) => this.normalizeBillForDisplay(bill));
     } catch (error) {
       console.error("Error getting patient history:", error);
       throw error;
@@ -504,6 +521,7 @@ class BillingService {
             ref_by,
             center_id,
             bill_items(
+              is_package_component,
               tests(test_name),
               packages(package_name)
             )
@@ -531,7 +549,7 @@ class BillingService {
 
       const { data, error } = await q;
       if (error) throw error;
-      return data || [];
+      return (data || []).map((bill) => this.normalizeBillForDisplay(bill));
     } catch (error) {
       console.error("Error searching patient history:", error);
       return [];
@@ -786,7 +804,7 @@ class BillingService {
       }
 
       console.log(`Billing data for reports: Found ${data.length} bills`);
-      return data;
+      return (data || []).map((bill) => this.normalizeBillForDisplay(bill));
     } catch (error) {
       console.error("Error getting billing data for reports:", error);
       return [];

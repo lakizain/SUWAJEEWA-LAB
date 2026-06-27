@@ -139,6 +139,28 @@ CREATE TABLE IF NOT EXISTS package_tests (
     UNIQUE(package_id, test_id)
 );
 
+CREATE TABLE IF NOT EXISTS center_test_prices (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    center_id UUID NOT NULL REFERENCES centers(id) ON DELETE CASCADE,
+    test_id UUID NOT NULL REFERENCES tests(id) ON DELETE CASCADE,
+    price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(center_id, test_id)
+);
+
+CREATE TABLE IF NOT EXISTS center_package_prices (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    center_id UUID NOT NULL REFERENCES centers(id) ON DELETE CASCADE,
+    package_id UUID NOT NULL REFERENCES packages(id) ON DELETE CASCADE,
+    price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(center_id, package_id)
+);
+
 -- =============================================
 -- BILLING MANAGEMENT TABLES
 -- =============================================
@@ -176,6 +198,7 @@ CREATE TABLE IF NOT EXISTS bill_items (
     quantity INTEGER DEFAULT 1,
     unit_price DECIMAL(10,2) NOT NULL,
     total_price DECIMAL(10,2) NOT NULL,
+    is_package_component BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -263,6 +286,13 @@ CREATE INDEX IF NOT EXISTS idx_bill_items_package_id ON bill_items(package_id);
 -- Package tests indexes
 CREATE INDEX IF NOT EXISTS idx_package_tests_package_id ON package_tests(package_id);
 CREATE INDEX IF NOT EXISTS idx_package_tests_test_id ON package_tests(test_id);
+CREATE INDEX IF NOT EXISTS idx_center_test_prices_center_id ON center_test_prices(center_id);
+CREATE INDEX IF NOT EXISTS idx_center_test_prices_test_id ON center_test_prices(test_id);
+CREATE INDEX IF NOT EXISTS idx_center_test_prices_center_test ON center_test_prices(center_id, test_id);
+CREATE INDEX IF NOT EXISTS idx_center_package_prices_center_id ON center_package_prices(center_id);
+CREATE INDEX IF NOT EXISTS idx_center_package_prices_package_id ON center_package_prices(package_id);
+CREATE INDEX IF NOT EXISTS idx_center_package_prices_center_package ON center_package_prices(center_id, package_id);
+CREATE INDEX IF NOT EXISTS idx_bill_items_package_component ON bill_items(package_id, is_package_component);
 
 -- Test subcategories indexes
 CREATE INDEX IF NOT EXISTS idx_test_subcategories_test_id ON test_subcategories(test_id);
@@ -308,6 +338,12 @@ CREATE TRIGGER update_tests_updated_at BEFORE UPDATE ON tests
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_packages_updated_at BEFORE UPDATE ON packages
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_center_test_prices_updated_at BEFORE UPDATE ON center_test_prices
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_center_package_prices_updated_at BEFORE UPDATE ON center_package_prices
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_bills_updated_at BEFORE UPDATE ON bills
@@ -368,6 +404,8 @@ ALTER TABLE test_subcategories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subcategory_suggestions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reference_ranges ENABLE ROW LEVEL SECURITY;
 ALTER TABLE package_tests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE center_test_prices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE center_package_prices ENABLE ROW LEVEL SECURITY;
 
 -- Create permissive policies for development (adjust for production)
 DO $$ BEGIN
@@ -454,6 +492,18 @@ DO $$ BEGIN
         CREATE POLICY "Allow all for authenticated" ON package_tests
             FOR ALL TO authenticated USING (true) WITH CHECK (true);
     END IF;
+
+    -- Center test prices table policies
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='center_test_prices' AND policyname='Allow all for authenticated') THEN
+        CREATE POLICY "Allow all for authenticated" ON center_test_prices
+            FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    END IF;
+
+    -- Center package prices table policies
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='center_package_prices' AND policyname='Allow all for authenticated') THEN
+        CREATE POLICY "Allow all for authenticated" ON center_package_prices
+            FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    END IF;
 END $$;
 
 -- =============================================
@@ -506,6 +556,104 @@ FROM packages p
 LEFT JOIN package_tests pt ON p.id = pt.package_id
 LEFT JOIN tests t ON pt.test_id = t.id
 GROUP BY p.id, p.pgid, p.package_name, p.price, p.is_active;
+
+CREATE OR REPLACE FUNCTION get_test_price_for_center(p_center_id UUID, p_test_id UUID)
+RETURNS DECIMAL(10,2) AS $$
+DECLARE
+    v_center_price DECIMAL(10,2);
+    v_global_price DECIMAL(10,2);
+BEGIN
+    SELECT ctp.price
+      INTO v_center_price
+      FROM center_test_prices ctp
+     WHERE ctp.center_id = p_center_id
+       AND ctp.test_id = p_test_id
+       AND ctp.is_active = true
+     LIMIT 1;
+
+    IF v_center_price IS NOT NULL THEN
+        RETURN v_center_price;
+    END IF;
+
+    SELECT t.price
+      INTO v_global_price
+      FROM tests t
+     WHERE t.id = p_test_id
+     LIMIT 1;
+
+    RETURN COALESCE(v_global_price, 0);
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+CREATE OR REPLACE FUNCTION get_package_price_for_center(p_center_id UUID, p_package_id UUID)
+RETURNS DECIMAL(10,2) AS $$
+DECLARE
+    v_center_price DECIMAL(10,2);
+    v_global_price DECIMAL(10,2);
+BEGIN
+    SELECT cpp.price
+      INTO v_center_price
+      FROM center_package_prices cpp
+     WHERE cpp.center_id = p_center_id
+       AND cpp.package_id = p_package_id
+       AND cpp.is_active = true
+     LIMIT 1;
+
+    IF v_center_price IS NOT NULL THEN
+        RETURN v_center_price;
+    END IF;
+
+    SELECT p.price
+      INTO v_global_price
+      FROM packages p
+     WHERE p.id = p_package_id
+     LIMIT 1;
+
+    RETURN COALESCE(v_global_price, 0);
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+CREATE OR REPLACE VIEW test_pricing_view AS
+SELECT
+    t.id AS test_id,
+    t.test_name,
+    t.short_name,
+    t.price AS global_price,
+    c.id AS center_id,
+    c.center_name,
+    c.cid,
+    ctp.price AS center_price,
+    COALESCE(ctp.price, t.price) AS resolved_price,
+    (ctp.price IS NOT NULL) AS has_center_price
+FROM tests t
+CROSS JOIN centers c
+LEFT JOIN center_test_prices ctp
+       ON ctp.center_id = c.id
+      AND ctp.test_id = t.id
+      AND ctp.is_active = true
+WHERE t.is_active = true
+  AND c.is_active = true;
+
+CREATE OR REPLACE VIEW package_pricing_view AS
+SELECT
+    p.id AS package_id,
+    p.package_name,
+    p.pgid,
+    p.price AS global_price,
+    c.id AS center_id,
+    c.center_name,
+    c.cid,
+    cpp.price AS center_price,
+    COALESCE(cpp.price, p.price) AS resolved_price,
+    (cpp.price IS NOT NULL) AS has_center_price
+FROM packages p
+CROSS JOIN centers c
+LEFT JOIN center_package_prices cpp
+       ON cpp.center_id = c.id
+      AND cpp.package_id = p.id
+      AND cpp.is_active = true
+WHERE p.is_active = true
+  AND c.is_active = true;
 
 -- User management view
 CREATE OR REPLACE VIEW user_management AS
@@ -591,4 +739,3 @@ COMMENT ON TABLE test_report_headers IS 'Test report headers and comments';
 -- =============================================
 -- END OF SCHEMA
 -- =============================================
-
