@@ -424,7 +424,8 @@
                             Print with signature
                         </label>
                     </div>
-                    <button class="btn btn-primary">Save & Print</button>
+                    <button class="btn btn-success" id="saveBtn">Save</button>
+                    <button class="btn btn-primary" id="savePrintBtn">Save & Print</button>
                     <button class="btn btn-outline-secondary" id="previewReportBtn">Preview</button>
                 </div>
             </div>
@@ -936,29 +937,42 @@
             document.getElementById('print-generated-date').textContent = `${dateStr} ${timeStr}`;
 
             // Get data from form fields (adjust selectors based on your actual form structure)
-            const reportIdInput = document.querySelector('#tab-summary input[readonly]');
-            const billNoInput = document.querySelector('#tab-summary input[readonly]');
-            const patientInput = document.querySelector('#tab-summary input[readonly]');
-            const ageInput = document.querySelector('#tab-summary input[readonly]');
-            const genderInput = document.querySelector('#tab-summary input[readonly]');
-            const testTypeInput = document.querySelector('#tab-summary input[readonly]');
-            const specimenInput = document.querySelector('#tab-summary input[readonly]');
-            const refByInput = document.querySelector('#tab-summary input[readonly]');
+            const allReadOnlyInputs = document.querySelectorAll('#tab-summary input[readonly]');
+            const reportIdInput = allReadOnlyInputs[0];
+            const billNoInput = allReadOnlyInputs[1];
+            const patientInput = allReadOnlyInputs[2];
+            const titleInput = allReadOnlyInputs[3];
+            const ageInput = allReadOnlyInputs[4];
+            const genderInput = allReadOnlyInputs[5];
+            const testTypeInput = allReadOnlyInputs[6];
+            const specimenInput = allReadOnlyInputs[7];
+            const refByInput = allReadOnlyInputs[8];
+
+            // Format age to use YEARS, MONTHS, DAYS instead of y, m, d
+            const formatAge = (ageStr) => {
+                return ageStr
+                    .replace(/(\d+)y/g, "$1 YEARS")
+                    .replace(/(\d+)m/g, "$1 MONTHS")
+                    .replace(/(\d+)d/g, "$1 DAYS")
+                    .toUpperCase();
+            };
 
             // Populate patient details
-            if (reportIdInput) document.getElementById('print-report-id').textContent = reportIdInput.value || 'RPT-001';
-            if (billNoInput) document.getElementById('print-bill-no').textContent = billNoInput.value || 'BIL-001';
-            if (patientInput) document.getElementById('print-patient-name').textContent = patientInput.value || 'John Doe';
-            if (ageInput) document.getElementById('print-patient-age').textContent = ageInput.value || '35';
-            if (genderInput) document.getElementById('print-patient-gender').textContent = genderInput.value || 'Male';
-            if (testTypeInput) document.getElementById('print-test-type').textContent = testTypeInput.value || 'Blood Test';
-            if (specimenInput) document.getElementById('print-specimen').textContent = specimenInput.value || 'Blood';
-            if (refByInput) document.getElementById('print-referred-by').textContent = refByInput.value || 'Dr. Smith';
+            const title = (titleInput?.value || '').toUpperCase();
+            const patientName = (patientInput?.value || 'John Doe').toUpperCase();
+            if (reportIdInput) document.getElementById('print-report-id').textContent = (reportIdInput.value || 'RPT-001').toUpperCase();
+            if (billNoInput) document.getElementById('print-bill-no').textContent = (billNoInput.value || 'BIL-001').toUpperCase();
+            if (patientInput) document.getElementById('print-patient-name').textContent = title ? `${title} ${patientName}` : patientName;
+            if (ageInput) document.getElementById('print-patient-age').textContent = formatAge(ageInput.value || '35');
+            if (genderInput) document.getElementById('print-patient-gender').textContent = (genderInput.value || 'Male').toUpperCase();
+            if (testTypeInput) document.getElementById('print-test-type').textContent = (testTypeInput.value || 'Blood Test').toUpperCase();
+            if (specimenInput) document.getElementById('print-specimen').textContent = (specimenInput.value || 'Blood').toUpperCase();
+            if (refByInput) document.getElementById('print-referred-by').textContent = (refByInput.value || 'Dr. Smith').toUpperCase();
 
             // Get comments from textarea
             const commentsInput = document.getElementById('commentsResultInput');
             if (commentsInput) {
-                document.getElementById('print-comments').textContent = commentsInput.value || 'All test results are within normal limits. No abnormalities detected.';
+                document.getElementById('print-comments').textContent = (commentsInput.value || 'All test results are within normal limits. No abnormalities detected.').toUpperCase();
             }
 
             // Populate footer link image if available from selected test

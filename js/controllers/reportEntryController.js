@@ -165,10 +165,9 @@ class ReportEntryController {
     this.refByInput = allTextInputs[8] || null;
 
     // Action buttons
-    this.updateBtn = document.querySelector("button.btn.btn-primary");
-    this.previewBtn = document.querySelector(
-      "button.btn.btn-outline-secondary"
-    );
+    this.saveBtn = document.getElementById("saveBtn");
+    this.savePrintBtn = document.getElementById("savePrintBtn");
+    this.previewBtn = document.getElementById("previewReportBtn");
     this.printReportBtn = document.getElementById("printReportBtn");
     this.editBtn = document.querySelector("button.btn.btn-warning");
     this.printWithSignatureCheckbox =
@@ -249,8 +248,11 @@ class ReportEntryController {
     });
 
     // Action buttons
-    if (this.updateBtn) {
-      this.updateBtn.addEventListener("click", () => this.handleSaveAndPrint());
+    if (this.saveBtn) {
+      this.saveBtn.addEventListener("click", () => this.handleSaveOnly());
+    }
+    if (this.savePrintBtn) {
+      this.savePrintBtn.addEventListener("click", () => this.handleSaveAndPrint());
     }
     if (this.previewBtn) {
       this.previewBtn.addEventListener("click", () => this.handlePreview());
@@ -2139,6 +2141,11 @@ class ReportEntryController {
   }
 
   async handleSaveOnly() {
+    if (!this.selectedBill) {
+      this.showError("Please select a bill first");
+      return;
+    }
+
     try {
       // Collect inputs
       const results = this.collectTestResults();
@@ -2149,6 +2156,8 @@ class ReportEntryController {
         );
         return;
       }
+
+      // Save test results
       await this.saveTestResults(this.selectedBill.id, billItemId, results);
 
       // Save report header too (comments/special notes)
@@ -2166,17 +2175,17 @@ class ReportEntryController {
         console.warn("Failed saving report header:", e);
       }
 
-      // Update report status to completed
-      await this.updateReportStatus(billItemId, "completed");
+      // Update report status to ready
+      await this.updateReportStatus(billItemId, "ready");
 
-      // Return button to Edit state
-      if (this.editBtn) {
-        this.editBtn.textContent = "Edit";
-        this.editBtn.classList.remove("btn-success");
-        this.editBtn.classList.add("btn-warning");
-      }
+      // Show success
+      this.showSuccess("Report saved successfully!");
+
+      // Refresh bills table
+      await this.loadTodaysBills();
     } catch (e) {
-      // Errors are handled in save methods
+      console.error("Error in handleSaveOnly:", e);
+      this.showError("An error occurred while saving");
     }
   }
 
@@ -2277,19 +2286,27 @@ class ReportEntryController {
     const testName = billItem
       ? this.safeText(
           billItem.tests?.test_name || billItem.packages?.package_name || ""
-        )
-      : this.getTestTypes(bill);
+        ).toUpperCase()
+      : this.getTestTypes(bill).toUpperCase();
     const specimen = billItem
-      ? this.getSpecimenForTest(billItem)
-      : this.getSpecimenTypes(bill);
-    const age = this.safeText(this.ageInput?.value || "");
-    const gender = this.safeText(this.genderInput?.value || "");
-    const centerName = this.safeText(bill.centers?.center_name || "");
+      ? this.getSpecimenForTest(billItem).toUpperCase()
+      : this.getSpecimenTypes(bill).toUpperCase();
+    
+    // Format age to use YEARS, MONTHS, DAYS instead of y, m, d
+    const ageRaw = this.safeText(this.ageInput?.value || "");
+    const formattedAge = ageRaw
+      .replace(/(\d+)y/g, "$1 YEARS")
+      .replace(/(\d+)m/g, "$1 MONTHS")
+      .replace(/(\d+)d/g, "$1 DAYS")
+      .toUpperCase();
+    
+    const gender = this.safeText(this.genderInput?.value || "").toUpperCase();
+    const centerName = this.safeText(bill.centers?.center_name || "").toUpperCase();
     const commentsRaw = this.commentsResultInput?.value || "";
-    const commentsText = this.safeText(commentsRaw);
+    const commentsText = this.safeText(commentsRaw).toUpperCase();
     const hasComments = commentsRaw.trim().length > 0;
-    const notesText = this.safeText((this.specialNotesInput?.value ?? this.commentsResultInput?.value) || "");
-    const title = this.safeText(bill.patient_title || "");
+    const notesText = this.safeText((this.specialNotesInput?.value ?? this.commentsResultInput?.value) || "").toUpperCase();
+    const title = this.safeText(bill.patient_title || "").toUpperCase();
     
     // Get footer link (image URL) from the selected test
     const footerLink = billItem?.tests?.footer_text 
@@ -2422,12 +2439,12 @@ class ReportEntryController {
               <div class="info-col">
                 <div class="row"><div class="label">NAME</div><div class="colon">:</div><div>${title ? title + " " : ""}${this.safeText(
                   bill.patient_name
-                )}</div></div>
-                <div class="row"><div class="label">AGE</div><div class="colon">:</div><div>${age}</div></div>
+                ).toUpperCase()}</div></div>
+                <div class="row"><div class="label">AGE</div><div class="colon">:</div><div>${formattedAge}</div></div>
                 <div class="row"><div class="label">GENDER</div><div class="colon">:</div><div>${gender}</div></div>
                 <div class="row"><div class="label">REQUESTED BY</div><div class="colon">:</div><div>${this.safeText(
                   this.refByInput?.value || ""
-                )}</div></div>
+                ).toUpperCase()}</div></div>
                 <div class="row"><div class="label">CENTER</div><div class="colon">:</div><div>${centerName}</div></div>
               </div>
               <div class="info-col">
@@ -2435,10 +2452,8 @@ class ReportEntryController {
                 <div class="row"><div class="label">SAMPLE REPORTED ON</div><div class="colon">:</div><div>${printDate}</div></div>
                 <div class="row"><div class="label">INV NO</div><div class="colon">:</div><div>${this.safeText(
                   bill.bill_no
-                )}</div></div>
-                <div class="row"><div class="label">SAMPLE TYPE</div><div class="colon">:</div><div>${this.safeText(
-                  specimen
-                )}</div></div>
+                ).toUpperCase()}</div></div>
+                <div class="row"><div class="label">SAMPLE TYPE</div><div class="colon">:</div><div>${specimen}</div></div>
               </div>
             </div>
 
