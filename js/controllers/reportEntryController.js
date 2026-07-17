@@ -143,10 +143,9 @@ class ReportEntryController {
     }
 
     this.readyReportsEmailInput = document.getElementById("readyReportsEmail");
+    this.downloadReadyReportsBtn = document.getElementById("downloadReadyReportsBtn");
     this.sendReadyReportsBtn = document.getElementById("sendReadyReportsBtn");
-    this.clearReadySelectionBtn = document.getElementById(
-      "clearReadySelectionBtn"
-    );
+    this.clearReadySelectionBtn = document.getElementById("clearReadySelectionBtn");
     this.readySelectedCountEl = document.getElementById("readySelectedCount");
     this.readySelectAllCheckbox = document.getElementById("readySelectAll");
 
@@ -293,6 +292,11 @@ class ReportEntryController {
     if (this.sendReadyReportsBtn) {
       this.sendReadyReportsBtn.addEventListener("click", () =>
         this.handleSendReadyReports()
+      );
+    }
+    if (this.downloadReadyReportsBtn) {
+      this.downloadReadyReportsBtn.addEventListener("click", () =>
+        this.handleDownloadReadyReports()
       );
     }
     if (this.clearReadySelectionBtn) {
@@ -709,6 +713,8 @@ class ReportEntryController {
         : emailValue.includes("@");
     if (this.sendReadyReportsBtn)
       this.sendReadyReportsBtn.disabled = !(hasSelection && emailLooksValid);
+    if (this.downloadReadyReportsBtn)
+      this.downloadReadyReportsBtn.disabled = !hasSelection;
     if (this.clearReadySelectionBtn)
       this.clearReadySelectionBtn.disabled = !hasSelection;
   }
@@ -751,6 +757,94 @@ class ReportEntryController {
     } finally {
       this.updateReadySendControls();
     }
+  }
+
+  async handleDownloadReadyReports() {
+    try {
+      const items = Array.from(this.readySelectionKeys)
+        .map((k) => this.readySelectionItems.get(k))
+        .filter(Boolean);
+
+      if (items.length === 0) {
+        this.showError("Please select at least one test from Ready Reports");
+        return;
+      }
+
+      // Save current state to restore later
+      const originalSelectedBill = this.selectedBill;
+      const originalSelectedTestItem = this.selectedTestItem;
+
+      // Process each report individually
+      for (const item of items) {
+        // Get full bill data
+        const bill = await this.reportEntryService.getBillByNumber(item.billNo);
+        if (!bill) continue;
+
+        // Find the matching bill item
+        const billItem = bill.bill_items?.find(bi => 
+          (bi.tests?.test_name === item.testName || bi.packages?.package_name === item.testName)
+        );
+        if (!billItem) continue;
+
+        // Set controller state temporarily to use existing methods
+        this.selectedBill = bill;
+        this.selectedTestItem = billItem;
+
+        // Load test subcategories and results to populate resultsItemsBody
+        await this.renderTestResults(bill, billItem);
+        await this.loadSubcategoriesAndResultsForPrint();
+
+        // Generate print HTML
+        const reportHTML = this.generatePrintLayoutHTML(false);
+
+        // Open each report in a new window and trigger print individually
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(reportHTML);
+        printWindow.document.close();
+        
+        // Wait for images to load, then print
+        await new Promise((resolve) => {
+          printWindow.onload = () => {
+            setTimeout(() => {
+              printWindow.print();
+              resolve();
+            }, 500);
+          };
+        });
+      }
+
+      // Restore original state
+      this.selectedBill = originalSelectedBill;
+      this.selectedTestItem = originalSelectedTestItem;
+      if (originalSelectedBill) {
+        this.populateSummaryForm(originalSelectedBill, originalSelectedTestItem);
+        this.renderTestResults(originalSelectedBill, originalSelectedTestItem);
+      }
+    } catch (e) {
+      console.error("Failed to download ready reports", e);
+      this.showError("Failed to download reports");
+    }
+  }
+
+  // Helper to load subcategories and test results for printing
+  async loadSubcategoriesAndResultsForPrint() {
+    if (!this.selectedBill || !this.selectedTestItem) return;
+    
+    // Load test subcategories
+    const testId = this.selectedTestItem.tests?.id || this.selectedTestItem.test_id;
+    if (testId) {
+      const subcategories = await this.testService.getTestSubcategories(testId);
+      this.currentSubcategories = subcategories;
+      
+      // Load saved results
+      const savedResults = await this.reportEntryService.getTestResultsByBillItem(this.selectedTestItem.id);
+      
+      // Load reference ranges
+      await this.populateRefRangesForSubcategories(subcategories);
+    }
+    
+    // Load report header (comments and special notes)
+    this.currentReportHeader = await this.reportEntryService.getReportHeader(this.selectedTestItem.id);
   }
 
   // Auto-calc for specific tests by ID (UUID). Add rules here as needed.

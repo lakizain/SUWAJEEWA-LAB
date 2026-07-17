@@ -2372,6 +2372,9 @@ class BillingController {
   populateFormWithBillData(bill) {
     console.log("Populating form with bill data:", bill);
 
+    // Store paid amount temporarily so we can re-apply after loading bill items
+    this.tempPaidAmount = bill.paid_amount;
+
     // Populate basic patient information
     if (bill.patient_phone) {
       document.getElementById("patient-phone").value = bill.patient_phone;
@@ -2580,14 +2583,20 @@ class BillingController {
 
         // Update the test table
         this.updateTestTable();
-
-        // Recalculate payment summary now that items are loaded
-        this.updateBillTotals();
-
-        const paidEl = document.getElementById("paid-amount-input");
-        const currentPaid = parseFloat(paidEl?.value) || 0;
-        this.updateRemainingAmount(currentPaid);
       }
+
+      // Re-apply paid amount from stored value to ensure it's preserved - even if no bill items
+      const paidAmountInput = document.getElementById("paid-amount-input");
+      if (paidAmountInput && this.tempPaidAmount !== undefined && this.tempPaidAmount !== null) {
+        paidAmountInput.value = this.tempPaidAmount;
+      }
+
+      // Recalculate payment summary
+      this.updateBillTotals();
+
+      const paidEl = document.getElementById("paid-amount-input");
+      const currentPaid = parseFloat(paidEl?.value) || 0;
+      this.updateRemainingAmount(currentPaid);
     } catch (error) {
       console.error("Error loading bill items for editing:", error);
     }
