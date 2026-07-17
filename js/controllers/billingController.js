@@ -1491,7 +1491,7 @@ class BillingController {
 
   // Validate bill data
   validateBillData(billData) {
-    const requiredFields = ["patient_name", "patient_phone"];
+    const requiredFields = ["patient_name"];
     const errors = [];
 
     // Check required fields
@@ -3036,7 +3036,7 @@ class BillingController {
         <div class="info-row">
           <span class="info-label">TEL :</span>
           <span class="info-value">${
-            billData.patient_phone || "////////////"
+            billData.patient_phone || "Not Given"
           }</span>
         </div>
       </div>
@@ -3049,7 +3049,7 @@ class BillingController {
           .map(
             (test) => `
           <div class="test-row">
-            <span class="test-name">${test.test_name}</span>
+            <span class="test-name">${test.short_name || test.test_name}</span>
             <span class="test-price">Rs. ${test.price.toFixed(2)}</span>
           </div>
         `
