@@ -72,6 +72,72 @@ class ReferenceService {
     }
   }
 
+  // Get references suitable for BILLING — scoped to user's center + globals
+  //   Returns active references where:
+  //     center_id = p_center_id   (assigned to user's center)
+  //     OR
+  //     center_id IS NULL         (global refs — available to all centers)
+  // If p_center_id is null (global admin / no center), returns all active refs.
+  async getReferencesForBillingCenter(p_centerId) {
+    try {
+      if (!this.isSupabaseAvailable()) {
+        return this.getActiveReferences();
+      }
+
+      // Build query
+      let query = this.supabase
+        .from("references")
+        .select("id, name, rid, center_id")
+        .eq("is_active", true);
+
+      if (p_centerId) {
+        // OR: ref is global (center_id IS NULL) OR assigned to this center
+        query = query.or("center_id.is.null,center_id.eq." + p_centerId);
+      }
+
+      query = query.order("name", { ascending: true });
+
+      const { data: references, error } = await query;
+      if (error) throw error;
+      return references || [];
+    } catch (error) {
+      console.error("Error getting billing references for center:", error);
+      // Safe fallback: return generic dropdown list
+      return this.getReferencesForDropdown();
+    }
+  }
+
+  // Search references scoped to user's billing center (center + global)
+  async searchBillingReferences(searchTerm, centerId = null) {
+    try {
+      if (!this.isSupabaseAvailable()) {
+        const all = await this.getActiveReferences();
+        if (!searchTerm) return all;
+        const s = searchTerm.toLowerCase();
+        return all.filter(r => (r.name || '').toLowerCase().includes(s) || (r.rid || '').toLowerCase().includes(s));
+      }
+
+      let query = this.supabase
+        .from("references")
+        .select("id, name, rid, center_id")
+        .eq("is_active", true)
+        .or(`name.ilike.%${searchTerm}%,rid.ilike.%${searchTerm}%`);
+
+      if (centerId) {
+        query = query.or("center_id.is.null,center_id.eq." + centerId);
+      }
+
+      query = query.order("name", { ascending: true });
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error("Error searching billing references:", error);
+      return [];
+    }
+  }
+
   // Create new reference
   async createReference(referenceData) {
     try {
@@ -81,7 +147,11 @@ class ReferenceService {
         rid: rid,
         name: referenceData.name,
         commission: parseFloat(referenceData.commission) || 0,
-        is_active: referenceData.is_active || true,
+        center_id: referenceData.center_id || null,
+        phone: referenceData.phone || null,
+        email: referenceData.email || null,
+        address: referenceData.address || null,
+        is_active: referenceData.is_active !== undefined ? referenceData.is_active : true,
       };
 
       const { data: reference, error } = await this.supabase

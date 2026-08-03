@@ -32,27 +32,60 @@
                         </div>
                         <hr>
                         <h5 class="fw-bold mb-3"><i class="bi bi-person-lines-fill"></i> Reference Details</h5>
+
                         <div class="mb-2">
                             <label class="form-label">RID</label>
-                            <input type="text" class="form-control" value="Auto-generated" disabled>
+                            <input id="ref-rid" type="text" class="form-control" value="Auto-generated" disabled>
                             <small class="text-muted">RID will be automatically generated when you save</small>
                         </div>
+
                         <div class="mb-2">
                             <label class="form-label">Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" placeholder="Enter doctor/reference name">
+                            <input id="ref-name" type="text" class="form-control" placeholder="Enter doctor/reference name (e.g. Dr. A. Perera)">
                         </div>
-                        <div class="mb-3">
+
+                        <div class="mb-2">
+                            <label class="form-label">Assign Center</label>
+                            <select id="ref-center" class="form-select">
+                                <option value="">-- All Centers (Global) --</option>
+                            </select>
+                            <small class="text-muted">Leave blank to make reference usable by all centers</small>
+                        </div>
+
+                        <div class="mb-2">
                             <label class="form-label">Commission (%)</label>
-                            <input type="number" class="form-control" placeholder="Enter commission percentage">
+                            <input id="ref-commission" type="number" step="0.01" min="0" max="100" class="form-control" placeholder="e.g. 5.00">
                         </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Phone</label>
+                            <input id="ref-phone" type="tel" class="form-control" placeholder="e.g. 077-1234567">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Email</label>
+                            <input id="ref-email" type="email" class="form-control" placeholder="e.g. dr.perera@example.com">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Address / Clinic</label>
+                            <textarea id="ref-address" class="form-control" rows="2" placeholder="e.g. No. 23, Main St, Colombo"></textarea>
+                        </div>
+
+                        <div class="mb-3 form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="ref-active" checked>
+                            <label class="form-check-label" for="ref-active">Active</label>
+                        </div>
+
                         <div class="d-flex gap-2">
                             <button class="btn btn-primary flex-fill"><i class="bi bi-plus-lg"></i> Create New</button>
                             <button class="btn btn-success flex-fill"><i class="bi bi-save"></i> Save</button>
-                            <button class="btn btn-danger flex-fill"><i class="bi bi-trash"></i> Delete</button>
+                            <button class="btn btn-danger flex-fill" disabled><i class="bi bi-trash"></i> Delete</button>
                         </div>
                     </div>
                 </div>
             </div>
+
             <div class="col-md-8">
                 <div class="card shadow-sm">
                     <div class="card-body">
@@ -66,28 +99,16 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>RID</th>
-                                        <th>Name</th>
-                                        <th>Commission (%)</th>
+                                        <th>Center</th>
+                                        <th>Name / Clinic Address</th>
+                                        <th>Contact</th>
+                                        <th>Commission</th>
+                                        <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <!-- Example rows -->
-                                    <tr>
-                                        <td><span class="badge bg-info">RID001</span></td>
-                                        <td>
-                                            <span class="fw-bold">OPD</span><br>
-                                            <small class="text-muted">Created: 8/3/2025</small>
-                                        </td>
-                                        <td><span class="badge bg-success">0.00%</span></td>
-                                        <td>
-                                            <button class="btn btn-outline-primary btn-sm"><i
-                                                    class="bi bi-pencil"></i></button>
-                                            <button class="btn btn-outline-danger btn-sm"><i
-                                                    class="bi bi-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <!-- More rows as needed -->
+                                    <tr><td colspan="7">Loading...</td></tr>
                                 </tbody>
                             </table>
                         </div>

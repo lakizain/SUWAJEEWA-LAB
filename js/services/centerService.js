@@ -77,7 +77,11 @@ class CenterService {
       const centerPayload = {
         cid: cid,
         center_name: centerData.center_name,
-        is_active: centerData.is_active || true,
+        short_name: centerData.short_name || null,
+        phone: centerData.phone || null,
+        address: centerData.address || null,
+        email: centerData.email || null,
+        is_active: centerData.is_active !== undefined ? centerData.is_active : true,
       };
 
       const { data: center, error } = await this.supabase

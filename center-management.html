@@ -34,12 +34,39 @@
                         <h5 class="fw-bold mb-3"><i class="bi bi-building"></i> Center Details</h5>
                         <div class="mb-2">
                             <label class="form-label">CID</label>
-                            <input type="text" class="form-control" value="Auto-generated" disabled>
+                            <input type="text" id="center-cid" class="form-control" value="Auto-generated" disabled>
                             <small class="text-muted">CID will be automatically generated when you save</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Center Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" placeholder="Enter center name">
+                            <input type="text" id="center-name" class="form-control" placeholder="Enter center name">
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Short Name <span class="text-danger">*</span></label>
+                                <input type="text" id="center-short-name" class="form-control text-uppercase" 
+                                       placeholder="e.g. KU, CO, KN" maxlength="2" style="text-transform: uppercase;">
+                                <small class="text-muted">2 capital letters (e.g. MG for Madhipola)</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Phone</label>
+                                <input type="tel" id="center-phone" class="form-control" 
+                                       placeholder="e.g. 037-1234567">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Address</label>
+                            <textarea id="center-address" class="form-control" rows="2" 
+                                      placeholder="Enter center address"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" id="center-email" class="form-control" 
+                                   placeholder="e.g. info@center.lk">
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="center-active" checked>
+                            <label class="form-check-label" for="center-active">Center is Active</label>
                         </div>
                         <div class="d-flex gap-2">
                             <button class="btn btn-primary flex-fill"><i class="bi bi-plus-lg"></i> Create New</button>
@@ -62,7 +89,10 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>CID</th>
+                                        <th>Short</th>
                                         <th>Center Name</th>
+                                        <th>Contact</th>
+                                        <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -70,10 +100,16 @@
                                     <!-- Example rows -->
                                     <tr>
                                         <td><span class="badge bg-info">CID001</span></td>
+                                        <td><span class="badge bg-secondary fw-bold">MG</span></td>
                                         <td>
                                             <span class="fw-bold">MADHIPOLA SUWAJEEWA LAB</span><br>
+                                            <small class="text-muted">123 Main St, Madhipola</small>
+                                        </td>
+                                        <td>
+                                            <small><i class="bi bi-telephone"></i> 037-1234567</small><br>
                                             <small class="text-muted">Created: 8/3/2025</small>
                                         </td>
+                                        <td><span class="badge bg-success">Active</span></td>
                                         <td>
                                             <button class="btn btn-outline-primary btn-sm"><i
                                                     class="bi bi-pencil"></i></button>
@@ -104,8 +140,13 @@
         function waitForAppAndInit() {
             if (window.app && window.app.debounce && window.app.showWarning) {
                 let selectedCenterId = null;
-                const centerNameInput = document.querySelector('input[placeholder="Enter center name"]');
-                const cidInput = document.querySelector('input[disabled]');
+                const cidInput = document.getElementById('center-cid');
+                const centerNameInput = document.getElementById('center-name');
+                const shortNameInput = document.getElementById('center-short-name');
+                const phoneInput = document.getElementById('center-phone');
+                const addressInput = document.getElementById('center-address');
+                const emailInput = document.getElementById('center-email');
+                const activeInput = document.getElementById('center-active');
                 const createBtn = document.querySelector('.btn-primary');
                 const saveBtn = document.querySelector('.btn-success');
                 const deleteBtn = document.querySelector('.btn-danger');
@@ -113,27 +154,42 @@
                 const searchInput = document.querySelector('input[placeholder="Search by name or ID..."]');
                 const refreshBtn = document.querySelector('.btn-outline-primary.btn-sm');
 
+                // Helper: validate short name (exactly 2 letters, uppercase)
+                function validateShortName(val) {
+                    return /^[A-Za-z]{2}$/.test(val || '');
+                }
+
                 // Helper: Clear form
                 function clearForm() {
                     selectedCenterId = null;
                     centerNameInput.value = '';
+                    shortNameInput.value = '';
+                    phoneInput.value = '';
+                    addressInput.value = '';
+                    emailInput.value = '';
+                    activeInput.checked = true;
                     cidInput.value = 'Auto-generated';
                     deleteBtn.disabled = true;
-                    saveBtn.textContent = 'Save';
+                    saveBtn.innerHTML = '<i class="bi bi-save"></i> Save';
                 }
 
                 // Helper: Fill form for edit
                 function fillForm(center) {
                     selectedCenterId = center.id;
-                    centerNameInput.value = center.center_name;
+                    centerNameInput.value = center.center_name || '';
+                    shortNameInput.value = center.short_name || '';
+                    phoneInput.value = center.phone || '';
+                    addressInput.value = center.address || '';
+                    emailInput.value = center.email || '';
+                    activeInput.checked = center.is_active !== false;
                     cidInput.value = center.cid;
                     deleteBtn.disabled = false;
-                    saveBtn.textContent = 'Update';
+                    saveBtn.innerHTML = '<i class="bi bi-save"></i> Update';
                 }
 
                 // Helper: Render center list
                 async function renderCenters(searchTerm = '') {
-                    centerTableBody.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
+                    centerTableBody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
                     let centers = [];
                     try {
                         if (searchTerm) {
@@ -143,30 +199,48 @@
                         }
                     } catch (e) {
                         window.app.showError('Failed to load centers');
-                        centerTableBody.innerHTML = '<tr><td colspan="3">Error loading data</td></tr>';
+                        centerTableBody.innerHTML = '<tr><td colspan="6">Error loading data</td></tr>';
                         return;
                     }
                     if (!centers || centers.length === 0) {
-                        centerTableBody.innerHTML = '<tr><td colspan="3">No centers found</td></tr>';
+                        centerTableBody.innerHTML = '<tr><td colspan="6">No centers found</td></tr>';
                         return;
                     }
                     centerTableBody.innerHTML = '';
                     centers.forEach(center => {
                         const tr = document.createElement('tr');
+                        const activeBadge = center.is_active !== false
+                            ? '<span class="badge bg-success">Active</span>'
+                            : '<span class="badge bg-secondary">Inactive</span>';
+                        const shortBadge = center.short_name
+                            ? `<span class="badge bg-secondary fw-bold">${center.short_name}</span>`
+                            : '<span class="badge bg-light text-dark">—</span>';
+                        const phoneHtml = center.phone
+                            ? `<small><i class="bi bi-telephone"></i> ${center.phone}</small>`
+                            : '<small class="text-muted">—</small>';
+                        const addressHtml = center.address
+                            ? `<br><small class="text-muted">${center.address.substring(0, 60)}</small>`
+                            : '';
+                        const emailHtml = center.email
+                            ? `<br><small class="text-muted"><i class="bi bi-envelope"></i> ${center.email.substring(0, 30)}</small>`
+                            : '';
                         tr.innerHTML = `
                             <td><span class="badge bg-info">${center.cid}</span></td>
+                            <td>${shortBadge}</td>
                             <td>
-                                <span class="fw-bold">${center.center_name}</span><br>
+                                <span class="fw-bold">${center.center_name}</span>${addressHtml}
+                            </td>
+                            <td>
+                                ${phoneHtml}${emailHtml}<br>
                                 <small class="text-muted">Created: ${window.app.formatDate(center.created_at)}</small>
                             </td>
+                            <td>${activeBadge}</td>
                             <td>
                                 <button class="btn btn-outline-primary btn-sm edit-btn"><i class="bi bi-pencil"></i></button>
                                 <button class="btn btn-outline-danger btn-sm delete-btn"><i class="bi bi-trash"></i></button>
                             </td>
                         `;
-                        // Edit
                         tr.querySelector('.edit-btn').addEventListener('click', () => fillForm(center));
-                        // Delete
                         tr.querySelector('.delete-btn').addEventListener('click', async () => {
                             if (confirm('Are you sure you want to delete this center?')) {
                                 try {
@@ -191,18 +265,30 @@
                 // Save/Update
                 saveBtn.addEventListener('click', async () => {
                     const name = centerNameInput.value.trim();
+                    const shortNameRaw = shortNameInput.value.trim().toUpperCase();
                     if (!name) {
                         window.app.showWarning('Center name is required');
                         return;
                     }
+                    if (!validateShortName(shortNameRaw)) {
+                        window.app.showWarning('Short Name must be exactly 2 letters (e.g. KU, CO)');
+                        shortNameInput.focus();
+                        return;
+                    }
+                    const payload = {
+                        center_name: name,
+                        short_name: shortNameRaw,
+                        phone: phoneInput.value.trim() || null,
+                        address: addressInput.value.trim() || null,
+                        email: emailInput.value.trim() || null,
+                        is_active: activeInput.checked,
+                    };
                     try {
                         if (selectedCenterId) {
-                            // Update
-                            await window.app.services.center.updateCenter(selectedCenterId, { center_name: name });
+                            await window.app.services.center.updateCenter(selectedCenterId, payload);
                             window.app.showSuccess('Center updated');
                         } else {
-                            // Create
-                            await window.app.services.center.createCenter({ center_name: name });
+                            await window.app.services.center.createCenter(payload);
                             window.app.showSuccess('Center created');
                         }
                         clearForm();

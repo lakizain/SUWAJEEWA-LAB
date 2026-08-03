@@ -1179,25 +1179,30 @@ class BillingController {
   }
 
   // Populate references dropdown
+  // NOTE: scoped to (user's center refs) + (global refs where center_id IS NULL)
   async populateReferencesDropdown() {
     const dropdown = document.getElementById("ref-by-dropdown");
     if (!dropdown) return;
     dropdown.innerHTML = "<option value=''>Loading references...</option>";
     try {
       const referenceService = window.app.getService("reference");
-      const references = await referenceService.getReferencesForDropdown();
+      const billingCenterId = this.getSelectedCenterId() || null;
+      const references = await referenceService.getReferencesForBillingCenter(billingCenterId);
+
       dropdown.innerHTML = "<option value=''>Select Reference</option>";
       if (references && references.length > 0) {
         references.forEach((ref) => {
           const option = document.createElement("option");
           option.value = ref.id;
-          option.textContent = `${ref.name} (${ref.rid})`;
+          const scopeBadge = ref.center_id ? "[C]" : "[G]";
+          option.textContent = `${ref.name} (${ref.rid})  ${scopeBadge}`;
           dropdown.appendChild(option);
         });
       } else {
         dropdown.innerHTML = "<option value=''>No references found</option>";
       }
     } catch (e) {
+      console.warn("populateReferencesDropdown error:", e);
       dropdown.innerHTML = "<option value=''>Error loading references</option>";
     }
   }
@@ -1580,7 +1585,7 @@ class BillingController {
   }
 
   // Print bill
-  printBill(bill) {
+  async printBill(bill) {
     try {
       console.log("Printing bill with 2 copies:", bill);
 
@@ -1596,18 +1601,28 @@ class BillingController {
         billData.reference_rid
       );
 
+      // Resolve center contact info for the bill header
+      const centerId =
+        (bill && bill.center_id) ||
+        billData.center_id ||
+        this.getSelectedCenterId() ||
+        this.billingService?.getUserCenterId();
+      const centerInfo = await this.getCenterContactInfo(centerId);
+
       // Create two separate bills - one for customer, one for lab
       const customerBillHTML = this.generateBillHTML(
         bill,
         billData,
         selectedTests,
-        "CUSTOMER COPY"
+        "CUSTOMER COPY",
+        centerInfo
       );
       const labBillHTML = this.generateBillHTML(
         bill,
         billData,
         selectedTests,
-        "LAB COPY"
+        "LAB COPY",
+        centerInfo
       );
 
       // Generate PDF with two identical pages
@@ -2294,22 +2309,37 @@ class BillingController {
         new_referral: bill.new_referral,
       };
 
+      // Resolve center contact info - prefer info from the bill's joined centers
+      const centerFromBill = bill.centers && {
+        center_name: bill.centers.center_name,
+        phone: bill.centers.phone,
+        address: bill.centers.address,
+        email: bill.centers.email,
+      };
+      const centerInfo =
+        centerFromBill && (centerFromBill.phone || centerFromBill.address)
+          ? centerFromBill
+          : await this.getCenterContactInfo(bill.center_id);
+
       console.log("Printing existing bill:", bill);
       console.log("Bill data for printing:", billData);
       console.log("Selected tests for printing:", selectedTests);
+      console.log("Center info for print header:", centerInfo);
 
       // Create two separate bills - one for customer, one for lab
       const customerBillHTML = this.generateBillHTML(
         bill,
         billData,
         selectedTests,
-        "CUSTOMER COPY"
+        "CUSTOMER COPY",
+        centerInfo
       );
       const labBillHTML = this.generateBillHTML(
         bill,
         billData,
         selectedTests,
-        "LAB COPY"
+        "LAB COPY",
+        centerInfo
       );
 
       // Generate PDF with two identical pages
@@ -2704,6 +2734,7 @@ class BillingController {
   }
 
   // Handle reference search
+  // NOTE: scoped to user's center + global refs only
   async handleReferenceSearch(event) {
     const searchTerm = event.target.value.trim();
 
@@ -2711,7 +2742,11 @@ class BillingController {
 
     try {
       const referenceService = window.app.getService("reference");
-      const references = await referenceService.searchReferences(searchTerm);
+      const billingCenterId = this.getSelectedCenterId() || null;
+      const references = await referenceService.searchBillingReferences(
+        searchTerm,
+        billingCenterId
+      );
       this.displayReferenceSuggestions(references);
     } catch (error) {
       console.error("Error searching references:", error);
@@ -2952,8 +2987,69 @@ class BillingController {
     this.updateTestTable();
   }
 
+  // Helper: resolve center contact info for the print header.
+  // Falls back to a sensible default (legacy lab details) if info cannot be loaded.
+  async getCenterContactInfo(centerId) {
+    const DEFAULT = {
+      center_name: "Suwajeewa Laboratories",
+      address: "No 62, Akuramboda Road Pallepola, Matale",
+      phone: "070 6222 644",
+      email: null,
+    };
+
+    try {
+      if (!centerId) {
+        // Try to fall back to the logged-in user's center
+        const userCenterId = this.billingService?.getUserCenterId();
+        if (!userCenterId) return DEFAULT;
+        centerId = userCenterId;
+      }
+
+      const centerService =
+        window.app?.getService("center") ||
+        (window.CenterService ? new window.CenterService() : null);
+
+      if (!centerService || typeof centerService.getCenterById !== "function") {
+        return DEFAULT;
+      }
+
+      const center = await centerService.getCenterById(centerId);
+      if (!center) return DEFAULT;
+
+      return {
+        center_name: center.center_name || DEFAULT.center_name,
+        address: center.address || null,
+        phone: center.phone || null,
+        email: center.email || null,
+      };
+    } catch (err) {
+      console.warn("Failed to load center contact info, using default:", err);
+      return DEFAULT;
+    }
+  }
+
   // Generate bill HTML
-  generateBillHTML(bill, billData, selectedTests, copyType) {
+  generateBillHTML(bill, billData, selectedTests, copyType, centerInfo) {
+    const DEFAULT_CENTER = {
+      center_name: "Suwajeewa Laboratories",
+      address: "No 62, Akuramboda Road Pallepola, Matale",
+      phone: "070 6222 644",
+      email: null,
+    };
+    const center = { ...DEFAULT_CENTER, ...(centerInfo || {}) };
+
+    const headerAddressLines = [];
+    if (center.address) headerAddressLines.push(center.address);
+    const contactParts = [];
+    if (center.phone) contactParts.push(center.phone);
+    if (center.email) contactParts.push(center.email);
+    if (contactParts.length > 0) headerAddressLines.push(contactParts.join(" | "));
+    // Fallback to default address/phone if nothing was provided by the center record
+    if (headerAddressLines.length === 0) {
+      headerAddressLines.push(DEFAULT_CENTER.address);
+      headerAddressLines.push(DEFAULT_CENTER.phone);
+    }
+
     const now = new Date();
     const formattedDate = now.toLocaleDateString("si-LK", {
       year: "numeric",
@@ -2987,9 +3083,8 @@ class BillingController {
           <img src="Imgs/suwajeewa_logo.png" alt="Suwajeewa Laboratory Logo" style="max-width: 100px; max-height: 100px; margin-bottom: 10px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
           <div class="logo-placeholder" style="display: none;">//LOGO HERE</div>
         </div>
-        <div class="lab-name">Suwajeewa Laboratories</div>
-        <div class="lab-address">No 62, Akuramboda Road Pallepola, Matale</div>
-        <div class="lab-address">070 6222 644</div>
+        <div class="lab-name">${center.center_name}</div>
+        ${headerAddressLines.map((line) => `<div class="lab-address">${line}</div>`).join("")}
         ${
           copyType === "LAB COPY"
             ? `<div class="copy-type" style="text-align: center; font-weight: bold; font-size: 14px; margin-top: 5px; border: 1px solid #000; padding: 2px; background: #f0f0f0;">${copyType}</div>`

@@ -49,34 +49,99 @@ class BillingService {
     };
   }
 
-  // Generate unique bill number
-  async generateBillNumber() {
+  // Generate unique bill number (center-wise if centerId is provided)
+  // NEW FORMAT (from today): YT-00001   (short_name + 5-digit counter, zero-padded)
+  // OLD BILLS STAY UNCHANGED:   CID001-B001   or   B001
+  async generateBillNumber(centerId = null) {
+    const resolvedCenterId = centerId || this.getUserCenterId();
+
     if (!this.isSupabaseAvailable()) {
-      // Generate a timestamp-based bill number for offline mode
       const timestamp = Date.now().toString().slice(-6);
       return `B${timestamp}`;
     }
 
+    // Primary path: use the atomic RPC function (recommended)
+    if (resolvedCenterId) {
+      try {
+        const { data, error } = await this.supabase
+          .rpc('get_next_bill_number', { p_center_id: resolvedCenterId });
+
+        if (error) {
+          console.warn('RPC get_next_bill_number failed, falling back:', error);
+        } else if (data && data.length > 0 && data[0].formatted_bill_no) {
+          return data[0].formatted_bill_no;
+        }
+      } catch (rpcError) {
+        console.warn('RPC call error, falling back to legacy:', rpcError);
+      }
+    }
+
+    // ======================================================
+    // FALLBACK: manual bill number generation (if RPC unavailable)
+    // ======================================================
     try {
-      const { data: lastBill, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select("bill_no")
         .order("created_at", { ascending: false })
         .limit(1);
 
+      if (resolvedCenterId) {
+        query = query.eq("center_id", resolvedCenterId);
+      }
+
+      const { data: lastBill, error } = await query;
       if (error) throw error;
 
       let nextNumber = 1;
       if (lastBill && lastBill.length > 0) {
         const lastBillNo = lastBill[0].bill_no;
-        const lastNumber = parseInt(lastBillNo.replace("B", ""));
+
+        // Try to extract number — supports all 3 formats:
+        //   (1) New:        YT-00001        -> 1
+        //   (2) Previous:   CID001-B001     -> 1
+        //   (3) Old global: B001             -> 1
+        const newFormatMatch    = lastBillNo.match(/^[A-Z]{2}-(\d+)$/);
+        const cidFormatMatch    = lastBillNo.match(/-B(\d+)/);
+        const globalFormatMatch = lastBillNo.match(/^B(\d+)/);
+
+        const lastNumber = newFormatMatch
+          ? parseInt(newFormatMatch[1], 10)
+          : cidFormatMatch
+            ? parseInt(cidFormatMatch[1], 10)
+            : globalFormatMatch
+              ? parseInt(globalFormatMatch[1], 10)
+              : 0;
+
         nextNumber = lastNumber + 1;
       }
 
+      // If we have a center, build the bill number using short_name > cid
+      if (resolvedCenterId) {
+        try {
+          const { data: ctr, error: ctrErr } = await this.supabase
+            .from("centers")
+            .select("cid, short_name")
+            .eq("id", resolvedCenterId)
+            .single();
+
+          if (!ctrErr && ctr) {
+            const prefix = (ctr.short_name && /^[A-Z]{2}$/.test(ctr.short_name))
+              ? ctr.short_name
+              : ctr.cid;
+
+            // NEW FORMAT: PREFIX-NNNNN  (5-digit zero pad)
+            return `${prefix}-${nextNumber.toString().padStart(5, "0")}`;
+          }
+        } catch (e) {
+          // ignore, fall through to plain B format
+        }
+      }
+
+      // Plain fallback (no center info)
       return `B${nextNumber.toString().padStart(3, "0")}`;
     } catch (error) {
       console.error("Error generating bill number:", error);
-      // Fallback to timestamp-based number
       const timestamp = Date.now().toString().slice(-6);
       return `B${timestamp}`;
     }
@@ -87,7 +152,13 @@ class BillingService {
     const maxRetries = 3;
 
     try {
-      const billNumber = await this.generateBillNumber();
+      // Auto-fill center_id if not provided and user has a center
+      let centerId = billData.center_id;
+      if ((centerId === "" || centerId === undefined || centerId === null) && this.getUserCenterId()) {
+        centerId = this.getUserCenterId();
+      }
+
+      const billNumber = await this.generateBillNumber(centerId);
 
       // If Supabase is not available, return mock data for offline mode
       if (!this.isSupabaseAvailable()) {
@@ -101,12 +172,6 @@ class BillingService {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
-      }
-
-      // Auto-fill center_id if not provided and user has a center
-      let centerId = billData.center_id;
-      if ((centerId === "" || centerId === undefined || centerId === null) && this.getUserCenterId()) {
-        centerId = this.getUserCenterId();
       }
 
       const billPayload = {
@@ -324,7 +389,7 @@ class BillingService {
                         tests (test_name, short_name, price),
                         packages (package_name, price)
                     ),
-                    centers (center_name)
+                    centers (center_name, phone, address, email, short_name)
                 `
         )
         .eq("id", billId)
@@ -351,7 +416,7 @@ class BillingService {
                         tests (test_name, short_name, price),
                         packages (package_name, price)
                     ),
-                    centers (center_name)
+                    centers (center_name, phone, address, email, short_name)
                 `
         )
         .eq("bill_no", billNo)
@@ -390,10 +455,10 @@ class BillingService {
     }
   }
 
-  // Get patient history by phone
+  // Get patient history by phone (filtered by user's center unless admin)
   async getPatientHistory(phone) {
     try {
-      const { data: bills, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select(
           `
@@ -420,6 +485,12 @@ class BillingService {
         )
         .eq("patient_phone", phone)
         .order("bill_date", { ascending: false });
+
+      if (!this.isUserAdmin() && this.getUserCenterId()) {
+        query = query.eq("center_id", this.getUserCenterId());
+      }
+
+      const { data: bills, error } = await query;
 
       if (error) throw error;
       return (bills || []).map((bill) => this.normalizeBillForDisplay(bill));
