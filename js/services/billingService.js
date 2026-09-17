@@ -78,43 +78,49 @@ class BillingService {
 
     // ======================================================
     // FALLBACK: manual bill number generation (if RPC unavailable)
+    // To guarantee sequential (1,2,3,4...): take last 50 bills,
+    // extract numeric suffix from EVERY bill, take MAX, then +1.
+    // This avoids "random" jumps caused by created_at ordering issues
+    // when bill formats are mixed or timestamps are very close.
     // ======================================================
     try {
       let query = this.supabase
         .from("bills")
         .select("bill_no")
         .order("created_at", { ascending: false })
-        .limit(1);
+        .limit(50);
 
       if (resolvedCenterId) {
         query = query.eq("center_id", resolvedCenterId);
       }
 
-      const { data: lastBill, error } = await query;
+      const { data: recentBills, error } = await query;
       if (error) throw error;
 
-      let nextNumber = 1;
-      if (lastBill && lastBill.length > 0) {
-        const lastBillNo = lastBill[0].bill_no;
+      // Helper: extract the trailing numeric part from ANY bill format.
+      // Examples:
+      //   PA-00001          -> 1
+      //   CID001-B001       -> 1
+      //   B003              -> 3
+      //   PA-00007-7842     -> 7 (ignores trailing timestamp suffix)
+      const extractNum = (billNo) => {
+        if (!billNo) return 0;
+        // Strip any trailing timestamp suffix first (e.g. "-7842")
+        const clean = String(billNo).replace(/-\d{4,6}$/, "");
+        // Then grab the LAST consecutive digits block
+        const m = clean.match(/(\d+)(?!.*\d)/);
+        return m ? parseInt(m[1], 10) : 0;
+      };
 
-        // Try to extract number — supports all 3 formats:
-        //   (1) New:        YT-00001        -> 1
-        //   (2) Previous:   CID001-B001     -> 1
-        //   (3) Old global: B001             -> 1
-        const newFormatMatch    = lastBillNo.match(/^[A-Z]{2}-(\d+)$/);
-        const cidFormatMatch    = lastBillNo.match(/-B(\d+)/);
-        const globalFormatMatch = lastBillNo.match(/^B(\d+)/);
-
-        const lastNumber = newFormatMatch
-          ? parseInt(newFormatMatch[1], 10)
-          : cidFormatMatch
-            ? parseInt(cidFormatMatch[1], 10)
-            : globalFormatMatch
-              ? parseInt(globalFormatMatch[1], 10)
-              : 0;
-
-        nextNumber = lastNumber + 1;
+      // Find MAX number across all recent bills (guarantees sequential)
+      let lastNumber = 0;
+      if (recentBills && recentBills.length > 0) {
+        for (const row of recentBills) {
+          const n = extractNum(row.bill_no);
+          if (n > lastNumber) lastNumber = n;
+        }
       }
+      const nextNumber = lastNumber + 1;
 
       // If we have a center, build the bill number using short_name > cid
       if (resolvedCenterId) {
@@ -212,28 +218,64 @@ class BillingService {
         JSON.stringify(billPayload, null, 2)
       );
 
-      // Check if bill number already exists (race condition protection)
-      const { data: existingBill, error: checkError } = await this.supabase
-        .from("bills")
-        .select("bill_no")
-        .eq("bill_no", billNumber)
-        .single();
+      // =====================================================
+      // Race condition check: if bill number already exists,
+      // try incrementing sequentially (+1, +2, +3, ...) up to
+      // 5 times BEFORE resorting to timestamp suffix.
+      // This keeps bill numbers strictly sequential (1,2,3,4...).
+      // =====================================================
+      const extractTailNum = (billNo) => {
+        if (!billNo) return 1;
+        const m = String(billNo).match(/^(.+)-(\d+)$/);
+        return m ? { prefix: m[1], num: parseInt(m[2], 10) } : null;
+      };
 
-      if (checkError && checkError.code !== "PGRST116") {
-        // PGRST116 = no rows returned
-        console.error("Error checking existing bill:", checkError);
-        throw checkError;
+      let finalBillNo = billNumber;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const { data: existingBill, error: checkError } = await this.supabase
+          .from("bills")
+          .select("bill_no")
+          .eq("bill_no", finalBillNo)
+          .single();
+
+        if (checkError && checkError.code === "PGRST116") {
+          // No conflict found — use this number
+          break;
+        }
+        if (checkError && checkError.code !== "PGRST116") {
+          console.error("Error checking existing bill:", checkError);
+          throw checkError;
+        }
+
+        // Conflict — try sequential +1 increment
+        console.warn(
+          `Bill number ${finalBillNo} exists (attempt ${attempt + 1}/6), trying next sequential number...`
+        );
+
+        const parts = extractTailNum(finalBillNo);
+        if (parts) {
+          const next = parts.num + 1;
+          // Re-apply original 5-digit zero-padding for SHORT-NNNNN format
+          finalBillNo = `${parts.prefix}-${String(next).padStart(
+            /^[A-Z]{2}$/.test(parts.prefix) ? 5 : 3,
+            "0"
+          )}`;
+        } else {
+          // Fallback: old B001-style → B002
+          const m2 = finalBillNo.match(/^B(\d+)$/);
+          if (m2) {
+            finalBillNo = `B${String(parseInt(m2[1], 10) + 1).padStart(3, "0")}`;
+          } else {
+            // Unknown format → timestamp suffix (last resort)
+            finalBillNo = `${billNumber}-${Date.now().toString().slice(-4)}`;
+            break;
+          }
+        }
       }
 
-      if (existingBill) {
-        console.warn(
-          "Bill number already exists, generating new one:",
-          billNumber
-        );
-        // Generate a new bill number with timestamp to avoid conflicts
-        const timestamp = Date.now().toString().slice(-4);
-        billPayload.bill_no = `${billNumber}-${timestamp}`;
-        console.log("New bill number generated:", billPayload.bill_no);
+      billPayload.bill_no = finalBillNo;
+      if (finalBillNo !== billNumber) {
+        console.log("Final conflict-resolved bill number:", finalBillNo);
       }
 
       const { data: bill, error } = await this.supabase
