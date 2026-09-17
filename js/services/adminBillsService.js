@@ -65,7 +65,7 @@ class AdminBillsService {
         .order("created_at", { ascending: false })
         .limit(limit);
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         query = query.eq("center_id", this.getUserCenterId());
       }
 
@@ -113,7 +113,7 @@ class AdminBillsService {
         .order("created_at", { ascending: false })
         .limit(50);
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         query = query.eq("center_id", this.getUserCenterId());
       }
 
@@ -186,7 +186,7 @@ class AdminBillsService {
         query = query.ilike("patient_name", `%${patientName.trim()}%`);
       }
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         query = query.eq("center_id", this.getUserCenterId());
       }
 
@@ -217,7 +217,7 @@ class AdminBillsService {
         .gte("created_at", startOfDay)
         .lte("created_at", endOfDay);
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         todayQuery = todayQuery.eq("center_id", this.getUserCenterId());
       }
 
@@ -232,7 +232,7 @@ class AdminBillsService {
         .select("final_amount, paid_amount, status")
         .gte("created_at", startOfMonth);
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         monthQuery = monthQuery.eq("center_id", this.getUserCenterId());
       }
 
@@ -245,7 +245,7 @@ class AdminBillsService {
         .from("bills")
         .select("final_amount, paid_amount, status");
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         allQuery = allQuery.eq("center_id", this.getUserCenterId());
       }
 
@@ -370,8 +370,8 @@ class AdminBillsService {
         throw new Error("Bill not found");
       }
 
-      // Check authorization
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      // Check authorization (same center only, for ALL users)
+      if (this.getUserCenterId()) {
         if (billDetails.center_id !== this.getUserCenterId()) {
           throw new Error("You are not authorized to delete this bill");
         }
@@ -424,8 +424,8 @@ class AdminBillsService {
         throw new Error("Bill not found");
       }
 
-      // Check authorization
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      // Check authorization (same center only, for ALL users)
+      if (this.getUserCenterId()) {
         if (billDetails.center_id !== this.getUserCenterId()) {
           throw new Error("You are not authorized to delete this bill");
         }
@@ -470,8 +470,8 @@ class AdminBillsService {
         return { canDelete: false, reason: "Bill not found" };
       }
 
-      // Check authorization
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      // Check authorization (same center only, for ALL users)
+      if (this.getUserCenterId()) {
         if (billDetails.center_id !== this.getUserCenterId()) {
           return { canDelete: false, reason: "You are not authorized to delete this bill" };
         }

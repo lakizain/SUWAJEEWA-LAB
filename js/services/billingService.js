@@ -528,7 +528,7 @@ class BillingService {
         .eq("patient_phone", phone)
         .order("bill_date", { ascending: false });
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         query = query.eq("center_id", this.getUserCenterId());
       }
 
@@ -565,7 +565,7 @@ class BillingService {
         .order("created_at", { ascending: false })
         .limit(limit);
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         query = query.eq("center_id", this.getUserCenterId());
       }
 
@@ -597,7 +597,7 @@ class BillingService {
         .or(`bill_no.ilike.%${searchTerm}%,patient_name.ilike.%${searchTerm}%`)
         .order("created_at", { ascending: false });
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         query = query.eq("center_id", this.getUserCenterId());
       }
 
@@ -650,8 +650,8 @@ class BillingService {
 
       if (centerId && centerId !== "all") {
         q = q.eq("center_id", centerId);
-      } else if (!this.isUserAdmin() && this.getUserCenterId()) {
-        // If user is not admin and no centerId provided, use user's center
+      } else if (this.getUserCenterId()) {
+        // If no centerId provided, use user's center (for all users regardless of role)
         q = q.eq("center_id", this.getUserCenterId());
       }
 
@@ -674,8 +674,8 @@ class BillingService {
     try {
       console.log("Updating bill with data:", { billId, updateData });
 
-      // Check if user is authorized to update this bill (only admin or same center)
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      // Check if user is authorized to update this bill (same center only, for ALL users)
+      if (this.getUserCenterId()) {
         const bill = await this.getBillById(billId);
         if (bill && bill.center_id !== this.getUserCenterId()) {
           throw new Error("You are not authorized to update this bill");
@@ -712,8 +712,8 @@ class BillingService {
   // Update bill payment
   async updateBillPayment(billId, paidAmount) {
     try {
-      // Check authorization
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      // Check authorization (same center only, for ALL users)
+      if (this.getUserCenterId()) {
         const bill = await this.getBillById(billId);
         if (bill && bill.center_id !== this.getUserCenterId()) {
           throw new Error("You are not authorized to update this bill");
@@ -738,8 +738,8 @@ class BillingService {
   // Delete bill
   async deleteBill(billId) {
     try {
-      // Check authorization
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      // Check authorization (same center only, for ALL users)
+      if (this.getUserCenterId()) {
         const bill = await this.getBillById(billId);
         if (bill && bill.center_id !== this.getUserCenterId()) {
           throw new Error("You are not authorized to delete this bill");
@@ -791,7 +791,7 @@ class BillingService {
         .from("bills")
         .select("final_amount, status");
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         todayQuery = todayQuery.eq("center_id", this.getUserCenterId());
         totalQuery = totalQuery.eq("center_id", this.getUserCenterId());
       }
@@ -838,7 +838,7 @@ class BillingService {
         .order("created_at", { ascending: false })
         .limit(5);
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         query = query.eq("center_id", this.getUserCenterId());
       }
 
@@ -884,8 +884,8 @@ class BillingService {
       }
       if (filters.centerId && filters.centerId !== "all") {
         query = query.eq("center_id", filters.centerId);
-      } else if (!this.isUserAdmin() && this.getUserCenterId()) {
-        // If user is not admin and no centerId provided, use user's center
+      } else if (this.getUserCenterId()) {
+        // If no centerId provided, use user's center (for all users regardless of role)
         query = query.eq("center_id", this.getUserCenterId());
       }
       if (filters.referenceId && filters.referenceId !== "all") {
@@ -959,8 +959,8 @@ class BillingService {
       }
       if (filters.centerId && filters.centerId !== "all") {
         query = query.eq("center_id", filters.centerId);
-      } else if (!this.isUserAdmin() && this.getUserCenterId()) {
-        // If user is not admin and no centerId provided, use user's center
+      } else if (this.getUserCenterId()) {
+        // If no centerId provided, use user's center (for all users regardless of role)
         query = query.eq("center_id", this.getUserCenterId());
       }
 

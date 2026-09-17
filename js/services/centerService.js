@@ -106,7 +106,7 @@ class CenterService {
         .select("*")
         .order("center_name", { ascending: true });
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         query = query.eq("id", this.getUserCenterId());
       }
 
@@ -134,7 +134,7 @@ class CenterService {
       query = query.eq("is_active", true);
     }
 
-    if (!this.isUserAdmin() && this.getUserCenterId()) {
+    if (this.getUserCenterId()) {
       query = query.eq("id", this.getUserCenterId());
     }
 
@@ -281,7 +281,7 @@ class CenterService {
         .or(`center_name.ilike.%${searchTerm}%,cid.ilike.%${searchTerm}%`)
         .order("center_name", { ascending: true });
 
-      if (!this.isUserAdmin() && this.getUserCenterId()) {
+      if (this.getUserCenterId()) {
         query = query.eq("id", this.getUserCenterId());
       }
 

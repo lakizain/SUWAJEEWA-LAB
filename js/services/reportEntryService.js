@@ -138,9 +138,9 @@ class ReportEntryService {
     return this.supabase !== null;
   }
 
-  // Helper to apply center filter to a query
+  // Helper to apply center filter to a query (applies to ALL users with a center_id)
   applyCenterFilter(query) {
-    if (!this.isUserAdmin() && this.getUserCenterId()) {
+    if (this.getUserCenterId()) {
       query = query.eq("center_id", this.getUserCenterId());
     }
     return query;

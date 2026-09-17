@@ -9,6 +9,7 @@ class BillingController {
     this.editingBillId = null; // Track if we're editing a bill
     this.referenceChanged = false; // Track if reference was changed during editing
     this.isInitialized = false;
+    this.paidAmountManuallyEdited = false; // Track if user manually edited Paid Amount
   }
 
   // Initialize the billing page
@@ -830,6 +831,8 @@ class BillingController {
 
   // Handle paid amount change
   handlePaidAmountChange(event) {
+    // Mark that user has manually edited the Paid Amount field
+    this.paidAmountManuallyEdited = true;
     const paidAmount = parseFloat(event.target.value) || 0;
     this.updateRemainingAmount(paidAmount);
   }
@@ -840,6 +843,14 @@ class BillingController {
     const discountAmount = this.calculateDiscountAmount(totalAmount);
     const finalAmount = totalAmount - discountAmount;
     const paidAmountInput = document.getElementById("paid-amount-input");
+
+    // Auto-set Paid Amount to Final Amount when:
+    // - Not editing an existing bill
+    // - User hasn't manually edited the Paid Amount field
+    if (paidAmountInput && !this.editingBillId && !this.paidAmountManuallyEdited) {
+      paidAmountInput.value = finalAmount.toFixed(2);
+    }
+
     const paidAmount = parseFloat(paidAmountInput?.value) || 0;
     const remainingAmount = finalAmount - paidAmount;
 
@@ -905,6 +916,12 @@ class BillingController {
 
   // Refresh Payment Details section
   refreshPaymentDetails() {
+    // Reset the manual edit flag so auto-fill will work on the next bill
+    this.paidAmountManuallyEdited = false;
+
+    // Clear selected tests array FIRST to ensure totals are zero
+    this.selectedTests = [];
+
     // Clear paid amount input
     const paidAmountInput = document.getElementById("paid-amount-input");
     if (paidAmountInput) {
@@ -932,9 +949,6 @@ class BillingController {
 
     // Update all totals to reflect cleared state
     this.updateBillTotals();
-
-    // Clear selected tests array to ensure totals are zero
-    this.selectedTests = [];
 
     console.log("Payment Details section refreshed");
   }
@@ -2049,6 +2063,7 @@ class BillingController {
     // Clear editing mode
     this.editingBillId = null;
     this.referenceChanged = false; // Reset reference change flag
+    this.paidAmountManuallyEdited = false; // Reset paid amount manual edit flag for new bill
 
     // Reset save button text
     const saveButton = document.querySelector(".btn-save");
@@ -2525,6 +2540,9 @@ class BillingController {
     if (bill.paid_amount !== undefined && bill.paid_amount !== null) {
       document.getElementById("paid-amount-input").value = bill.paid_amount;
     }
+    // When editing an existing bill, treat saved paid amount as manually edited
+    // to prevent auto-fill from overriding the stored value
+    this.paidAmountManuallyEdited = true;
 
     // Lifetime discount UI state
     const _lifetimeDiscountCheckbox = document.getElementById(
