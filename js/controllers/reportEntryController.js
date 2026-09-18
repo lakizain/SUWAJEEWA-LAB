@@ -929,7 +929,9 @@ class ReportEntryController {
           this._autoCalcLock = false;
         }
       },
-      // ba643e33...: ROW5 = ROW6 + ROW7
+      // ba643e33... (LFT / LIVER PROFILE):
+      // ROW3 = ROW1 - ROW2 (GLOBULIN); ROW4 = ROW2 / ROW3 (A/G RATIO);
+      // ROW7 = ROW5 - ROW6 (BILIRUBIN INDIRECT)
       "ba643e33-6ec9-4de7-b9d2-e266102cbb40": (inputs) => {
         const parse = (el) => {
           const raw = (el?.value || "").trim();
@@ -939,18 +941,25 @@ class ReportEntryController {
 
         if (!Array.isArray(inputs) || inputs.length < 7) return;
 
-        const i5 = 4, i6 = 5, i7 = 6;
+        const i1 = 0, i2 = 1, i3 = 2, i4 = 3, i5 = 4, i6 = 5, i7 = 6;
+        const v1 = parse(inputs[i1]);
+        const v2 = parse(inputs[i2]);
+        const v5 = parse(inputs[i5]);
         const v6 = parse(inputs[i6]);
-        const v7 = parse(inputs[i7]);
 
         if (this._autoCalcLock) return;
         this._autoCalcLock = true;
         try {
-          const r5 = (v6 == null || v7 == null) ? null : (v6 + v7);
-          if (inputs[i5]) inputs[i5].value = this.formatValueForInput(r5);
+          const r3 = (v1 == null || v2 == null) ? null : (v1 - v2);
+          if (inputs[i3]) inputs[i3].value = this.formatValueForInput(r3);
 
-          // Trigger remark updates for affected rows
-          [i5].forEach((idx) => {
+          const r4 = (v2 == null || r3 == null || r3 === 0) ? null : (v2 / r3);
+          if (inputs[i4]) inputs[i4].value = this.formatValueForInput(r4);
+
+          const r7 = (v5 == null || v6 == null) ? null : (v5 - v6);
+          if (inputs[i7]) inputs[i7].value = this.formatValueForInput(r7);
+
+          [i3, i4, i7].forEach((idx) => {
             const el = inputs[idx];
             if (el) el.dispatchEvent(new Event("input", { bubbles: true }));
           });
@@ -1056,7 +1065,7 @@ class ReportEntryController {
     const sourceRowIndicesByTestId = {
       "d683c8f0-f901-465d-bb3d-1fee6282ebca": [0, 1, 2],
       "b3ca9595-a144-4bea-a219-c315b6f95a59": [0, 1],
-      "ba643e33-6ec9-4de7-b9d2-e266102cbb40": [5, 6],
+      "ba643e33-6ec9-4de7-b9d2-e266102cbb40": [0, 1, 4, 5],
       "9517c4cb-95fa-4aa5-86bd-2babfe6d59ce": [0, 1],
       "3b5166cc-755f-433e-833c-7e8c746c13ce": [1, 2],
     };
@@ -1073,7 +1082,7 @@ class ReportEntryController {
     const outputsByTest = {
       "d683c8f0-f901-465d-bb3d-1fee6282ebca": [3, 4, 5], // rows 4,5,6
       "b3ca9595-a144-4bea-a219-c315b6f95a59": [2, 3],     // rows 3,4
-      "ba643e33-6ec9-4de7-b9d2-e266102cbb40": [4],        // row 5
+      "ba643e33-6ec9-4de7-b9d2-e266102cbb40": [2, 3, 6],  // rows 3,4,7
       "9517c4cb-95fa-4aa5-86bd-2babfe6d59ce": [2, 3],     // rows 3,4
       "3b5166cc-755f-433e-833c-7e8c746c13ce": [3, 4],     // rows 4,5: BMI, Ideal Weight Range
     };
