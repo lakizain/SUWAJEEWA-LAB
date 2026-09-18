@@ -57,9 +57,11 @@ RETURNS TABLE (
 DECLARE
     v_short VARCHAR(2);
     v_cid   VARCHAR;
+    v_prefix VARCHAR;
+    v_pad_len INTEGER;
     v_next  INTEGER;
+    v_global_max INTEGER;
 BEGIN
-    -- Get short_name first, fall back to cid if not set
     SELECT c.short_name, c.cid
       INTO v_short, v_cid
       FROM centers c
@@ -69,33 +71,46 @@ BEGIN
         RAISE EXCEPTION 'Center with ID % not found', p_center_id;
     END IF;
 
-    -- Atomically increment the counter (next = current + 1, sequential)
+    IF v_short IS NOT NULL AND CHAR_LENGTH(v_short) = 2 THEN
+        v_prefix := v_short;
+        v_pad_len := 5;
+    ELSE
+        v_prefix := v_cid;
+        v_pad_len := 5;
+    END IF;
+
     UPDATE centers
        SET bill_counter = bill_counter + 1
      WHERE id = p_center_id
     RETURNING bill_counter INTO v_next;
 
-    -- If no row was updated (shouldn't happen since we already validated), raise error
     IF v_next IS NULL THEN
         RAISE EXCEPTION 'Failed to increment bill counter for center %', p_center_id;
     END IF;
 
-    -- NEW FORMAT:
-    -- If short_name (2 letters) is set -> PA-00001
-    -- Otherwise fallback to CID prefix for backward compat -> CID001-00001
-    IF v_short IS NOT NULL AND CHAR_LENGTH(v_short) = 2 THEN
-        RETURN QUERY
-        SELECT 
-            v_next,
-            v_short,
-            v_short || '-' || LPAD(v_next::TEXT, 5, '0');
-    ELSE
-        RETURN QUERY
-        SELECT 
-            v_next,
-            v_cid,
-            v_cid   || '-' || LPAD(v_next::TEXT, 5, '0');
+    SELECT COALESCE(
+        MAX(
+            CAST(SUBSTRING(bill_no FROM (LENGTH(v_prefix) + 2)) AS INTEGER)
+        ),
+        0
+    )
+    INTO v_global_max
+    FROM bills
+    WHERE bill_no LIKE v_prefix || '-%'
+      AND SUBSTRING(bill_no FROM (LENGTH(v_prefix) + 2)) ~ '^[0-9]+$';
+
+    IF v_global_max >= v_next THEN
+        v_next := v_global_max + 1;
+        UPDATE centers
+           SET bill_counter = v_next
+         WHERE id = p_center_id;
     END IF;
+
+    RETURN QUERY
+    SELECT
+        v_next,
+        v_prefix,
+        v_prefix || '-' || LPAD(v_next::TEXT, v_pad_len, '0');
 END;
 $$ LANGUAGE plpgsql VOLATILE SECURITY DEFINER;
 

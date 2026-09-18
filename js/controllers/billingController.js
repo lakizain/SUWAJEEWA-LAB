@@ -1046,7 +1046,7 @@ class BillingController {
         userMessage = "Bill number conflict detected. Please try saving again.";
       } else if (error.message.includes("Duplicate data detected")) {
         userMessage =
-          "This bill appears to already exist. Please check the patient information.";
+          "Duplicate bill data detected. Please try saving again.";
       } else if (error.message.includes("Invalid data provided")) {
         userMessage =
           "Please check all required fields and ensure data is valid.";

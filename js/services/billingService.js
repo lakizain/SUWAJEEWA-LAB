@@ -49,6 +49,181 @@ class BillingService {
     };
   }
 
+  parseBillNumberParts(billNo) {
+    if (!billNo) return null;
+    const value = String(billNo);
+    const shortFormat = value.match(/^([A-Z]{2})-(\d+)$/);
+    if (shortFormat) {
+      return {
+        prefix: shortFormat[1],
+        num: parseInt(shortFormat[2], 10),
+        padLength: 5,
+      };
+    }
+
+    const prefixedFormat = value.match(/^(.+)-(\d+)$/);
+    if (prefixedFormat) {
+      return {
+        prefix: prefixedFormat[1],
+        num: parseInt(prefixedFormat[2], 10),
+        padLength: /^[A-Z]{2}$/.test(prefixedFormat[1]) ? 5 : 3,
+      };
+    }
+
+    const legacyFormat = value.match(/^B(\d+)$/);
+    if (legacyFormat) {
+      return {
+        prefix: "B",
+        num: parseInt(legacyFormat[1], 10),
+        padLength: 3,
+        legacy: true,
+      };
+    }
+
+    return null;
+  }
+
+  incrementBillNumber(billNo) {
+    const parts = this.parseBillNumberParts(billNo);
+    if (!parts) return null;
+
+    const next = parts.num + 1;
+    if (parts.legacy) {
+      return `B${String(next).padStart(parts.padLength, "0")}`;
+    }
+
+    return `${parts.prefix}-${String(next).padStart(parts.padLength, "0")}`;
+  }
+
+  async isBillNumberTaken(billNo) {
+    const { data, error } = await this.supabase
+      .from("bills")
+      .select("bill_no")
+      .eq("bill_no", billNo)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data !== null;
+  }
+
+  async findNextAvailableBillNumber(startBillNo, maxAttempts = 100) {
+    let candidate = startBillNo;
+    const startParts = this.parseBillNumberParts(startBillNo);
+
+    if (startParts) {
+      let maxExisting = 0;
+
+      if (startParts.legacy) {
+        const { data: legacyBills, error } = await this.supabase
+          .from("bills")
+          .select("bill_no")
+          .like("bill_no", "B%")
+          .order("created_at", { ascending: false })
+          .limit(300);
+
+        if (!error) {
+          for (const row of legacyBills || []) {
+            const parts = this.parseBillNumberParts(row.bill_no);
+            if (parts?.legacy && parts.num > maxExisting) {
+              maxExisting = parts.num;
+            }
+          }
+        }
+      } else {
+        const { data: prefixBills, error } = await this.supabase
+          .from("bills")
+          .select("bill_no")
+          .like("bill_no", `${startParts.prefix}-%`)
+          .order("created_at", { ascending: false })
+          .limit(300);
+
+        if (!error) {
+          for (const row of prefixBills || []) {
+            const parts = this.parseBillNumberParts(row.bill_no);
+            if (parts?.num > maxExisting) {
+              maxExisting = parts.num;
+            }
+          }
+        }
+      }
+
+      const nextFromMax = maxExisting + 1;
+      const nextFromStart = startParts.num;
+      const resolvedNum = Math.max(nextFromStart, nextFromMax);
+
+      if (startParts.legacy) {
+        candidate = `B${String(resolvedNum).padStart(startParts.padLength, "0")}`;
+      } else {
+        candidate = `${startParts.prefix}-${String(resolvedNum).padStart(
+          startParts.padLength,
+          "0"
+        )}`;
+      }
+
+      if (candidate !== startBillNo) {
+        console.log(
+          `Adjusted bill number from ${startBillNo} to ${candidate} based on existing bills`
+        );
+      }
+    }
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const taken = await this.isBillNumberTaken(candidate);
+      if (!taken) {
+        if (attempt > 0 || candidate !== startBillNo) {
+          console.log(`Resolved available bill number: ${candidate}`);
+        }
+        return candidate;
+      }
+
+      console.warn(
+        `Bill number ${candidate} exists (attempt ${attempt + 1}/${maxAttempts}), trying next...`
+      );
+
+      const nextCandidate = this.incrementBillNumber(candidate);
+      if (!nextCandidate) {
+        break;
+      }
+      candidate = nextCandidate;
+    }
+
+    const fallback = `${startBillNo}-${Date.now().toString().slice(-4)}`;
+    console.warn(`Using fallback bill number: ${fallback}`);
+    return fallback;
+  }
+
+  isBillNumberConflict(error) {
+    if (!error) return false;
+    if (error.code === "23505") {
+      return !error.constraint || error.constraint.includes("bill_no");
+    }
+    return error.code === "409";
+  }
+
+  async syncCenterCounterIfNeeded(centerId, billNo) {
+    const parts = this.parseBillNumberParts(billNo);
+    if (!parts?.num || !centerId || !this.isSupabaseAvailable()) return;
+
+    try {
+      const { data: center, error } = await this.supabase
+        .from("centers")
+        .select("bill_counter")
+        .eq("id", centerId)
+        .single();
+
+      if (error || !center) return;
+
+      if (parts.num > (center.bill_counter || 0)) {
+        await this.supabase
+          .from("centers")
+          .update({ bill_counter: parts.num })
+          .eq("id", centerId);
+      }
+    } catch (syncError) {
+      console.warn("Could not sync bill counter:", syncError);
+    }
+  }
+
   // Generate unique bill number (center-wise if centerId is provided)
   // NEW FORMAT (from today): YT-00001   (short_name + 5-digit counter, zero-padded)
   // OLD BILLS STAY UNCHANGED:   CID001-B001   or   B001
@@ -69,7 +244,7 @@ class BillingService {
         if (error) {
           console.warn('RPC get_next_bill_number failed, falling back:', error);
         } else if (data && data.length > 0 && data[0].formatted_bill_no) {
-          return data[0].formatted_bill_no;
+          return this.findNextAvailableBillNumber(data[0].formatted_bill_no);
         }
       } catch (rpcError) {
         console.warn('RPC call error, falling back to legacy:', rpcError);
@@ -84,68 +259,74 @@ class BillingService {
     // when bill formats are mixed or timestamps are very close.
     // ======================================================
     try {
-      let query = this.supabase
-        .from("bills")
-        .select("bill_no")
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (resolvedCenterId) {
-        query = query.eq("center_id", resolvedCenterId);
-      }
-
-      const { data: recentBills, error } = await query;
-      if (error) throw error;
-
-      // Helper: extract the trailing numeric part from ANY bill format.
-      // Examples:
-      //   PA-00001          -> 1
-      //   CID001-B001       -> 1
-      //   B003              -> 3
-      //   PA-00007-7842     -> 7 (ignores trailing timestamp suffix)
-      const extractNum = (billNo) => {
-        if (!billNo) return 0;
-        // Strip any trailing timestamp suffix first (e.g. "-7842")
-        const clean = String(billNo).replace(/-\d{4,6}$/, "");
-        // Then grab the LAST consecutive digits block
-        const m = clean.match(/(\d+)(?!.*\d)/);
-        return m ? parseInt(m[1], 10) : 0;
-      };
-
-      // Find MAX number across all recent bills (guarantees sequential)
-      let lastNumber = 0;
-      if (recentBills && recentBills.length > 0) {
-        for (const row of recentBills) {
-          const n = extractNum(row.bill_no);
-          if (n > lastNumber) lastNumber = n;
-        }
-      }
-      const nextNumber = lastNumber + 1;
-
-      // If we have a center, build the bill number using short_name > cid
+      let prefix = null;
       if (resolvedCenterId) {
         try {
           const { data: ctr, error: ctrErr } = await this.supabase
             .from("centers")
-            .select("cid, short_name")
+            .select("cid, short_name, bill_counter")
             .eq("id", resolvedCenterId)
             .single();
 
           if (!ctrErr && ctr) {
-            const prefix = (ctr.short_name && /^[A-Z]{2}$/.test(ctr.short_name))
-              ? ctr.short_name
-              : ctr.cid;
-
-            // NEW FORMAT: PREFIX-NNNNN  (5-digit zero pad)
-            return `${prefix}-${nextNumber.toString().padStart(5, "0")}`;
+            prefix =
+              ctr.short_name && /^[A-Z]{2}$/.test(ctr.short_name)
+                ? ctr.short_name
+                : ctr.cid;
           }
         } catch (e) {
           // ignore, fall through to plain B format
         }
       }
 
-      // Plain fallback (no center info)
-      return `B${nextNumber.toString().padStart(3, "0")}`;
+      const extractNum = (billNo) => {
+        const parts = this.parseBillNumberParts(
+          String(billNo).replace(/-\d{4,6}$/, "")
+        );
+        return parts?.num || 0;
+      };
+
+      let lastNumber = 0;
+      if (prefix) {
+        const { data: prefixBills, error: prefixError } = await this.supabase
+          .from("bills")
+          .select("bill_no")
+          .like("bill_no", `${prefix}-%`)
+          .order("created_at", { ascending: false })
+          .limit(200);
+
+        if (prefixError) throw prefixError;
+
+        for (const row of prefixBills || []) {
+          const n = extractNum(row.bill_no);
+          if (n > lastNumber) lastNumber = n;
+        }
+      } else {
+        const { data: recentBills, error } = await this.supabase
+          .from("bills")
+          .select("bill_no")
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (error) throw error;
+
+        for (const row of recentBills || []) {
+          const n = extractNum(row.bill_no);
+          if (n > lastNumber) lastNumber = n;
+        }
+      }
+
+      const nextNumber = lastNumber + 1;
+
+      if (prefix) {
+        return this.findNextAvailableBillNumber(
+          `${prefix}-${nextNumber.toString().padStart(5, "0")}`
+        );
+      }
+
+      return this.findNextAvailableBillNumber(
+        `B${nextNumber.toString().padStart(3, "0")}`
+      );
     } catch (error) {
       console.error("Error generating bill number:", error);
       const timestamp = Date.now().toString().slice(-6);
@@ -154,8 +335,8 @@ class BillingService {
   }
 
   // Create new bill with retry mechanism for race conditions
-  async createBill(billData, retryCount = 0) {
-    const maxRetries = 3;
+  async createBill(billData, retryCount = 0, preferredBillNo = null) {
+    const maxRetries = 5;
 
     try {
       // Auto-fill center_id if not provided and user has a center
@@ -164,7 +345,12 @@ class BillingService {
         centerId = this.getUserCenterId();
       }
 
-      const billNumber = await this.generateBillNumber(centerId);
+      const generatedBillNumber = preferredBillNo
+        ? preferredBillNo
+        : await this.generateBillNumber(centerId);
+      const billNumber = await this.findNextAvailableBillNumber(
+        generatedBillNumber
+      );
 
       // If Supabase is not available, return mock data for offline mode
       if (!this.isSupabaseAvailable()) {
@@ -213,70 +399,12 @@ class BillingService {
         status: "pending",
       };
 
+      billPayload.bill_no = billNumber;
+
       console.log(
         `Creating bill with payload (attempt ${retryCount + 1}):`,
         JSON.stringify(billPayload, null, 2)
       );
-
-      // =====================================================
-      // Race condition check: if bill number already exists,
-      // try incrementing sequentially (+1, +2, +3, ...) up to
-      // 5 times BEFORE resorting to timestamp suffix.
-      // This keeps bill numbers strictly sequential (1,2,3,4...).
-      // =====================================================
-      const extractTailNum = (billNo) => {
-        if (!billNo) return 1;
-        const m = String(billNo).match(/^(.+)-(\d+)$/);
-        return m ? { prefix: m[1], num: parseInt(m[2], 10) } : null;
-      };
-
-      let finalBillNo = billNumber;
-      for (let attempt = 0; attempt < 6; attempt++) {
-        const { data: existingBill, error: checkError } = await this.supabase
-          .from("bills")
-          .select("bill_no")
-          .eq("bill_no", finalBillNo)
-          .single();
-
-        if (checkError && checkError.code === "PGRST116") {
-          // No conflict found — use this number
-          break;
-        }
-        if (checkError && checkError.code !== "PGRST116") {
-          console.error("Error checking existing bill:", checkError);
-          throw checkError;
-        }
-
-        // Conflict — try sequential +1 increment
-        console.warn(
-          `Bill number ${finalBillNo} exists (attempt ${attempt + 1}/6), trying next sequential number...`
-        );
-
-        const parts = extractTailNum(finalBillNo);
-        if (parts) {
-          const next = parts.num + 1;
-          // Re-apply original 5-digit zero-padding for SHORT-NNNNN format
-          finalBillNo = `${parts.prefix}-${String(next).padStart(
-            /^[A-Z]{2}$/.test(parts.prefix) ? 5 : 3,
-            "0"
-          )}`;
-        } else {
-          // Fallback: old B001-style → B002
-          const m2 = finalBillNo.match(/^B(\d+)$/);
-          if (m2) {
-            finalBillNo = `B${String(parseInt(m2[1], 10) + 1).padStart(3, "0")}`;
-          } else {
-            // Unknown format → timestamp suffix (last resort)
-            finalBillNo = `${billNumber}-${Date.now().toString().slice(-4)}`;
-            break;
-          }
-        }
-      }
-
-      billPayload.bill_no = finalBillNo;
-      if (finalBillNo !== billNumber) {
-        console.log("Final conflict-resolved bill number:", finalBillNo);
-      }
 
       const { data: bill, error } = await this.supabase
         .from("bills")
@@ -293,36 +421,40 @@ class BillingService {
           constraint: error.constraint,
         });
 
+        if (this.isBillNumberConflict(error)) {
+          if (retryCount < maxRetries) {
+            const nextBillNo =
+              this.incrementBillNumber(billPayload.bill_no) ||
+              `${billPayload.bill_no}-${Date.now().toString().slice(-4)}`;
+
+            console.log(
+              `Bill number conflict on ${billPayload.bill_no}, retrying with ${nextBillNo} (${
+                retryCount + 1
+              }/${maxRetries})...`
+            );
+
+            await new Promise((resolve) =>
+              setTimeout(resolve, 100 * (retryCount + 1))
+            );
+            return this.createBill(billData, retryCount + 1, nextBillNo);
+          }
+
+          throw new Error(
+            `Bill number ${billPayload.bill_no} already exists. Please try again.`
+          );
+        }
+
         // Handle specific error codes
         if (error.code === "23505") {
-          // Unique violation
-          if (error.constraint && error.constraint.includes("bill_no")) {
-            // Retry with a new bill number if it's a bill number conflict
-            if (retryCount < maxRetries) {
-              console.log(
-                `Bill number conflict detected, retrying (${
-                  retryCount + 1
-                }/${maxRetries})...`
-              );
-              // Wait a bit before retrying to avoid immediate conflicts
-              await new Promise((resolve) =>
-                setTimeout(resolve, 100 * (retryCount + 1))
-              );
-              return this.createBill(billData, retryCount + 1);
-            } else {
-              throw new Error(
-                `Bill number ${billPayload.bill_no} already exists. Please try again.`
-              );
-            }
-          } else if (error.constraint && error.constraint.includes("patient")) {
+          if (error.constraint && error.constraint.includes("patient")) {
             throw new Error(
               "A bill with this patient information already exists."
             );
-          } else {
-            throw new Error(
-              "Duplicate data detected. Please check your input and try again."
-            );
           }
+
+          throw new Error(
+            "Duplicate data detected. Please check your input and try again."
+          );
         } else if (error.code === "23514") {
           // Check violation
           throw new Error(
@@ -333,25 +465,12 @@ class BillingService {
           throw new Error(
             "Invalid reference data. Please check center or reference selection."
           );
-        } else if (error.code === "409") {
-          // Conflict
-          if (retryCount < maxRetries) {
-            console.log(
-              `Conflict detected, retrying (${retryCount + 1}/${maxRetries})...`
-            );
-            await new Promise((resolve) =>
-              setTimeout(resolve, 200 * (retryCount + 1))
-            );
-            return this.createBill(billData, retryCount + 1);
-          } else {
-            throw new Error(
-              "Conflict detected after multiple attempts. Please try again."
-            );
-          }
         }
 
         throw error;
       }
+
+      await this.syncCenterCounterIfNeeded(centerId, bill.bill_no);
 
       if (billData.items && billData.items.length > 0) {
         await this.addBillItems(bill.id, billData.items);
