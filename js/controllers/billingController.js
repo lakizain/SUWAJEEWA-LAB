@@ -1008,17 +1008,14 @@ class BillingController {
 
       this.currentBill = bill;
 
-      // Always print two bills after saving
-      // If reference was changed during editing, ensure it's printed with updated reference
-      if (this.editingBillId && this.referenceChanged) {
-        console.log(
-          "Reference was changed during editing, printing updated bill"
-        );
-      }
+      // Capture print data before form reset clears the UI state
+      const printContext = {
+        billData: { ...billData, ...bill },
+        selectedTests: this.selectedTests.map((test) => ({ ...test })),
+      };
 
-      // Ensure print is always triggered after successful save
       console.log("Bill saved successfully, triggering print for 2 copies...");
-      this.printBill(bill);
+      await this.printBill(bill, printContext);
 
       this.resetBillForm();
       await this.loadRecentBills();
@@ -1598,14 +1595,118 @@ class BillingController {
     return true;
   }
 
+  convertBillItemsToSelectedTests(billItems) {
+    return (billItems || [])
+      .map((item) => {
+        if (item.tests) {
+          return {
+            id: item.tests.id,
+            test_name: item.tests.test_name,
+            short_name: item.tests.short_name,
+            price: parseFloat(item.unit_price) || 0,
+            qty: item.quantity || 1,
+            itemType: "test",
+          };
+        }
+        if (item.packages) {
+          return {
+            id: item.packages.id,
+            test_name: item.packages.package_name,
+            short_name:
+              item.packages.short_name || item.packages.package_name,
+            price: parseFloat(item.unit_price) || 0,
+            qty: item.quantity || 1,
+            itemType: "package",
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }
+
+  buildBillDataForPrint(bill) {
+    return {
+      patient_title: bill.patient_title,
+      patient_name: bill.patient_name,
+      patient_age_years: bill.patient_age_years,
+      patient_age_months: bill.patient_age_months,
+      patient_age_days: bill.patient_age_days,
+      patient_gender: bill.patient_gender,
+      patient_phone: bill.patient_phone,
+      ref_by: bill.ref_by,
+      reference_rid: bill.reference_rid,
+      new_referral: bill.new_referral,
+      center_id: bill.center_id,
+      total_amount: bill.total_amount,
+      discount: bill.discount,
+      discount_type: bill.discount_type,
+      final_amount: bill.final_amount,
+      paid_amount: bill.paid_amount,
+      remaining_amount: bill.remaining_amount,
+    };
+  }
+
+  async resolvePrintContext(bill, printContext = null) {
+    if (printContext?.billData) {
+      const centerId =
+        bill?.center_id ||
+        printContext.billData.center_id ||
+        this.getSelectedCenterId() ||
+        this.billingService?.getUserCenterId();
+
+      return {
+        bill,
+        billData: printContext.billData,
+        selectedTests: printContext.selectedTests || [],
+        centerInfo: await this.getCenterContactInfo(centerId),
+      };
+    }
+
+    if (bill?.id && this.billingService?.isSupabaseAvailable()) {
+      const fullBill = await this.billingService.getBillById(bill.id);
+      const billItems = await this.billingService.getBillItems(bill.id);
+      const resolvedBill = fullBill || bill;
+      const centerFromBill = resolvedBill.centers && {
+        center_name: resolvedBill.centers.center_name,
+        phone: resolvedBill.centers.phone,
+        address: resolvedBill.centers.address,
+        email: resolvedBill.centers.email,
+      };
+      const centerInfo =
+        centerFromBill && (centerFromBill.phone || centerFromBill.address)
+          ? centerFromBill
+          : await this.getCenterContactInfo(resolvedBill.center_id);
+
+      return {
+        bill: resolvedBill,
+        billData: this.buildBillDataForPrint(resolvedBill),
+        selectedTests: this.convertBillItemsToSelectedTests(billItems),
+        centerInfo,
+      };
+    }
+
+    const billData = this.collectBillData();
+    const centerId =
+      bill?.center_id ||
+      billData.center_id ||
+      this.getSelectedCenterId() ||
+      this.billingService?.getUserCenterId();
+
+    return {
+      bill,
+      billData,
+      selectedTests: [...this.selectedTests],
+      centerInfo: await this.getCenterContactInfo(centerId),
+    };
+  }
+
   // Print bill
-  async printBill(bill) {
+  async printBill(bill, printContext = null) {
     try {
       console.log("Printing bill with 2 copies:", bill);
 
-      // Get bill details
-      const billData = this.collectBillData();
-      const selectedTests = this.selectedTests;
+      const { bill: resolvedBill, billData, selectedTests, centerInfo } =
+        await this.resolvePrintContext(bill, printContext);
 
       console.log("Bill data for printing:", billData);
       console.log("Selected tests for printing:", selectedTests);
@@ -1615,24 +1716,16 @@ class BillingController {
         billData.reference_rid
       );
 
-      // Resolve center contact info for the bill header
-      const centerId =
-        (bill && bill.center_id) ||
-        billData.center_id ||
-        this.getSelectedCenterId() ||
-        this.billingService?.getUserCenterId();
-      const centerInfo = await this.getCenterContactInfo(centerId);
-
       // Create two separate bills - one for customer, one for lab
       const customerBillHTML = this.generateBillHTML(
-        bill,
+        resolvedBill,
         billData,
         selectedTests,
         "CUSTOMER COPY",
         centerInfo
       );
       const labBillHTML = this.generateBillHTML(
-        bill,
+        resolvedBill,
         billData,
         selectedTests,
         "LAB COPY",
@@ -1640,7 +1733,10 @@ class BillingController {
       );
 
       // Generate PDF with two identical pages
-      this.generatePDF([customerBillHTML, labBillHTML], bill.bill_no);
+      this.generatePDF(
+        [customerBillHTML, labBillHTML],
+        resolvedBill.bill_no || bill.bill_no
+      );
 
       // Show success message with print details
       window.app.showSuccess(
@@ -1648,7 +1744,7 @@ class BillingController {
       );
     } catch (error) {
       console.error("Error generating PDF:", error);
-      window.app.showError("Failed to generate PDF");
+      window.app.showError(error.message || "Failed to generate PDF");
     }
   }
 
@@ -2009,6 +2105,11 @@ class BillingController {
 
       // Open in new window for PDF generation
       const pdfWindow = window.open("", "_blank", "width=800,height=600");
+      if (!pdfWindow) {
+        throw new Error(
+          "Print window was blocked. Please allow pop-ups for this site and try again."
+        );
+      }
       pdfWindow.document.write(combinedHTML);
       pdfWindow.document.close();
 
@@ -2025,6 +2126,7 @@ class BillingController {
       };
     } catch (error) {
       console.error("PDF generation error:", error);
+      throw error;
     }
   }
 
@@ -2280,85 +2382,7 @@ class BillingController {
         return;
       }
 
-      // Get bill items
-      const billItems = await billingService.getBillItems(billId);
-
-      // Convert bill items to selectedTests format for printing
-      const selectedTests = billItems
-        .map((item) => {
-          if (item.tests) {
-            return {
-              id: item.tests.id,
-              test_name: item.tests.test_name,
-              short_name: item.tests.short_name,
-              price: parseFloat(item.unit_price) || 0,
-              qty: item.quantity || 1,
-              itemType: "test",
-            };
-          } else if (item.packages) {
-            return {
-              id: item.packages.id,
-              test_name: item.packages.package_name,
-              short_name:
-                item.packages.short_name || item.packages.package_name,
-              price: parseFloat(item.unit_price) || 0,
-              qty: item.quantity || 1,
-              itemType: "package",
-            };
-          }
-          return null;
-        })
-        .filter((test) => test !== null);
-
-      // Create bill data for printing
-      const billData = {
-        patient_title: bill.patient_title,
-        patient_name: bill.patient_name,
-        patient_age_years: bill.patient_age_years,
-        patient_age_months: bill.patient_age_months,
-        patient_age_days: bill.patient_age_days,
-        patient_gender: bill.patient_gender,
-        patient_phone: bill.patient_phone,
-        ref_by: bill.ref_by,
-        reference_rid: bill.reference_rid, // Include RID if available
-        new_referral: bill.new_referral,
-      };
-
-      // Resolve center contact info - prefer info from the bill's joined centers
-      const centerFromBill = bill.centers && {
-        center_name: bill.centers.center_name,
-        phone: bill.centers.phone,
-        address: bill.centers.address,
-        email: bill.centers.email,
-      };
-      const centerInfo =
-        centerFromBill && (centerFromBill.phone || centerFromBill.address)
-          ? centerFromBill
-          : await this.getCenterContactInfo(bill.center_id);
-
-      console.log("Printing existing bill:", bill);
-      console.log("Bill data for printing:", billData);
-      console.log("Selected tests for printing:", selectedTests);
-      console.log("Center info for print header:", centerInfo);
-
-      // Create two separate bills - one for customer, one for lab
-      const customerBillHTML = this.generateBillHTML(
-        bill,
-        billData,
-        selectedTests,
-        "CUSTOMER COPY",
-        centerInfo
-      );
-      const labBillHTML = this.generateBillHTML(
-        bill,
-        billData,
-        selectedTests,
-        "LAB COPY",
-        centerInfo
-      );
-
-      // Generate PDF with two identical pages
-      this.generatePDF([customerBillHTML, labBillHTML], bill.bill_no);
+      await this.printBill(bill);
 
       window.app.showSuccess(
         "PDF generated successfully with 2 copies (Customer Copy & Lab Copy)"
@@ -3080,18 +3104,41 @@ class BillingController {
       second: "2-digit",
     });
 
-    const totalAmount = this.calculateTotalAmount();
-    const discountType = this.getDiscountType();
-    const discountValue = this.getDiscountValue();
-    const discountAmount = this.calculateDiscountAmount(totalAmount);
-    const finalAmount = totalAmount - discountAmount;
+    const totalAmount =
+      billData.total_amount != null
+        ? parseFloat(billData.total_amount) || 0
+        : (selectedTests || []).reduce((sum, test) => {
+            const price = parseFloat(test.price) || 0;
+            const qty = parseFloat(test.qty) || 1;
+            return sum + price * qty;
+          }, 0);
+    const discountType =
+      billData.discount_type ?? this.getDiscountType();
+    const discountValue =
+      billData.discount != null
+        ? parseFloat(billData.discount) || 0
+        : this.getDiscountValue();
+    const discountAmount = this.calculateDiscountAmount(
+      totalAmount,
+      discountValue,
+      discountType
+    );
+    const finalAmount =
+      billData.final_amount != null
+        ? parseFloat(billData.final_amount) || 0
+        : totalAmount - discountAmount;
     const discountLabel =
       discountType === "fixed"
         ? `Discount (Rs. ${discountValue.toFixed(2)})`
         : `Discount (${discountValue}%)`;
     const paidAmount =
-      parseFloat(document.getElementById("paid-amount-input")?.value) || 0;
-    const remainingAmount = finalAmount - paidAmount;
+      billData.paid_amount != null
+        ? parseFloat(billData.paid_amount) || 0
+        : parseFloat(document.getElementById("paid-amount-input")?.value) || 0;
+    const remainingAmount =
+      billData.remaining_amount != null
+        ? parseFloat(billData.remaining_amount) || 0
+        : finalAmount - paidAmount;
 
     // Generate a single bill content
     const singleBillContent = `
