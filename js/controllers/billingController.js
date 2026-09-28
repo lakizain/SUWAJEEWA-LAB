@@ -1703,7 +1703,7 @@ class BillingController {
   // Print bill
   async printBill(bill, printContext = null) {
     try {
-      console.log("Printing bill with 2 copies:", bill);
+      console.log("Printing bill with 2 identical copies:", bill);
 
       const { bill: resolvedBill, billData, selectedTests, centerInfo } =
         await this.resolvePrintContext(bill, printContext);
@@ -1716,19 +1716,17 @@ class BillingController {
         billData.reference_rid
       );
 
-      // Create two separate bills - one for customer, one for lab
+      // Create two identical bill copies
       const customerBillHTML = this.generateBillHTML(
         resolvedBill,
         billData,
         selectedTests,
-        "CUSTOMER COPY",
         centerInfo
       );
       const labBillHTML = this.generateBillHTML(
         resolvedBill,
         billData,
         selectedTests,
-        "LAB COPY",
         centerInfo
       );
 
@@ -1740,7 +1738,7 @@ class BillingController {
 
       // Show success message with print details
       window.app.showSuccess(
-        "Bill saved and PDF generated with 2 copies (Customer Copy & Lab Copy)"
+        "Bill saved and PDF generated with 2 identical copies"
       );
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -2385,7 +2383,7 @@ class BillingController {
       await this.printBill(bill);
 
       window.app.showSuccess(
-        "PDF generated successfully with 2 copies (Customer Copy & Lab Copy)"
+        "PDF generated successfully with 2 identical copies"
       );
       window.app.hideLoading();
     } catch (error) {
@@ -3071,7 +3069,7 @@ class BillingController {
   }
 
   // Generate bill HTML
-  generateBillHTML(bill, billData, selectedTests, copyType, centerInfo) {
+  generateBillHTML(bill, billData, selectedTests, centerInfo) {
     const DEFAULT_CENTER = {
       center_name: "Suwajeewa Laboratories",
       address: "No 62, Akuramboda Road Pallepola, Matale",
@@ -3150,11 +3148,6 @@ class BillingController {
         </div>
         <div class="lab-name">${center.center_name}</div>
         ${headerAddressLines.map((line) => `<div class="lab-address">${line}</div>`).join("")}
-        ${
-          copyType === "LAB COPY"
-            ? `<div class="copy-type" style="text-align: center; font-weight: bold; font-size: 14px; margin-top: 5px; border: 1px solid #000; padding: 2px; background: #f0f0f0;">${copyType}</div>`
-            : ""
-        }
       </div>
       
       <!-- Patient Information -->
