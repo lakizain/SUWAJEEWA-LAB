@@ -2823,6 +2823,7 @@ class ReportEntryController {
     const original = rawValue == null ? "" : String(rawValue);
     const trimmed = original.trim();
     if (trimmed === "") return "";
+    if (!finalize && original !== trimmed) return original;
     if (!/^[+-]?\d*\.?\d*$/.test(trimmed)) return original;
 
     const sign = trimmed.startsWith("-")
