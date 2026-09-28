@@ -1050,6 +1050,9 @@ class ReportEntryController {
       },
     };
 
+    calculators["ebc9b307-ba15-4c2d-912b-7b82a179afe9"] =
+      calculators["9517c4cb-95fa-4aa5-86bd-2babfe6d59ce"];
+
     if (!testId || !calculators[testId] || !this.resultsItemsBody) return;
 
     // Collect all value inputs in row order
@@ -1067,6 +1070,7 @@ class ReportEntryController {
       "b3ca9595-a144-4bea-a219-c315b6f95a59": [0, 1],
       "ba643e33-6ec9-4de7-b9d2-e266102cbb40": [0, 1, 4, 5],
       "9517c4cb-95fa-4aa5-86bd-2babfe6d59ce": [0, 1],
+      "ebc9b307-ba15-4c2d-912b-7b82a179afe9": [0, 1],
       "3b5166cc-755f-433e-833c-7e8c746c13ce": [1, 2],
     };
 
@@ -1084,6 +1088,7 @@ class ReportEntryController {
       "b3ca9595-a144-4bea-a219-c315b6f95a59": [2, 3],     // rows 3,4
       "ba643e33-6ec9-4de7-b9d2-e266102cbb40": [2, 3, 6],  // rows 3,4,7
       "9517c4cb-95fa-4aa5-86bd-2babfe6d59ce": [2, 3],     // rows 3,4
+      "ebc9b307-ba15-4c2d-912b-7b82a179afe9": [2, 3],     // rows 3,4
       "3b5166cc-755f-433e-833c-7e8c746c13ce": [3, 4],     // rows 4,5: BMI, Ideal Weight Range
     };
 

@@ -638,8 +638,10 @@ class BillingService {
                     paid_amount,
                     remaining_amount,
                     bill_items (
+                      id,
                       is_package_component,
-                      tests (test_name),
+                      test_id,
+                      tests (id, test_name),
                       packages (package_name)
                     )
                 `

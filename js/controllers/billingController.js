@@ -3,6 +3,7 @@ class BillingController {
   constructor() {
     this.billingService = null;
     this.pricingService = null;
+    this.reportEntryService = null;
     this.currentBill = null;
     this.selectedTests = [];
     this.selectedPackages = [];
@@ -22,6 +23,7 @@ class BillingController {
 
       this.billingService = window.app.getService("billing");
       this.pricingService = window.app.getService("pricing");
+      this.reportEntryService = new ReportEntryService();
       console.log("Billing service:", this.billingService);
 
       this.setupEventListeners();
@@ -56,6 +58,19 @@ class BillingController {
 
   // Setup event listeners
   setupEventListeners() {
+    const historyTable = document.querySelector("#patient-history-table tbody");
+    if (historyTable) {
+      historyTable.addEventListener("click", (event) => {
+        const testButton = event.target.closest("[data-bill-item-id]");
+        if (testButton) {
+          this.displayHistoryTestResults(
+            testButton.dataset.billItemId,
+            testButton.dataset.testName
+          );
+        }
+      });
+    }
+
     // Patient phone search
     const patientPhoneInput = document.querySelector(
       'input[placeholder*="phone"]'
@@ -497,6 +512,9 @@ class BillingController {
     }
     if (!historyTable) return;
 
+    const resultsPanel = document.getElementById("patient-history-results");
+    if (resultsPanel) resultsPanel.hidden = true;
+
     if (history.length === 0) {
       historyTable.innerHTML = `
                 <tr>
@@ -511,7 +529,17 @@ class BillingController {
 
     const rows = history
       .map((bill) => {
-        const testNames = this.getTestNames(bill.bill_items || []);
+        const testItems = (bill.bill_items || []).filter(
+          (item) => item.tests && item.id
+        );
+        const testNames = testItems.length
+          ? testItems
+              .map(
+                (item) =>
+                  `<button type="button" class="btn btn-link btn-sm p-0 me-2" data-bill-item-id="${item.id}" data-test-name="${this.escapeHistoryText(item.tests.test_name)}">${this.escapeHistoryText(item.tests.test_name)}</button>`
+              )
+              .join("")
+          : this.getTestNames(bill.bill_items || []);
         return `
           <tr>
             <td><strong>${bill.bill_no}</strong></td>
@@ -527,6 +555,62 @@ class BillingController {
       .join("");
 
     historyTable.innerHTML = rows;
+  }
+
+  async displayHistoryTestResults(billItemId, testName) {
+    const resultsPanel = document.getElementById("patient-history-results");
+    const resultsBody = document.querySelector(
+      "#patient-history-results-table tbody"
+    );
+    if (!resultsPanel || !resultsBody) return;
+
+    resultsPanel.hidden = false;
+    resultsPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    resultsBody.innerHTML = `
+      <tr><td colspan="4" class="text-center">Loading results...</td></tr>
+    `;
+
+    const results = await this.reportEntryService.getTestResultsByBillItem(
+      billItemId
+    );
+    const title = document.getElementById("patient-history-results-title");
+    if (title) title.textContent = `${testName || "Test"} results`;
+
+    if (!results.length) {
+      resultsBody.innerHTML = `
+        <tr><td colspan="4" class="text-center">No saved results for this test.</td></tr>
+      `;
+      return;
+    }
+
+    resultsBody.innerHTML = results
+      .map((result) => {
+        const subcategory = Array.isArray(result.test_subcategories)
+          ? result.test_subcategories[0]
+          : result.test_subcategories;
+        return `
+          <tr>
+            <td>${this.escapeHistoryText(subcategory?.subcategory_name || subcategory?.name || "")}</td>
+            <td>${this.escapeHistoryText(result.value || "")}</td>
+            <td>${this.escapeHistoryText(result.unit || "")}</td>
+            <td>${this.escapeHistoryText(result.status || "")}</td>
+          </tr>
+        `;
+      })
+      .join("");
+  }
+
+  escapeHistoryText(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (character) => {
+      const entities = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      };
+      return entities[character];
+    });
   }
 
   // Get test names from bill items

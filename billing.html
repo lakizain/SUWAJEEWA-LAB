@@ -200,6 +200,22 @@
                                     </tbody>
                                 </table>
                             </div>
+                            <div id="patient-history-results" class="mt-3" hidden>
+                                <h6 id="patient-history-results-title" class="mb-2">Test results</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered mb-0" id="patient-history-results-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Test</th>
+                                                <th>Result</th>
+                                                <th>Unit</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -369,6 +385,7 @@
     <script src="js/services/centerService.js"></script>
     <script src="js/services/packageService.js"></script>
     <script src="js/services/reportsService.js"></script>
+    <script src="js/services/reportEntryService.js"></script>
 
     <!-- Load main app -->
     <script src="js/app.js"></script>

@@ -462,6 +462,35 @@ class ReportEntryService {
         .order("created_at", { ascending: true });
 
       if (error) {
+        if (error.code === "42703" && error.message?.includes("bill_item_id")) {
+          const { data: billItem, error: billItemError } = await this.supabase
+            .from("bill_items")
+            .select("bill_id, test_id")
+            .eq("id", billItemId)
+            .maybeSingle();
+
+          if (billItemError) throw billItemError;
+          if (!billItem?.bill_id || !billItem?.test_id) return [];
+
+          const { data: legacyResults, error: legacyError } = await this.supabase
+            .from("test_results")
+            .select(
+              `
+              *,
+              test_subcategories!inner (
+                *,
+                tests (test_name, short_name)
+              )
+            `
+            )
+            .eq("bill_id", billItem.bill_id)
+            .eq("test_subcategories.test_id", billItem.test_id)
+            .order("created_at", { ascending: true });
+
+          if (legacyError) throw legacyError;
+          return legacyResults || [];
+        }
+
         const friendly = error?.message?.includes("does not exist")
           ? "Table test_results not found. Run database/setup.sql in your Supabase project."
           : error?.message || "Failed to load test results";
