@@ -2120,7 +2120,7 @@ class ReportEntryController {
           }
           
           .results-table thead th:nth-child(2) { 
-            transform: translateX(-5mm); 
+            transform: translateX(0); 
           }
           
           .results-table tbody td:nth-child(2)::before { 
@@ -2141,7 +2141,7 @@ class ReportEntryController {
           
           .results-table tbody td:nth-child(2) { 
             padding-left: 0; 
-            transform: translateX(-5mm); 
+            transform: translateX(0); 
           }
           
           .results-table tbody td:first-child { 
@@ -2457,11 +2457,11 @@ class ReportEntryController {
           .results-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 1.5px; }
           .results-table th, .results-table td { border: none; padding: 3px 6px; vertical-align: top; }
           .results-table thead th { background: #fff; font-weight: 700; text-align: left; }
-          .results-table thead th:nth-child(2) { transform: translateX(-5mm); }
+          .results-table thead th:nth-child(2) { transform: translateX(0); }
           .results-table tbody td:nth-child(2)::before { content: ":"; display: inline-block; width: 10px; text-align: center; margin-right: 6px; }
           .results-table tbody tr.empty-category-row td:nth-child(2)::before { content: ""; }
           .results-table tbody tr.hide-value-colon td:nth-child(2)::before { content: ""; }
-          .results-table tbody td:nth-child(2) { padding-left: 0; transform: translateX(-5mm); }
+          .results-table tbody td:nth-child(2) { padding-left: 0; transform: translateX(0); }
           .results-table tbody td:first-child { 
             font-weight: 400; 
             text-align: left;
