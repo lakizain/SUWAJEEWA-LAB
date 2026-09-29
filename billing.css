@@ -95,7 +95,7 @@ body {
 
 /* Content Section */
 .content-section {
-  padding: 2rem 0;
+  padding: 0.5rem 0 2rem;
 }
 
 /* Panel Styles */
@@ -128,7 +128,7 @@ body {
 .billing-form-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  padding: 0.5rem 0.75rem;
+  padding: 0.25rem 0.75rem;
 }
 
 .billing-meta-fields {
@@ -144,20 +144,20 @@ body {
 
 .billing-meta-field label {
   display: block;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.1rem;
   color: #F9FAFB;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   line-height: 1.1;
 }
 
 .billing-meta-field .form-control {
   min-width: 0;
-  height: 30px;
-  padding: 0.2rem 0.45rem;
+  height: 26px;
+  padding: 0.15rem 0.4rem;
   border-width: 1px;
   border-radius: 4px;
   background: #FFFFFF;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
 }
 
 @media (max-width: 575.98px) {
@@ -180,6 +180,61 @@ body {
 .payment-panel .summary-label,
 .payment-panel .summary-value {
   color: var(--text) !important;
+}
+
+.billing-details-row {
+  margin-bottom: 0.75rem !important;
+}
+
+.billing-patient-fields .mb-3 {
+  margin-bottom: 0.55rem !important;
+}
+
+.billing-patient-fields .form-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.82rem;
+}
+
+.billing-patient-fields .form-control {
+  height: 36px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.84rem;
+}
+
+.billing-patient-fields .info-text {
+  margin-top: 0.25rem;
+  font-size: 0.74rem;
+}
+
+.payment-panel {
+  padding: 1rem;
+}
+
+.payment-panel .panel-header {
+  margin: -1rem -1rem 0.75rem;
+  padding: 0.6rem 1rem;
+}
+
+.payment-panel .mb-4 {
+  margin-bottom: 0.75rem !important;
+}
+
+.payment-panel h6 {
+  margin-bottom: 0.45rem !important;
+}
+
+.payment-panel .form-check.mb-3 {
+  margin-bottom: 0.5rem !important;
+}
+
+.payment-panel .summary-item {
+  margin-bottom: 0.35rem;
+  padding: 0.35rem 0;
+}
+
+.payment-panel .btn-save {
+  padding: 0.7rem;
+  font-size: 1rem;
 }
 
 /* Form Styles */
