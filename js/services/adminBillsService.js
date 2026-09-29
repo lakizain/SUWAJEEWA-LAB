@@ -32,13 +32,17 @@ class AdminBillsService {
     return user?.role === 'admin' ? null : user?.center_id;
   }
 
+  getCenterIdForQuery(selectedCenterId = null) {
+    return this.isUserAdmin() ? (selectedCenterId || null) : (this.getUserCenterId() || null);
+  }
+
   // Check if Supabase is available
   isSupabaseAvailable() {
     return this.supabase !== null;
   }
 
   // Get all recent bills for admin view
-  async getAllRecentBills(limit = 50) {
+  async getAllRecentBills(limit = 50, selectedCenterId = null) {
     try {
       if (!this.isSupabaseAvailable()) {
         console.warn("Supabase not available. Returning sample data");
@@ -65,8 +69,9 @@ class AdminBillsService {
         .order("created_at", { ascending: false })
         .limit(limit);
 
-      if (this.getUserCenterId()) {
-        query = query.eq("center_id", this.getUserCenterId());
+      const centerId = this.getCenterIdForQuery(selectedCenterId);
+      if (centerId) {
+        query = query.eq("center_id", centerId);
       }
 
       const { data: bills, error } = await query;
@@ -80,7 +85,7 @@ class AdminBillsService {
   }
 
   // Search bills by bill number or patient name
-  async searchBills(searchTerm) {
+  async searchBills(searchTerm, selectedCenterId = null) {
     try {
       if (!this.isSupabaseAvailable()) {
         console.warn("Supabase not available. Returning empty results");
@@ -88,7 +93,7 @@ class AdminBillsService {
       }
 
       if (!searchTerm || searchTerm.trim() === "") {
-        return await this.getAllRecentBills();
+        return await this.getAllRecentBills(50, selectedCenterId);
       }
 
       const term = searchTerm.trim();
@@ -113,8 +118,9 @@ class AdminBillsService {
         .order("created_at", { ascending: false })
         .limit(50);
 
-      if (this.getUserCenterId()) {
-        query = query.eq("center_id", this.getUserCenterId());
+      const centerId = this.getCenterIdForQuery(selectedCenterId);
+      if (centerId) {
+        query = query.eq("center_id", centerId);
       }
 
       const { data: bills, error } = await query;
@@ -157,7 +163,7 @@ class AdminBillsService {
   }
 
   // Get patient history by patient details
-  async getPatientHistory(patientName, patientPhone = null) {
+  async getPatientHistory(patientName, patientPhone = null, selectedCenterId = null) {
     try {
       if (!this.isSupabaseAvailable()) {
         return [];
@@ -186,8 +192,9 @@ class AdminBillsService {
         query = query.ilike("patient_name", `%${patientName.trim()}%`);
       }
 
-      if (this.getUserCenterId()) {
-        query = query.eq("center_id", this.getUserCenterId());
+      const centerId = this.getCenterIdForQuery(selectedCenterId);
+      if (centerId) {
+        query = query.eq("center_id", centerId);
       }
 
       const { data: bills, error } = await query;

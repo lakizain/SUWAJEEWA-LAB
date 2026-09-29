@@ -41,6 +41,17 @@
         option.textContent = center.center_name;
         centerSelect.appendChild(option);
       });
+
+      const billsCenterFilter = $('bills-center-filter');
+      if (billsCenterFilter) {
+        billsCenterFilter.innerHTML = '<option value="">All Centers</option>';
+        centers.forEach(center => {
+          const option = document.createElement('option');
+          option.value = center.id;
+          option.textContent = center.center_name;
+          billsCenterFilter.appendChild(option);
+        });
+      }
     } catch (error) {
       console.error('Error populating center dropdown:', error);
     }
@@ -328,7 +339,8 @@
     try {
       if (!state.adminBillsService) return;
       
-      const bills = await state.adminBillsService.getAllRecentBills();
+      const centerId = $('bills-center-filter')?.value || null;
+      const bills = await state.adminBillsService.getAllRecentBills(50, centerId);
       renderBills(bills);
     } catch (error) {
       console.error('Error fetching bills:', error);
@@ -340,7 +352,8 @@
     try {
       if (!state.adminBillsService) return;
       
-      const bills = await state.adminBillsService.searchBills(searchTerm);
+      const centerId = $('bills-center-filter')?.value || null;
+      const bills = await state.adminBillsService.searchBills(searchTerm, centerId);
       renderBills(bills);
     } catch (error) {
       console.error('Error searching bills:', error);
@@ -504,6 +517,18 @@
         }
       });
     }
+
+    const centerFilter = $('bills-center-filter');
+    if (centerFilter) {
+      centerFilter.addEventListener('change', function() {
+        const searchTerm = searchInput ? searchInput.value.trim() : '';
+        if (searchTerm) {
+          searchBills(searchTerm);
+        } else {
+          fetchBills();
+        }
+      });
+    }
     
     // Table click events
     const billsBody = $('billsHistoryBody');
@@ -521,6 +546,10 @@
     state.centerService = new window.CenterService();
     // Initialize admin bills service
     state.adminBillsService = new window.AdminBillsService();
+    const centerFilterContainer = $('admin-center-filter-container');
+    if (centerFilterContainer) {
+      centerFilterContainer.hidden = !state.adminBillsService.isUserAdmin();
+    }
     
     // Populate center dropdown
     await populateCenterDropdown();

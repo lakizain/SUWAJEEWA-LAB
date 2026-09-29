@@ -1873,6 +1873,36 @@ class ReportEntryController {
     }
   }
 
+  validateRequiredRowTotal() {
+    const testId = this.selectedTestItem?.tests?.id || this.selectedTestItem?.test_id;
+    if (testId !== "6eccf0e5-4a62-4504-8639-f8ab7d0723f6") return true;
+
+    const values = [2, 3, 4, 5, 6].map((index) => {
+      const subcategory = this.currentSubcategories?.[index];
+      const row = subcategory && this.resultsItemsBody?.querySelector(
+        `tr[data-subcategory-id="${subcategory.id}"]`
+      );
+      const rawValue = row?.querySelector("td:nth-child(2) input")?.value?.trim();
+      if (!rawValue) return null;
+
+      const value = Number(rawValue);
+      return Number.isFinite(value) ? value : null;
+    });
+
+    if (values.some((value) => value === null)) {
+      this.showError("Rows 3 to 7 must contain numeric values and add up to 100 before saving or printing.");
+      return false;
+    }
+
+    const total = values.reduce((sum, value) => sum + value, 0);
+    if (Math.abs(total - 100) > 1e-6) {
+      this.showError(`Rows 3 to 7 must add up to 100 before saving or printing. Current total: ${Number(total.toFixed(6))}.`);
+      return false;
+    }
+
+    return true;
+  }
+
   // Show/hide the right-panel results table header (Bill No. / Patient / Test)
   setResultsHeaderVisible(visible) {
     if (this.resultsTableHead)
@@ -1888,6 +1918,7 @@ class ReportEntryController {
       this.showError("Please select a bill first");
       return;
     }
+    if (!this.validateRequiredRowTotal()) return;
 
     // Collect test results from the table
     const results = this.collectTestResults();
@@ -1919,6 +1950,7 @@ class ReportEntryController {
       this.showError("Please select a bill first");
       return;
     }
+    if (!this.validateRequiredRowTotal()) return;
 
     try {
       // Collect data first
@@ -1984,6 +2016,7 @@ class ReportEntryController {
       this.showError("Please select a bill first");
       return;
     }
+    if (!this.validateRequiredRowTotal()) return;
 
     // Generate print content
     const printContent = this.generatePrintHTML();
@@ -2253,6 +2286,7 @@ class ReportEntryController {
       this.showError("Please select a bill first");
       return;
     }
+    if (!this.validateRequiredRowTotal()) return;
 
     try {
       // Collect inputs

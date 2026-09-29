@@ -30,7 +30,7 @@ class CenterService {
   // Helper to get user's center id
   getUserCenterId() {
     const user = this.getCurrentUser();
-    return user?.center_id;
+    return user?.role === 'admin' ? null : user?.center_id;
   }
 
   // Check if Supabase is available
