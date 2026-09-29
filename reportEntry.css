@@ -1001,6 +1001,11 @@ td,
     page-break-inside: avoid;
   }
 
+  .print-table th:nth-child(2),
+  .print-table td:nth-child(2) {
+    padding-left: 20px; /* Indent second column for better readability */
+  }
+
   .print-footer {
     page-break-inside: avoid;
   }
