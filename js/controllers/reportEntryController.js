@@ -3,6 +3,16 @@ const VALUE_DECIMAL_PLACES = 3;
 const THREE_DECIMAL_VALUE_TEST_ID = "3ea45cbd-4b12-4ae1-9983-52e759219e98";
 
 /**
+ * Gap (in mm) left between the end of the test results and the
+ * "....." line + "Medical Laboratory Technologist" label when the
+ * letterhead (header/footer) is NOT used.
+ * 30 = 3 cm.  (Change to 50 if you want 5 cm.)
+ * When "Print with signature" is ON, the signature image is placed
+ * inside this gap, just above the dotted line.
+ */
+const SIGNATURE_GAP_MM = 30;
+
+/**
  * 0-based subcategory row indices where manual value entry is skipped (by test UUID).
  * Row numbers shown to users are index + 1 (e.g. index 11 = 12th row).
  */
@@ -171,6 +181,8 @@ class ReportEntryController {
     this.editBtn = document.querySelector("button.btn.btn-warning");
     this.printWithSignatureCheckbox =
       document.getElementById("printWithSignature");
+    this.printWithLetterheadCheckbox =
+      document.getElementById("printWithLetterhead");
   }
 
   bindEvents() {
@@ -760,69 +772,191 @@ class ReportEntryController {
   }
 
   async handleDownloadReadyReports() {
+    const items = Array.from(this.readySelectionKeys)
+      .map((key) => this.readySelectionItems.get(key))
+      .filter(Boolean);
+
+    if (items.length === 0) {
+      this.showError("Please select at least one test from Ready Reports");
+      return;
+    }
+
+    if (typeof window.html2pdf !== "function") {
+      this.showError("PDF generator is unavailable. Please refresh and try again.");
+      return;
+    }
+
+    const originalState = {
+      bill: this.selectedBill,
+      testItem: this.selectedTestItem,
+      currentSubcategories: this.currentSubcategories,
+      currentSubcategoryIndex: this.currentSubcategoryIndex,
+      currentReportHeader: this.currentReportHeader,
+      resultsHTML: this.resultsItemsBody?.innerHTML ?? "",
+      resultValues: Array.from(
+        this.resultsItemsBody?.querySelectorAll("tr[data-subcategory-id]") || []
+      ).map((row) => ({
+        id: row.dataset.subcategoryId,
+        value: row.querySelector("td:nth-child(2) input")?.value || "",
+        remark: row.querySelector("td:nth-child(5) input")?.value || "",
+      })),
+      summaryValues: [
+        this.reportIdInput,
+        this.billNoInput,
+        this.patientNameInput,
+        this.titleInput,
+        this.ageInput,
+        this.genderInput,
+        this.testTypeInput,
+        this.specimenInput,
+        this.refByInput,
+      ].map((input) => input?.value ?? ""),
+      comments: this.commentsResultInput?.value ?? "",
+      specialNotes: this.specialNotesInput?.value ?? "",
+      topCategory: this.topCategoryInput?.value ?? "",
+      topValue: this.topValueInput?.value ?? "",
+    };
+
+    if (this.downloadReadyReportsBtn) this.downloadReadyReportsBtn.disabled = true;
+
     try {
-      const items = Array.from(this.readySelectionKeys)
-        .map((k) => this.readySelectionItems.get(k))
-        .filter(Boolean);
-
-      if (items.length === 0) {
-        this.showError("Please select at least one test from Ready Reports");
-        return;
-      }
-
-      // Save current state to restore later
-      const originalSelectedBill = this.selectedBill;
-      const originalSelectedTestItem = this.selectedTestItem;
-
-      // Process each report individually
+      let downloadedCount = 0;
       for (const item of items) {
-        // Get full bill data
         const bill = await this.reportEntryService.getBillByNumber(item.billNo);
         if (!bill) continue;
 
-        // Find the matching bill item
-        const billItem = bill.bill_items?.find(bi => 
-          (bi.tests?.test_name === item.testName || bi.packages?.package_name === item.testName)
+        const billItem = bill.bill_items?.find((candidate) =>
+          item.billItemId
+            ? String(candidate.id) === item.billItemId
+            : candidate.tests?.test_name === item.testName ||
+              candidate.packages?.package_name === item.testName
         );
         if (!billItem) continue;
 
-        // Set controller state temporarily to use existing methods
         this.selectedBill = bill;
         this.selectedTestItem = billItem;
-
-        // Load test subcategories and results to populate resultsItemsBody
+        this.populateSummaryForm(bill, billItem);
         await this.renderTestResults(bill, billItem);
-        await this.loadSubcategoriesAndResultsForPrint();
+        await this.loadReportHeaderForItem(billItem.id);
 
-        // Generate print HTML
-        const reportHTML = this.generatePrintLayoutHTML(false);
-
-        // Open each report in a new window and trigger print individually
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(reportHTML);
-        printWindow.document.close();
-        
-        // Wait for images to load, then print
-        await new Promise((resolve) => {
-          printWindow.onload = () => {
-            setTimeout(() => {
-              printWindow.print();
-              resolve();
-            }, 500);
-          };
-        });
+        const reportHTML = this.generatePrintHTML();
+        const patientName = bill.patient_name || "Patient";
+        const testName =
+          billItem.tests?.test_name || billItem.packages?.package_name || "Test";
+        await this.downloadReportPdf(
+          reportHTML,
+          `${this.sanitizePdfFilenamePart(patientName)}_${this.sanitizePdfFilenamePart(testName)}.pdf`
+        );
+        downloadedCount++;
       }
 
-      // Restore original state
-      this.selectedBill = originalSelectedBill;
-      this.selectedTestItem = originalSelectedTestItem;
-      if (originalSelectedBill) {
-        this.populateSummaryForm(originalSelectedBill, originalSelectedTestItem);
-        this.renderTestResults(originalSelectedBill, originalSelectedTestItem);
-      }
+      if (downloadedCount === 0) this.showError("No selected reports could be downloaded");
     } catch (e) {
       console.error("Failed to download ready reports", e);
       this.showError("Failed to download reports");
+    } finally {
+      this.selectedBill = originalState.bill;
+      this.selectedTestItem = originalState.testItem;
+
+      if (originalState.bill) {
+        this.populateSummaryForm(originalState.bill, originalState.testItem);
+        await this.renderTestResults(originalState.bill, originalState.testItem);
+        originalState.resultValues.forEach(({ id, value, remark }) => {
+          const row = this.resultsItemsBody?.querySelector(
+            `tr[data-subcategory-id="${id}"]`
+          );
+          const valueInput = row?.querySelector("td:nth-child(2) input");
+          const remarkInput = row?.querySelector("td:nth-child(5) input");
+          if (valueInput) valueInput.value = value;
+          if (remarkInput) remarkInput.value = remark;
+        });
+      } else if (this.resultsItemsBody) {
+        this.resultsItemsBody.innerHTML = originalState.resultsHTML;
+      }
+
+      [
+        this.reportIdInput,
+        this.billNoInput,
+        this.patientNameInput,
+        this.titleInput,
+        this.ageInput,
+        this.genderInput,
+        this.testTypeInput,
+        this.specimenInput,
+        this.refByInput,
+      ].forEach((input, index) => {
+        if (input) input.value = originalState.summaryValues[index];
+      });
+      this.currentSubcategories = originalState.currentSubcategories;
+      this.currentSubcategoryIndex = originalState.currentSubcategoryIndex;
+      this.currentReportHeader = originalState.currentReportHeader;
+      if (this.commentsResultInput) this.commentsResultInput.value = originalState.comments;
+      if (this.specialNotesInput) this.specialNotesInput.value = originalState.specialNotes;
+      if (this.topCategoryInput) this.topCategoryInput.value = originalState.topCategory;
+      if (this.topValueInput) this.topValueInput.value = originalState.topValue;
+      this.updateReadySendControls();
+    }
+  }
+
+  sanitizePdfFilenamePart(value) {
+    return String(value || "")
+      .trim()
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
+      .replace(/\s+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^[_.]+|[_.]+$/g, "") || "Report";
+  }
+
+  async downloadReportPdf(reportHTML, filename) {
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.position = "fixed";
+    frame.style.left = "-10000px";
+    frame.style.top = "0";
+    frame.style.width = "210mm";
+    frame.style.height = "297mm";
+    frame.style.border = "0";
+    document.body.appendChild(frame);
+
+    try {
+      await new Promise((resolve, reject) => {
+        frame.onload = resolve;
+        frame.onerror = reject;
+        frame.srcdoc = reportHTML;
+      });
+
+      const reportDocument = frame.contentDocument;
+      const reportPage = reportDocument?.querySelector(".page");
+      if (!reportDocument || !reportPage) {
+        throw new Error("Generated report template is missing its page content");
+      }
+
+      if (reportDocument.fonts?.ready) await reportDocument.fonts.ready;
+      await Promise.all(
+        Array.from(reportDocument.images).map((image) =>
+          image.decode().catch(() => undefined)
+        )
+      );
+
+      await window
+        .html2pdf()
+        .set({
+          margin: this.shouldIncludeLetterhead() ? [0, 0, 0, 0] : [16, 2, 16, 2],
+          filename,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: "#ffffff",
+          },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["css", "legacy"], avoid: [".page"] },
+        })
+        .from(reportPage)
+        .save();
+    } finally {
+      frame.remove();
     }
   }
 
@@ -2046,7 +2180,7 @@ class ReportEntryController {
         <style>
           @page { 
             size: A4; 
-            margin: 16mm 2mm; 
+            margin: ${this.shouldIncludeLetterhead() ? "0" : "16mm 2mm"};
           }
           
           body { 
@@ -2060,14 +2194,34 @@ class ReportEntryController {
           .page {
             display: flex;
             flex-direction: column;
-            height: calc(297mm - 32mm);
+            height: ${this.shouldIncludeLetterhead() ? "297mm" : "calc(297mm - 32mm)"};
             position: relative;
+          }
+
+          .letterhead-header,
+          .letterhead-footer {
+            position: fixed;
+            left: 0;
+            width: 100vw;
+            z-index: 10;
+          }
+
+          .letterhead-header { top: 0; }
+          .letterhead-footer { bottom: 0; }
+
+          .letterhead-header img,
+          .letterhead-footer img {
+            display: block;
+            width: 100%;
+            height: auto;
           }
           
           .report-container { 
             width: 100%; 
             background: white;
             padding: 20px;
+            padding-bottom: 18mm;
+            box-sizing: border-box;
             margin-left: -10px;
           }
           
@@ -2202,21 +2356,32 @@ class ReportEntryController {
           }
           
           .signature-section { 
-            position: absolute;
-            bottom: 5mm;
-            right: 5mm;
+            position: fixed;
+            right: 18mm;
+            bottom: 29mm;
             display: flex; 
             flex-direction: column; 
             align-items: flex-end; 
-            width: 25%; 
-            transform: translateY(10mm);
+            width: 32%; 
             page-break-inside: avoid;
             break-inside: avoid; 
+            z-index: 30;
+          }
+          /* Flow layout (no letterhead): signature block follows the results */
+          .signature-section.flow {
+            position: static;
+            right: auto;
+            bottom: auto;
+            align-items: stretch;
+            width: 32%;
+            margin: 0 16mm 0 auto;
+            z-index: auto;
           }
           .signature-image {
-            margin-bottom: 8px;
+            margin-bottom: 4px;
             text-align: center;
             width: 100%;
+            min-height: 45px;
           }
           .signature-line { 
             width: 100%; 
@@ -2230,6 +2395,19 @@ class ReportEntryController {
             text-align: center; 
             width: 100%; 
             word-wrap: break-word; 
+            margin-bottom: 0;
+            transform: none;
+          }
+
+          @media print {
+            .page {
+              box-sizing: border-box;
+              overflow: hidden;
+              break-inside: avoid;
+              page-break-inside: avoid;
+              break-after: avoid;
+              page-break-after: avoid;
+            }
           }
         </style>
       </head>
@@ -2240,10 +2418,12 @@ class ReportEntryController {
           </div>
         </div>
         <script>
+          ${this.getPrintFitScript()}
           // Automatically trigger print dialog when page loads - optimized for speed
           window.onload = function() {
             // Reduced delay for faster response
             setTimeout(function() {
+              window.fitReportToOnePage();
               window.print();
             }, 50);
           };
@@ -2420,6 +2600,8 @@ class ReportEntryController {
   generatePrintLayoutHTML(isForPrint) {
     const bill = this.selectedBill;
     const billItem = this.selectedTestItem;
+    const includeLetterhead = this.shouldIncludeLetterhead();
+    const includeSignature = this.shouldIncludeSignature();
     const now = new Date();
     const reportDate = this.safeText(
       new Date(bill.bill_date).toISOString().split("T")[0]
@@ -2462,6 +2644,46 @@ class ReportEntryController {
     const { hasRefRange: showRefRange, hasRemark: showRemark } =
       this.detectPrintableOptionalColumns();
 
+    // ------------------------------------------------------------------
+    // Signature block
+    //  - Letterhead ON  : fixed position above the footer (as before)
+    //  - Letterhead OFF : FLOW layout. The "....." line and
+    //    "Medical Laboratory Technologist" label are placed
+    //    SIGNATURE_GAP_MM below the end of the test results. If
+    //    "Print with signature" is ON, the signature image is placed
+    //    inside that gap, directly above the dotted line.
+    // ------------------------------------------------------------------
+    const useFlowSignature = !includeLetterhead;
+    const signatureImgTag = `<img src="Imgs/signature.svg" alt="Signature" style="max-width: 100%; height: auto; max-height: ${
+      useFlowSignature ? SIGNATURE_GAP_MM - 2 : 45
+    }${useFlowSignature ? "mm" : "px"};">`;
+
+    let signatureImageBlock;
+    if (useFlowSignature) {
+      // Fixed-height gap; image (if any) sits at the bottom of the gap
+      signatureImageBlock = `
+            <div class="signature-image">${
+              includeSignature ? signatureImgTag : ""
+            }</div>`;
+    } else if (includeSignature) {
+      signatureImageBlock = `
+            <div class="signature-image">
+              ${signatureImgTag}
+            </div>`;
+    } else {
+      signatureImageBlock = `
+            <div class="signature-image" style="visibility: hidden; height: 45px;">
+              ${signatureImgTag}
+            </div>`;
+    }
+
+    const signatureBlockHTML = `
+          <div class="signature-section ${useFlowSignature ? "flow" : "with-letterhead"}">
+            ${signatureImageBlock}
+            <div class="signature-line"></div>
+            <div class="signature-label">Medical Laboratory Technologist</div>
+          </div>`;
+
     return `
     <html>
       <head>
@@ -2471,18 +2693,22 @@ class ReportEntryController {
       billItem ? ` - ${this.safeText(testName)}` : ""
     }</title>
         <style>
-          @page { size: A4; margin: 16mm 2mm; }
-          body { font-family: Arial, sans-serif; color: #111; }
+          @page { size: A4; margin: ${includeLetterhead ? "0" : "16mm 2mm"}; }
+          body { font-family: Arial, sans-serif; color: #111; margin: 0; padding: 0; }
           .page { 
             display: flex; 
             flex-direction: column; 
-            height: calc(297mm - 32mm); 
+            height: ${includeLetterhead ? "297mm" : "calc(297mm - 32mm)"};
             position: relative; 
           }
-          .report-container { width: 100%; margin-left: -10px; }
+          .report-container { width: 100%; margin-left: ${includeLetterhead ? "0" : "-10px"}; padding-bottom: ${includeLetterhead ? "36mm" : "10mm"}; box-sizing: border-box; }
           .content-area { flex: 1 0 auto; }
-          .top-space { height: calc(40mm - 16mm); }
-          .info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 8px; font-size: 14px; margin-top: 10mm; margin-bottom: 4px; line-height: 1.4; }
+          .top-space { height: ${includeLetterhead ? "50mm" : "calc(40mm - 16mm)"}; }
+          .info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 8px; font-size: 14px; margin-top: ${includeLetterhead ? "0" : "10mm"}; margin-bottom: 4px; line-height: 1.4; }
+          .letterhead-header, .letterhead-footer { position: fixed; left: 0; width: 100vw; z-index: 10; }
+          .letterhead-header { top: 0; }
+          .letterhead-footer { bottom: 0; }
+          .letterhead-header img, .letterhead-footer img { display: block; width: 100%; height: auto; }
           .info-col { display: grid; grid-auto-rows: min-content; gap: 4px; }
           .info .info-col:last-child { margin-left: calc(15mm + 3px); }
           .row { display: grid; grid-template-columns: 180px 8px 1fr; align-items: baseline; }
@@ -2529,22 +2755,28 @@ class ReportEntryController {
           }
           .remarks { margin-top: 18mm; font-size: 14px; line-height: 1.4; }
           .remarks .label { font-weight: 700; }
-          .signature-section { 
-            position: absolute;
-            bottom: 2mm;
-            right: 5mm;
-            display: flex; 
-            flex-direction: column; 
-            align-items: flex-end; 
-            width: 25%; 
-            transform: translateY(10mm);
+
+          /* ---- Signature block (letterhead mode: fixed above footer) ---- */
+          .signature-section {
+            position: fixed;
+            right: 18mm;
+            bottom: 34mm;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            width: 32%;
             page-break-inside: avoid;
             break-inside: avoid;
+            z-index: 30;
+          }
+          .signature-section.with-letterhead {
+            bottom: 27mm;
           }
           .signature-image {
-            margin-bottom: 8px;
+            margin-bottom: 4px;
             text-align: center;
             width: 100%;
+            min-height: 45px;
           }
           .signature-line { 
             width: 100%; 
@@ -2558,11 +2790,50 @@ class ReportEntryController {
             text-align: center; 
             width: 100%; 
             word-wrap: break-word; 
+            margin-bottom: 0;
           }
+
+          /* ---- Signature block (no letterhead: flows ${SIGNATURE_GAP_MM / 10} cm below the results) ---- */
+          .signature-section.flow {
+            position: static;
+            right: auto;
+            bottom: auto;
+            display: block;
+            width: 32%;
+            margin: 0 16mm 0 auto;
+            z-index: auto;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .signature-section.flow .signature-image {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            height: ${SIGNATURE_GAP_MM}mm;
+            min-height: ${SIGNATURE_GAP_MM}mm;
+            margin-bottom: 2px;
+            overflow: hidden;
+          }
+          .signature-section.flow .signature-image img {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+          }
+
           .no-print-btn { text-align: center; margin-top: 16px; }
           
           @media print {
             .no-print { display: none !important; }
+            .page {
+              box-sizing: border-box;
+              overflow: hidden;
+              break-inside: avoid;
+              page-break-inside: avoid;
+              break-after: avoid;
+              page-break-after: avoid;
+            }
           }
           
           ${
@@ -2574,6 +2845,10 @@ class ReportEntryController {
       </head>
       <body>
         <div class="page">
+          ${includeLetterhead ? `
+          <div class="letterhead-header"><img src="Imgs/suwajeewa-header.svg" alt="Suwajeewa Laboratories"></div>
+          <div class="letterhead-footer"><img src="Imgs/suwajeewa-footer.png" alt=""></div>
+          ` : ""}
           <div class="report-container content-area">
             <div class="top-space"></div>
 
@@ -2638,21 +2913,15 @@ class ReportEntryController {
             `
                 : ""
             }
-          </div>
 
-          <div class="signature-section">
             ${
-              this.shouldIncludeSignature()
-                ? `
-            <div class="signature-image">
-              <img src="Imgs/signature.svg" alt="Signature" style="max-width: 100%; height: auto; max-height: 45px;">
-            </div>
-            `
+              useFlowSignature
+                ? `<div style="height: 0;"></div>${signatureBlockHTML}`
                 : ""
             }
-            <div class="signature-line"></div>
-            <div class="signature-label">Medical Laboratory Technologist</div>
           </div>
+
+          ${useFlowSignature ? "" : signatureBlockHTML}
 
           ${
             !isForPrint
@@ -2660,8 +2929,33 @@ class ReportEntryController {
               : ""
           }
         </div>
+        <script>${this.getPrintFitScript()}</script>
       </body>
     </html>`;
+  }
+
+  getPrintFitScript() {
+    return `
+      window.fitReportToOnePage = function () {
+        const reports = document.querySelectorAll(".report-container");
+        const report = reports[reports.length - 1];
+        const page = report?.closest(".page");
+        if (!page || !report) return;
+
+        report.style.transform = "none";
+        report.style.width = "";
+        const availableHeight = page.clientHeight;
+        const contentHeight = report.scrollHeight;
+        if (availableHeight > 0 && contentHeight > availableHeight) {
+          const scale = (availableHeight - 2) / contentHeight;
+          const reportWidth = report.getBoundingClientRect().width;
+          report.style.width = (reportWidth / scale) + "px";
+          report.style.transformOrigin = "top left";
+          report.style.transform = "scale(" + scale + ")";
+        }
+      };
+      window.addEventListener("beforeprint", window.fitReportToOnePage);
+    `;
   }
 
   // Read current table and build printable rows
@@ -2916,6 +3210,12 @@ class ReportEntryController {
     return this.printWithSignatureCheckbox
       ? this.printWithSignatureCheckbox.checked
       : true;
+  }
+
+  shouldIncludeLetterhead() {
+    return this.printWithLetterheadCheckbox
+      ? this.printWithLetterheadCheckbox.checked
+      : false;
   }
 
   // Performance optimization methods
