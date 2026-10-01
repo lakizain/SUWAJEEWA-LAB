@@ -3,14 +3,19 @@ const VALUE_DECIMAL_PLACES = 3;
 const THREE_DECIMAL_VALUE_TEST_ID = "3ea45cbd-4b12-4ae1-9983-52e759219e98";
 
 /**
- * Gap (in mm) left between the end of the test results and the
- * "....." line + "Medical Laboratory Technologist" label when the
- * letterhead (header/footer) is NOT used.
- * 30 = 3 cm.  (Change to 50 if you want 5 cm.)
- * When "Print with signature" is ON, the signature image is placed
- * inside this gap, just above the dotted line.
+ * Signature section is LOCKED to a fixed place on the A4 sheet (it does not
+ * depend on where the test results end).
+ *   - Section bottom : 31 mm above the bottom edge of the A4 sheet
+ *   - Section height : ~18 mm  (=> section top is ~248 mm from the sheet top)
+ * The section contains: signature image area, the "....." line and the
+ * "Medical Laboratory Technologist" label. The line + label are always shown;
+ * the signature image appears only when "Print with signature" is ticked.
  */
-const SIGNATURE_GAP_MM = 30;
+const SIGNATURE_BOTTOM_FROM_SHEET_MM = 31;
+const SIGNATURE_BLOCK_HEIGHT_MM = 18;
+const SIGNATURE_IMAGE_AREA_MM = 11;
+// Bottom @page margin used when printing WITHOUT letterhead (see @page rules)
+const PRINT_PAGE_MARGIN_BOTTOM_NO_LETTERHEAD_MM = 16;
 
 /**
  * 0-based subcategory row indices where manual value entry is skipped (by test UUID).
@@ -2337,6 +2342,7 @@ class ReportEntryController {
           }
           
           .results-table tbody td:first-child { 
+            font-size: 12px;
             font-weight: 400; 
             text-align: left;
             white-space: nowrap;
@@ -2355,49 +2361,13 @@ class ReportEntryController {
             font-weight: 700; 
           }
           
-          .signature-section { 
-            position: fixed;
-            right: 18mm;
-            bottom: 29mm;
-            display: flex; 
-            flex-direction: column; 
-            align-items: flex-end; 
-            width: 32%; 
-            page-break-inside: avoid;
-            break-inside: avoid; 
-            z-index: 30;
-          }
-          /* Flow layout (no letterhead): signature block follows the results */
-          .signature-section.flow {
-            position: static;
-            right: auto;
-            bottom: auto;
-            align-items: stretch;
-            width: 32%;
-            margin: 0 16mm 0 auto;
-            z-index: auto;
-          }
-          .signature-image {
-            margin-bottom: 4px;
-            text-align: center;
-            width: 100%;
-            min-height: 45px;
-          }
-          .signature-line { 
-            width: 100%; 
-            height: 1px; 
-            border-bottom: 1px dashed #000; 
-            margin-bottom: 2px; 
-          }
-          .signature-label { 
-            font-size: 14px; 
-            font-weight: 500;
-            text-align: center; 
-            width: 100%; 
-            word-wrap: break-word; 
-            margin-bottom: 0;
-            transform: none;
-          }
+          /* The generated report HTML is nested inside this wrapper.
+             Cancel the wrapper offsets so the inner .page starts exactly at the
+             printable area (keeps the signature at a fixed A4 position), while
+             keeping the inner content where it was. */
+          .report-container .page { margin-top: -20px; }
+          .report-container .report-container { padding-top: 40px; }
+          .report-container .signature-section { right: calc(18mm - 30px); }
 
           @media print {
             .page {
@@ -2645,41 +2615,26 @@ class ReportEntryController {
       this.detectPrintableOptionalColumns();
 
     // ------------------------------------------------------------------
-    // Signature block
-    //  - Letterhead ON  : fixed position above the footer (as before)
-    //  - Letterhead OFF : FLOW layout. The "....." line and
-    //    "Medical Laboratory Technologist" label are placed
-    //    SIGNATURE_GAP_MM below the end of the test results. If
-    //    "Print with signature" is ON, the signature image is placed
-    //    inside that gap, directly above the dotted line.
+    // Signature block - LOCKED to a fixed position on the A4 sheet:
+    // bottom edge = SIGNATURE_BOTTOM_FROM_SHEET_MM above the sheet bottom.
+    // .page starts at the printable area, so subtract the bottom @page margin.
     // ------------------------------------------------------------------
-    const useFlowSignature = !includeLetterhead;
-    const signatureImgTag = `<img src="Imgs/signature.svg" alt="Signature" style="max-width: 100%; height: auto; max-height: ${
-      useFlowSignature ? SIGNATURE_GAP_MM - 2 : 45
-    }${useFlowSignature ? "mm" : "px"};">`;
-
-    let signatureImageBlock;
-    if (useFlowSignature) {
-      // Fixed-height gap; image (if any) sits at the bottom of the gap
-      signatureImageBlock = `
-            <div class="signature-image">${
-              includeSignature ? signatureImgTag : ""
-            }</div>`;
-    } else if (includeSignature) {
-      signatureImageBlock = `
-            <div class="signature-image">
-              ${signatureImgTag}
-            </div>`;
-    } else {
-      signatureImageBlock = `
-            <div class="signature-image" style="visibility: hidden; height: 45px;">
-              ${signatureImgTag}
-            </div>`;
-    }
+    const sheetBottomMarginMm = includeLetterhead
+      ? 0
+      : PRINT_PAGE_MARGIN_BOTTOM_NO_LETTERHEAD_MM;
+    const signatureBottomMm =
+      SIGNATURE_BOTTOM_FROM_SHEET_MM - sheetBottomMarginMm;
+    // Keep the results area clear of the signature zone
+    const containerPaddingBottomMm =
+      signatureBottomMm + SIGNATURE_BLOCK_HEIGHT_MM + 2;
 
     const signatureBlockHTML = `
-          <div class="signature-section ${useFlowSignature ? "flow" : "with-letterhead"}">
-            ${signatureImageBlock}
+          <div class="signature-section">
+            <div class="signature-image">${
+              includeSignature
+                ? '<img src="Imgs/signature.svg" alt="Signature">'
+                : ""
+            }</div>
             <div class="signature-line"></div>
             <div class="signature-label">Medical Laboratory Technologist</div>
           </div>`;
@@ -2701,7 +2656,7 @@ class ReportEntryController {
             height: ${includeLetterhead ? "297mm" : "calc(297mm - 32mm)"};
             position: relative; 
           }
-          .report-container { width: 100%; margin-left: ${includeLetterhead ? "0" : "-10px"}; padding-bottom: ${includeLetterhead ? "36mm" : "10mm"}; box-sizing: border-box; }
+          .report-container { width: 100%; margin-left: ${includeLetterhead ? "0" : "-10px"}; padding-bottom: ${containerPaddingBottomMm}mm; box-sizing: border-box; }
           .content-area { flex: 1 0 auto; }
           .top-space { height: ${includeLetterhead ? "50mm" : "calc(40mm - 16mm)"}; }
           .info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 8px; font-size: 14px; margin-top: ${includeLetterhead ? "0" : "10mm"}; margin-bottom: 4px; line-height: 1.4; }
@@ -2728,6 +2683,7 @@ class ReportEntryController {
           .results-table tbody tr.hide-value-colon td:nth-child(2)::before { content: ""; }
           .results-table tbody td:nth-child(2) { padding-left: 0; transform: translateX(0); }
           .results-table tbody td:first-child { 
+            font-size: 12px;
             font-weight: 400; 
             text-align: left;
             white-space: nowrap;
@@ -2756,27 +2712,35 @@ class ReportEntryController {
           .remarks { margin-top: 18mm; font-size: 14px; line-height: 1.4; }
           .remarks .label { font-weight: 700; }
 
-          /* ---- Signature block (letterhead mode: fixed above footer) ---- */
+          /* ---- Signature block: fixed position on the A4 sheet ---- */
           .signature-section {
-            position: fixed;
+            position: absolute;
             right: 18mm;
-            bottom: 34mm;
+            bottom: ${signatureBottomMm}mm;
             display: flex;
             flex-direction: column;
-            align-items: flex-end;
+            align-items: stretch;
             width: 32%;
             page-break-inside: avoid;
             break-inside: avoid;
             z-index: 30;
           }
-          .signature-section.with-letterhead {
-            bottom: 27mm;
-          }
           .signature-image {
-            margin-bottom: 4px;
-            text-align: center;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
             width: 100%;
-            min-height: 45px;
+            height: ${SIGNATURE_IMAGE_AREA_MM}mm;
+            margin-bottom: 1mm;
+            overflow: hidden;
+            text-align: center;
+          }
+          .signature-image img {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
           }
           .signature-line { 
             width: 100%; 
@@ -2791,35 +2755,6 @@ class ReportEntryController {
             width: 100%; 
             word-wrap: break-word; 
             margin-bottom: 0;
-          }
-
-          /* ---- Signature block (no letterhead: flows ${SIGNATURE_GAP_MM / 10} cm below the results) ---- */
-          .signature-section.flow {
-            position: static;
-            right: auto;
-            bottom: auto;
-            display: block;
-            width: 32%;
-            margin: 0 16mm 0 auto;
-            z-index: auto;
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-          .signature-section.flow .signature-image {
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
-            height: ${SIGNATURE_GAP_MM}mm;
-            min-height: ${SIGNATURE_GAP_MM}mm;
-            margin-bottom: 2px;
-            overflow: hidden;
-          }
-          .signature-section.flow .signature-image img {
-            display: block;
-            max-width: 100%;
-            max-height: 100%;
-            width: auto;
-            height: auto;
           }
 
           .no-print-btn { text-align: center; margin-top: 16px; }
@@ -2914,14 +2849,9 @@ class ReportEntryController {
                 : ""
             }
 
-            ${
-              useFlowSignature
-                ? `<div style="height: 0;"></div>${signatureBlockHTML}`
-                : ""
-            }
           </div>
 
-          ${useFlowSignature ? "" : signatureBlockHTML}
+          ${signatureBlockHTML}
 
           ${
             !isForPrint
