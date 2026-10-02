@@ -11,6 +11,7 @@ class BillingController {
     this.referenceChanged = false; // Track if reference was changed during editing
     this.isInitialized = false;
     this.paidAmountManuallyEdited = false; // Track if user manually edited Paid Amount
+    this.testSearchRequestId = 0;
   }
 
   // Initialize the billing page
@@ -2932,6 +2933,7 @@ class BillingController {
   // Handle test search for autocomplete
   async handleTestSearch(event) {
     const searchTerm = event.target.value.trim();
+    const requestId = ++this.testSearchRequestId;
     console.log("Searching for tests with term:", searchTerm);
 
     if (searchTerm.length < 2) {
@@ -2960,15 +2962,43 @@ class BillingController {
         );
         console.log("Filtered sample tests:", tests);
       }
-      tests = (tests || []).slice().sort((a, b) => {
-        const an = ((a && (a.test_name || a.short_name)) || "").toString();
-        const bn = ((b && (b.test_name || b.short_name)) || "").toString();
-        return an.localeCompare(bn, undefined, { sensitivity: "base" });
-      });
+      if (requestId !== this.testSearchRequestId) return;
+
+      const normalizedTerm = searchTerm.toLowerCase().replace(/\s+/g, " ");
+      const searchWords = normalizedTerm.split(" ").filter(Boolean);
+      const getMatchScore = (test) => {
+        const testName = String(test?.test_name || "").toLowerCase();
+        const shortName = String(test?.short_name || "").toLowerCase();
+        const fields = [testName, shortName];
+
+        if (fields.some((field) => field === normalizedTerm)) return 1000;
+        if (fields.some((field) => field.startsWith(normalizedTerm))) return 800;
+        if (fields.some((field) => field.includes(normalizedTerm))) return 600;
+
+        const matchedWords = searchWords.filter((word) =>
+          fields.some((field) => field.includes(word))
+        ).length;
+        return matchedWords ? 300 + (matchedWords / searchWords.length) * 200 : 0;
+      };
+
+      tests = (tests || [])
+        .map((test) => ({ test, score: getMatchScore(test) }))
+        .filter(({ score }) => score > 0)
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          const an = String(a.test?.test_name || a.test?.short_name || "");
+          const bn = String(b.test?.test_name || b.test?.short_name || "");
+          return an.localeCompare(bn, undefined, { sensitivity: "base" });
+        })
+        .slice(0, 2)
+        .map(({ test }) => test);
+
       this._lastTestSuggestions = tests;
       this.displayTestSuggestions(tests);
     } catch (error) {
-      console.error("Error searching tests:", error);
+      if (requestId === this.testSearchRequestId) {
+        console.error("Error searching tests:", error);
+      }
     }
   }
 
