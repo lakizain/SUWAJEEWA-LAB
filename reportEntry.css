@@ -1,28 +1,29 @@
 /* Core layout with modern color scheme */
 :root {
   /* Background Colors */
-  --bg: #F5F7FA;              /* Primary background - soft light gray-blue */
+  --bg: #E8F0FB;              /* Primary background - soft billing blue */
   --panel: #FFFFFF;           /* Secondary background / cards / tables - white */
   
   /* Text Colors */
   --text: #1E293B;            /* Primary text - dark slate */
   --text-secondary: #475569;  /* Secondary text - slate gray */
+  --navy: #0F1F4B;
   
   /* Accent & Interactive Colors */
-  --accent: #2563EB;          /* Accent color (buttons, highlights, links) - modern blue */
+  --accent: #1D4ED8;          /* Accent color (buttons, highlights, links) */
   --accent-hover: #1E40AF;    /* Accent hover color - darker blue */
   
   /* Border & Divider Colors */
-  --border: #CBD5E1;          /* Border color */
-  --panel-border: #CBD5E1;    /* Panel borders */
+  --border: #BFD3F2;          /* Border color */
+  --panel-border: #BFD3F2;    /* Panel borders */
   
   /* Table & Input Colors */
-  --table-header: #E2E8F0;    /* Table header background - light neutral gray */
-  --input-bg: #F9FAFB;        /* Input background */
-  --table-alt-row: #F9FAFB;   /* Alternating table row background */
+  --table-header: #EEF4FF;    /* Table header background */
+  --input-bg: #FFFFFF;        /* Input background */
+  --table-alt-row: #F7FAFF;   /* Alternating table row background */
   
   /* Tab Colors */
-  --tab: #E2E8F0;             /* Tab background */
+  --tab: #EEF4FF;             /* Tab background */
   --tab-active: #FFFFFF;      /* Active tab background */
   
   /* Status Colors */
@@ -30,9 +31,9 @@
   --success: #16A34A;         /* Success color - green */
   
   /* Button Colors */
-  --btn: #2563EB;             /* Primary button background */
+  --btn: #1D4ED8;             /* Primary button background */
   --btn-hover: #1E40AF;       /* Primary button hover */
-  --btn-secondary: #E2E8F0;   /* Secondary button background */
+  --btn-secondary: #EEF4FF;   /* Secondary button background */
   --btn-secondary-text: #1E293B; /* Secondary button text */
 }
 
@@ -46,13 +47,13 @@ body {
   margin: 0;
 }
 body {
-  background: var(--bg) !important;
+  background: linear-gradient(160deg, #EAF2FF 0%, #DDE9FA 100%) fixed !important;
   color: var(--text);
 }
 
 /* Container background */
 .container-fluid {
-  background: var(--bg);
+  background: transparent;
 }
 
 /* Card body sections */
@@ -138,7 +139,7 @@ body {
 .form-grid select:focus {
   border-color: var(--accent);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 .inline-field {
   display: flex;
@@ -176,7 +177,7 @@ body {
 .filter-item select:focus {
   border-color: var(--accent);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 
 .table-wrap {
@@ -244,7 +245,7 @@ tbody tr:nth-child(odd) {
 .btn:hover {
   background: var(--btn-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
 }
 .btn-edit {
   background: var(--success);
@@ -293,7 +294,7 @@ tbody tr:nth-child(odd) {
 .search-grid select:focus {
   border-color: var(--accent);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 .to-row {
   display: flex;
@@ -324,12 +325,12 @@ tbody tr:nth-child(odd) {
 
 /* Interactive table rows */
 .table-row-hover:hover {
-  background-color: rgba(37, 99, 235, 0.08) !important;
+  background-color: rgba(29, 78, 216, 0.08) !important;
   cursor: pointer;
 }
 
 .table-row-hover:active {
-  background-color: rgba(37, 99, 235, 0.15) !important;
+  background-color: rgba(29, 78, 216, 0.15) !important;
 }
 
 /* Strong selected row highlight */
@@ -437,8 +438,14 @@ select {
   border-color: var(--border) !important;
   background-color: var(--input-bg) !important;
   color: var(--text) !important;
-  border-radius: 6px !important;
+  border-radius: 8px !important;
   transition: all 0.2s ease;
+}
+
+.form-control:not(.form-control-sm),
+.form-select {
+  min-height: 40px;
+  padding: 0.5rem 0.75rem;
 }
 
 .form-control:focus,
@@ -447,7 +454,7 @@ textarea:focus,
 input:focus,
 select:focus {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1) !important;
   outline: none;
 }
 
@@ -467,7 +474,7 @@ textarea.form-control {
   font-weight: 600 !important;
   -webkit-font-smoothing: antialiased;
   transition: all 0.2s ease;
-  border-radius: 6px !important;
+  border-radius: 8px !important;
 }
 
 .btn-primary span,
@@ -481,14 +488,14 @@ textarea.form-control {
   border-color: var(--btn-hover) !important;
   color: #ffffff !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3) !important;
 }
 
 .btn-primary:focus {
   background-color: var(--btn-hover) !important;
   border-color: var(--btn-hover) !important;
   color: #ffffff !important;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2) !important;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.2) !important;
 }
 
 .btn-primary:active {
@@ -502,7 +509,7 @@ textarea.form-control {
   border-color: var(--border) !important;
   color: var(--btn-secondary-text) !important;
   transition: all 0.2s ease;
-  border-radius: 6px !important;
+  border-radius: 8px !important;
 }
 
 .btn-outline-secondary:hover {
@@ -559,13 +566,16 @@ td,
 .card {
   border: 1px solid var(--border) !important;
   background-color: var(--panel) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 14px rgba(15, 31, 75, 0.07) !important;
 }
 .card-header,
 .card-footer {
   border-color: var(--border) !important;
   background-color: var(--panel) !important;
+}
+.card-header {
+  border-radius: 12px 12px 0 0 !important;
 }
 .nav-tabs,
 .nav-tabs .nav-link {
@@ -585,7 +595,7 @@ td,
 }
 
 .list-group-item:hover {
-  background-color: rgba(37, 99, 235, 0.05) !important;
+  background-color: rgba(29, 78, 216, 0.05) !important;
   cursor: pointer;
 }
 
@@ -603,16 +613,16 @@ td,
 }
 .card-header .nav-tabs .nav-link {
   border: 1px solid transparent !important;
-  background-color: #f1f5f9 !important;
-  color: #334155 !important;
-  border-radius: 6px 6px 0 0 !important;
-  padding: 0.5rem 1rem !important;
+  background-color: var(--table-header) !important;
+  color: var(--text-secondary) !important;
+  border-radius: 8px 8px 0 0 !important;
+  padding: 0.6rem 1rem !important;
   font-weight: 600 !important;
   transition: all 0.2s ease;
 }
 .card-header .nav-tabs .nav-link:hover {
-  color: #0f172a !important;
-  background-color: #e2e8f0 !important;
+  color: var(--navy) !important;
+  background-color: #DCEAFE !important;
 }
 .card-header .nav-tabs .nav-link.active,
 .card-header .nav-tabs .nav-item.show .nav-link {
@@ -630,14 +640,14 @@ td,
   border-bottom-color: var(--border) !important;
 }
 .col-lg-4 .nav-tabs .nav-link {
-  color: #334155 !important;
+  color: var(--text-secondary) !important;
   font-weight: 600 !important;
-  background-color: #f1f5f9 !important;
+  background-color: var(--table-header) !important;
   border-color: var(--border) !important;
 }
 .col-lg-4 .nav-tabs .nav-link:hover {
-  color: #0f172a !important;
-  background-color: #e2e8f0 !important;
+  color: var(--navy) !important;
+  background-color: #DCEAFE !important;
 }
 .col-lg-4 .nav-tabs .nav-link.active {
   color: #ffffff !important;
