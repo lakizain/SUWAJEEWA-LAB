@@ -2990,7 +2990,7 @@ class BillingController {
           const bn = String(b.test?.test_name || b.test?.short_name || "");
           return an.localeCompare(bn, undefined, { sensitivity: "base" });
         })
-        .slice(0, 2)
+        .slice(0, 1)
         .map(({ test }) => test);
 
       this._lastTestSuggestions = tests;

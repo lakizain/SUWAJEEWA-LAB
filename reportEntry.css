@@ -215,6 +215,11 @@ tbody tr:nth-child(odd) {
 }
 
 /* Align top Category/Value inputs with results table columns */
+#topValueInput,
+#resultsItemsBody td:nth-child(2) input {
+  font-weight: 700;
+}
+
 .results-top-fields {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr 1fr; /* Match 4 table columns: Category, Value, UOM, Status */

@@ -2283,6 +2283,9 @@ class ReportEntryController {
           .investigation-line .colon { 
             white-space: nowrap; 
           }
+          .investigation-value {
+            font-weight: 700;
+          }
           
           .hr { 
             margin-top: 8px; 
@@ -2672,6 +2675,7 @@ class ReportEntryController {
           .colon { text-align: center; }
           .investigation-line { display: grid; grid-template-columns: 140px 8px 1fr; align-items: baseline; margin-top: 16px; font-size: 14px; line-height: 1.4; }
           .investigation-line .label, .investigation-line .colon { white-space: nowrap; }
+          .investigation-value { font-weight: 700; }
           .hr { margin-top: 8px; border-top: 1px solid #999; }
           table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; line-height: 1.4; }
           .results-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 1.5px; }
@@ -2812,7 +2816,7 @@ class ReportEntryController {
             <div class="investigation-line">
               <div class="label">INVESTIGATION</div>
               <div class="colon">:</div>
-              <div>${this.safeText(testName)}</div>
+              <div class="investigation-value">${this.safeText(testName)}</div>
             </div>
 
             <div class="hr"></div>
