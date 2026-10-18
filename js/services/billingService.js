@@ -616,6 +616,40 @@ class BillingService {
     }
   }
 
+  // Get matching patient details across all centers without exposing other-center bill history.
+  async getPatientsByPhone(phone) {
+    try {
+      const { data: bills, error } = await this.supabase
+        .from("bills")
+        .select(
+          `
+            patient_phone,
+            patient_name,
+            patient_title,
+            patient_age_years,
+            patient_age_months,
+            patient_age_days,
+            patient_gender,
+            bill_date
+          `
+        )
+        .eq("patient_phone", phone)
+        .order("bill_date", { ascending: false });
+
+      if (error) throw error;
+
+      const uniquePatients = new Map();
+      for (const bill of bills || []) {
+        const key = (bill.patient_name || "N/A").trim().toLowerCase();
+        if (!uniquePatients.has(key)) uniquePatients.set(key, bill);
+      }
+      return Array.from(uniquePatients.values());
+    } catch (error) {
+      console.error("Error getting patients by phone:", error);
+      throw error;
+    }
+  }
+
   // Get patient history by phone (filtered by user's center unless admin)
   async getPatientHistory(phone) {
     try {

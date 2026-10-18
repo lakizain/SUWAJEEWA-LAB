@@ -12,6 +12,7 @@ class BillingController {
     this.isInitialized = false;
     this.paidAmountManuallyEdited = false; // Track if user manually edited Paid Amount
     this.testSearchRequestId = 0;
+    this.currentDateTimeInterval = null;
   }
 
   // Initialize the billing page
@@ -445,19 +446,28 @@ class BillingController {
 
   // Set current date and time
   setCurrentDateTime() {
-    const now = new Date();
-    const dateTimeString = now.toLocaleString("si-LK", {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
     const billDateInput = document.getElementById("bill-date");
-    if (billDateInput) {
+    if (!billDateInput) return;
+
+    const updateDateTime = () => {
+      const dateTimeString = new Date().toLocaleString("si-LK", {
+        timeZone: "Asia/Colombo",
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      });
       billDateInput.value = dateTimeString;
+    };
+
+    if (this.currentDateTimeInterval) {
+      clearInterval(this.currentDateTimeInterval);
     }
+    updateDateTime();
+    this.currentDateTimeInterval = setInterval(updateDateTime, 1000);
   }
 
   // Generate bill number
@@ -484,15 +494,23 @@ class BillingController {
     }
 
     try {
-      const history = await this.billingService.getPatientHistory(phone);
+      const [history, patients] = await Promise.all([
+        this.billingService.getPatientHistory(phone),
+        this.billingService.getPatientsByPhone(phone),
+      ]);
       this.displayPatientHistory(history);
 
-      // Show patient selection dropdown (unique by patient_name)
-      this.displayPatientSuggestions(history, event.target);
+      // Show matching patients from any center, while keeping bill history center-scoped.
+      this.displayPatientSuggestions(patients, event.target);
 
-      // Auto-fill patient details if found
-      if (history.length > 0) {
-        this.autoFillPatientDetails(history[0]);
+      // Keep the choice explicit when a phone number belongs to multiple people.
+      const uniquePatientCount = new Set(
+        patients.map((bill) =>
+          (bill.patient_name || "N/A").trim().toLowerCase()
+        )
+      ).size;
+      if (uniquePatientCount === 1) {
+        this.autoFillPatientDetails(patients[0]);
       }
     } catch (error) {
       console.error("Error searching patient history:", error);
@@ -734,12 +752,12 @@ class BillingController {
             b.patient_age_days
           );
           const info = [gender, age].filter(Boolean).join(" • ");
-          return `<div class="dropdown-item" data-bill='${encodeURIComponent(
+          return `<button type="button" class="dropdown-item" data-bill='${encodeURIComponent(
             JSON.stringify(b)
           )}'>
             <strong>${title}${name}</strong>
             <div class="small text-muted">${info || ""}</div>
-          </div>`;
+          </button>`;
         })
         .join("");
 
@@ -749,7 +767,7 @@ class BillingController {
 
       // Click handler
       dropdown.addEventListener("click", (e) => {
-        const item = e.target.closest(".dropdown-item");
+        const item = e.target.closest("button.dropdown-item");
         if (!item || item.classList.contains("disabled")) return;
         const bill = JSON.parse(
           decodeURIComponent(item.getAttribute("data-bill"))
@@ -775,7 +793,15 @@ class BillingController {
       inputEl.addEventListener("keydown", closeDropdown, { once: true });
       inputEl.addEventListener(
         "blur",
-        () => setTimeout(() => this.removePatientDropdown(), 150),
+        () =>
+          setTimeout(() => {
+            const currentDropdown = document.getElementById(
+              "patient-phone-dropdown"
+            );
+            if (!currentDropdown?.contains(document.activeElement)) {
+              this.removePatientDropdown();
+            }
+          }, 150),
         { once: true }
       );
     } catch (err) {
@@ -2969,16 +2995,23 @@ class BillingController {
       const getMatchScore = (test) => {
         const testName = String(test?.test_name || "").toLowerCase();
         const shortName = String(test?.short_name || "").toLowerCase();
-        const fields = [testName, shortName];
+        if (shortName === normalizedTerm) return 1400;
+        if (shortName.startsWith(normalizedTerm)) return 1300;
+        if (shortName.includes(normalizedTerm)) return 1200;
+        if (testName === normalizedTerm) return 1100;
+        if (testName.startsWith(normalizedTerm)) return 1000;
+        if (testName.includes(normalizedTerm)) return 900;
 
-        if (fields.some((field) => field === normalizedTerm)) return 1000;
-        if (fields.some((field) => field.startsWith(normalizedTerm))) return 800;
-        if (fields.some((field) => field.includes(normalizedTerm))) return 600;
-
-        const matchedWords = searchWords.filter((word) =>
-          fields.some((field) => field.includes(word))
+        const shortNameMatches = searchWords.filter((word) =>
+          shortName.includes(word)
         ).length;
-        return matchedWords ? 300 + (matchedWords / searchWords.length) * 200 : 0;
+        const testNameMatches = searchWords.filter((word) =>
+          testName.includes(word)
+        ).length;
+        const weightedMatches = shortNameMatches * 2 + testNameMatches;
+        return weightedMatches
+          ? 300 + (weightedMatches / (searchWords.length * 2)) * 200
+          : 0;
       };
 
       tests = (tests || [])
@@ -3766,9 +3799,9 @@ class BillingController {
   // Format age display
   formatAge(years, months, days) {
     const parts = [];
-    if (years) parts.push(`${years} Yrs`);
-    if (months) parts.push(`${months} Mths`);
-    if (days) parts.push(`${days} Days`);
+    if (years) parts.push(`${String(years).padStart(2, "0")} Yrs`);
+    if (months) parts.push(`${String(months).padStart(2, "0")} Mths`);
+    if (days) parts.push(`${String(days).padStart(2, "0")} Days`);
     return parts.length > 0 ? parts.join(" ") : "";
   }
 
