@@ -276,11 +276,105 @@ class ReportsService {
     }
   }
 
+  async getTestCostSummary(fromDate = null, toDate = null, centerId = null) {
+    if (!this.isSupabaseAvailable()) {
+      return this.getSampleTestCostSummary();
+    }
+
+    try {
+      let query = this.supabase
+        .from("bills")
+        .select(
+          `
+          id,
+          bill_date,
+          center_id,
+          bill_items(
+            quantity,
+            is_package_component,
+            tests(id, test_name, test_cost)
+          )
+        `
+        )
+        .order("bill_date", { ascending: true });
+
+      if (fromDate) {
+        query = query.gte(
+          "bill_date",
+          new Date(fromDate + "T00:00:00").toISOString()
+        );
+      }
+
+      if (toDate) {
+        query = query.lte(
+          "bill_date",
+          new Date(toDate + "T23:59:59").toISOString()
+        );
+      }
+
+      if (centerId && centerId !== "all") {
+        query = query.eq("center_id", centerId);
+      }
+
+      const { data: bills, error } = await query;
+      if (error) throw error;
+
+      const testSummary = new Map();
+      (bills || []).forEach((bill) => {
+        (bill.bill_items || []).forEach((item) => {
+          const test = item.tests;
+          if (!test) return;
+
+          const key = test.id || test.test_name;
+          if (!testSummary.has(key)) {
+            const parsedCost =
+              test.test_cost === null || test.test_cost === undefined
+                ? null
+                : Number(test.test_cost);
+            const hasValidCost =
+              parsedCost !== null && Number.isFinite(parsedCost);
+            testSummary.set(key, {
+              test_name: test.test_name || "Unknown Test",
+              test_count: 0,
+              test_cost: hasValidCost ? parsedCost : null,
+              total_test_cost: 0,
+              missing_cost_quantity: 0,
+            });
+          }
+
+          const summary = testSummary.get(key);
+          const parsedQuantity = Number(item.quantity);
+          const quantity =
+            Number.isFinite(parsedQuantity) && parsedQuantity > 0
+              ? parsedQuantity
+              : 1;
+          summary.test_count += quantity;
+
+          if (summary.test_cost === null) {
+            summary.missing_cost_quantity += quantity;
+          } else {
+            summary.total_test_cost += summary.test_cost * quantity;
+          }
+        });
+      });
+
+      return Array.from(testSummary.values()).sort((a, b) =>
+        a.test_name.localeCompare(b.test_name, undefined, {
+          sensitivity: "base",
+        })
+      );
+    } catch (error) {
+      console.error("Error getting test cost summary:", error);
+      throw error;
+    }
+  }
+
   // Get commission report data
   async getCommissionReport(
     fromDate = null,
     toDate = null,
-    referenceName = null
+    referenceName = null,
+    centerId = null
   ) {
     try {
       if (!this.isSupabaseAvailable()) {
@@ -295,6 +389,7 @@ class ReportsService {
           id,
           bill_no,
           bill_date,
+          center_id,
           patient_name,
           final_amount,
           ref_by,
@@ -319,6 +414,10 @@ class ReportsService {
       if (toDate) {
         const endOfDay = new Date(toDate + "T23:59:59").toISOString();
         query = query.lte("bill_date", endOfDay);
+      }
+
+      if (centerId && centerId !== "all") {
+        query = query.eq("center_id", centerId);
       }
 
       // Apply reference filter
@@ -461,6 +560,32 @@ class ReportsService {
         center_name: "Branch Lab",
         total_bills: 18,
         total_amount: 27000.0,
+      },
+    ];
+  }
+
+  getSampleTestCostSummary() {
+    return [
+      {
+        test_name: "FBC",
+        test_count: 1,
+        test_cost: 200,
+        total_test_cost: 200,
+        missing_cost_quantity: 0,
+      },
+      {
+        test_name: "CRP",
+        test_count: 1,
+        test_cost: 350,
+        total_test_cost: 350,
+        missing_cost_quantity: 0,
+      },
+      {
+        test_name: "LFT",
+        test_count: 1,
+        test_cost: 280,
+        total_test_cost: 280,
+        missing_cost_quantity: 0,
       },
     ];
   }

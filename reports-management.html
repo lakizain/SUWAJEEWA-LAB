@@ -341,6 +341,12 @@
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary"
+                            type="button" role="tab">
+                            Test Cost Summary
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
                         <button class="nav-link" id="commission-tab" data-bs-toggle="tab" data-bs-target="#commission"
                             type="button" role="tab">
                             Commission
@@ -572,27 +578,105 @@
                         </div>
                     </div>
 
+                    <!-- Test Cost Summary Tab -->
+                    <div class="tab-pane fade" id="summary" role="tabpanel">
+                        <div class="filter-section">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label class="form-label">From Date</label>
+                                    <input type="date" class="form-control" id="summary-from-date">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">To Date</label>
+                                    <input type="date" class="form-control" id="summary-to-date">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Center</label>
+                                    <select class="form-control" id="summary-center-filter">
+                                        <option value="all">All Centers</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <div class="d-grid">
+                                        <button class="btn btn-primary" id="summary-filter-btn">
+                                            <i class="fas fa-filter"></i> Apply Filter
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h3 class="report-title">Test Cost Summary</h3>
+                        <p class="text-muted">Counts tests billed directly and through packages. Cost totals use each test's currently configured test cost.</p>
+                        <div class="report-summary show" id="test-summary">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="summary-item">
+                                        <span class="summary-label">Total Test Items</span>
+                                        <span class="summary-value" id="summary-total-quantity">0</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="summary-item">
+                                        <span class="summary-label">Total Test Cost</span>
+                                        <span class="summary-value" id="summary-total-cost">Rs. 0.00</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="summary-item">
+                                        <span class="summary-label">Units Missing Cost</span>
+                                        <span class="summary-value" id="summary-missing-cost">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>TEST</th>
+                                        <th>TEST QUANTITY</th>
+                                        <th>COST PER TEST</th>
+                                        <th>TOTAL TEST COST</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="4" class="no-data">No data found</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <!-- Commission Tab -->
                     <div class="tab-pane fade" id="commission" role="tabpanel">
 
                         <!-- Filter Section -->
                         <div class="filter-section">
                             <div class="row">
-                                <div class="col-md-3">
+                                <div class="col-md">
                                     <label class="form-label">From Date</label>
                                     <input type="date" class="form-control" id="commission-from-date">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md">
                                     <label class="form-label">To Date</label>
                                     <input type="date" class="form-control" id="commission-to-date">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md">
+                                    <label class="form-label">Center</label>
+                                    <select class="form-control" id="commission-center-filter">
+                                        <option value="all">All Centers</option>
+                                    </select>
+                                </div>
+                                <div class="col-md">
                                     <label class="form-label">Reference</label>
                                     <select class="form-control" id="commission-reference-filter">
                                         <option value="all">All References</option>
                                     </select>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md">
                                     <label class="form-label">&nbsp;</label>
                                     <div class="d-grid">
                                         <button class="btn btn-primary" id="commission-filter-btn">
