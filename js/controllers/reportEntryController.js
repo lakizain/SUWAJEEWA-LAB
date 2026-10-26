@@ -36,6 +36,7 @@ class ReportEntryController {
     this.currentBills = [];
     this.selectedBill = null;
     this.selectedTestItem = null;
+    this.copiedTestResults = null;
     this.isLoading = false;
     this.testsIndexByName = new Map();
     this.testsById = new Map();
@@ -288,6 +289,7 @@ class ReportEntryController {
         this.getValueDecimalPlacesForCurrentTest()
       );
       this.topValueInput.addEventListener("keydown", (e) => {
+        if (this.handleResultCopyPasteShortcut(e)) return;
         if (e.key === "Enter") {
           e.preventDefault();
           this.commitTopValueAndAdvance();
@@ -298,6 +300,12 @@ class ReportEntryController {
           e.preventDefault();
           this.navigateSubcategory(-1);
         }
+      });
+    }
+
+    if (this.resultsItemsBody) {
+      this.resultsItemsBody.addEventListener("keydown", (e) => {
+        this.handleResultCopyPasteShortcut(e);
       });
     }
 
@@ -326,6 +334,92 @@ class ReportEntryController {
         this.toggleSelectAllReadyRows(Boolean(this.readySelectAllCheckbox.checked))
       );
     }
+  }
+
+  handleResultCopyPasteShortcut(event) {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return false;
+
+    const key = event.key.toLowerCase();
+    if (key !== "c" && key !== "v") return false;
+
+    const target = event.target;
+    const isTopValueInput = target === this.topValueInput;
+    const valueInput = target?.matches?.("input")
+      ? target.closest("td:nth-child(2)")
+        ? target
+        : null
+      : null;
+    if (!isTopValueInput && !valueInput) return false;
+
+    if (key === "c") {
+      if (!this.selectedTestItem || !Array.isArray(this.currentSubcategories)) {
+        return false;
+      }
+
+      const testId =
+        this.selectedTestItem.tests?.id || this.selectedTestItem.test_id || null;
+      if (!testId || !this.resultsItemsBody) return false;
+
+      const subcategoryIds = this.currentSubcategories.map((subcategory) =>
+        String(subcategory.id)
+      );
+      const values = subcategoryIds.map((subcategoryId) => {
+        const row = this.resultsItemsBody.querySelector(
+          `tr[data-subcategory-id="${subcategoryId}"]`
+        );
+        return row?.querySelector("td:nth-child(2) input")?.value ?? "";
+      });
+
+      this.copiedTestResults = { testId: String(testId), subcategoryIds, values };
+      event.preventDefault();
+      return true;
+    }
+
+    const testId =
+      this.selectedTestItem?.tests?.id || this.selectedTestItem?.test_id || null;
+    const clipboard = this.copiedTestResults;
+    const currentSubcategoryIds = (this.currentSubcategories || []).map(
+      (subcategory) => String(subcategory.id)
+    );
+    const sameTest =
+      testId && clipboard?.testId === String(testId) &&
+      clipboard.subcategoryIds.length === currentSubcategoryIds.length &&
+      clipboard.subcategoryIds.every(
+        (subcategoryId, index) => subcategoryId === currentSubcategoryIds[index]
+      );
+
+    if (!sameTest || !this.resultsItemsBody) {
+      if (clipboard) {
+        event.preventDefault();
+        return true;
+      }
+      return false;
+    }
+
+    event.preventDefault();
+    clipboard.subcategoryIds.forEach((subcategoryId, index) => {
+      const row = this.resultsItemsBody.querySelector(
+        `tr[data-subcategory-id="${subcategoryId}"]`
+      );
+      const input = row?.querySelector("td:nth-child(2) input");
+      if (!input || input.readOnly) return;
+      input.value = clipboard.values[index];
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    if (isTopValueInput) {
+      const currentSubcategory = this.currentSubcategories[this.currentSubcategoryIndex];
+      const currentRow = currentSubcategory
+        ? this.resultsItemsBody.querySelector(
+            `tr[data-subcategory-id="${currentSubcategory.id}"]`
+          )
+        : null;
+      this.topValueInput.value =
+        currentRow?.querySelector("td:nth-child(2) input")?.value ?? "";
+    }
+
+    return true;
   }
 
   async loadInitialData() {
