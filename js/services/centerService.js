@@ -34,6 +34,13 @@ class CenterService {
     return window.UserCenterAccess?.getActiveCenterId(user) || user?.center_id || null;
   }
 
+  getUserCenterIds() {
+    const user = this.getCurrentUser();
+    if (!user || user.role === 'admin') return null;
+    const assignedIds = window.UserCenterAccess?.getAssignedCenterIds(user) || [];
+    return assignedIds.length ? assignedIds : [];
+  }
+
   // Check if Supabase is available
   isSupabaseAvailable() {
     return this.supabase !== null;
@@ -107,8 +114,9 @@ class CenterService {
         .select("*")
         .order("center_name", { ascending: true });
 
-      if (this.getUserCenterId()) {
-        query = query.eq("id", this.getUserCenterId());
+      const centerIds = this.getUserCenterIds();
+      if (centerIds) {
+        query = query.in("id", centerIds);
       }
 
       const { data: centers, error } = await query;
@@ -135,8 +143,9 @@ class CenterService {
       query = query.eq("is_active", true);
     }
 
-    if (this.getUserCenterId()) {
-      query = query.eq("id", this.getUserCenterId());
+    const centerIds = this.getUserCenterIds();
+    if (centerIds) {
+      query = query.in("id", centerIds);
     }
 
     const { data: centers, error } = await query;
@@ -151,7 +160,13 @@ class CenterService {
       }
 
       const now = Date.now();
-      if (this._centersDropdownCache.data && now - this._centersDropdownCache.ts < 60000) {
+      const centerIds = this.getUserCenterIds();
+      const cacheKey = centerIds ? centerIds.slice().sort().join(",") : "admin";
+      if (
+        this._centersDropdownCache.data &&
+        this._centersDropdownCache.key === cacheKey &&
+        now - this._centersDropdownCache.ts < 60000
+      ) {
         return this._centersDropdownCache.data;
       }
 
@@ -159,17 +174,23 @@ class CenterService {
         selectClause: "id, center_name, cid",
         activeOnly: true,
       });
-      this._centersDropdownCache = { data: centers || [], ts: now };
+      this._centersDropdownCache = { data: centers || [], ts: now, key: cacheKey };
       return centers || [];
     } catch (error) {
       console.error("Error getting centers for dropdown:", error);
-      return this.getActiveCenters();
+      throw error;
     }
   }
 
   async getCentersForDropdownStrict() {
     const now = Date.now();
-    if (this._centersDropdownCache.data && now - this._centersDropdownCache.ts < 60000) {
+    const centerIds = this.getUserCenterIds();
+    const cacheKey = centerIds ? centerIds.slice().sort().join(",") : "admin";
+    if (
+      this._centersDropdownCache.data &&
+      this._centersDropdownCache.key === cacheKey &&
+      now - this._centersDropdownCache.ts < 60000
+    ) {
       return this._centersDropdownCache.data;
     }
 
@@ -177,7 +198,7 @@ class CenterService {
       selectClause: "id, center_name, cid",
       activeOnly: true,
     });
-    this._centersDropdownCache = { data: centers, ts: now };
+    this._centersDropdownCache = { data: centers, ts: now, key: cacheKey };
     return centers;
   }
 

@@ -37,13 +37,17 @@ class ReportsController {
 
     init() {
         if (this.isInitialized) return;
-        
+
+        this.initializeReports();
+    }
+
+    async initializeReports() {
         try {
             this.setupEventListeners();
             this.setupDateFilters();
-            this.loadCenters();
-            this.loadReferences();
-            this.loadDailySalesData();
+            await this.loadCenters();
+            await this.loadReferences();
+            await this.loadDailySalesData();
             this.isInitialized = true;
         } catch (error) {
             console.error('Error during initialization:', error);
@@ -51,7 +55,54 @@ class ReportsController {
         }
     }
 
+    getCurrentUser() {
+        return window.UserCenterAccess?.getCurrentUser() || null;
+    }
+
+    getAssignedCenterIds(user = this.getCurrentUser()) {
+        if (!user || user.role === 'admin') return [];
+        const ids = Array.isArray(user.center_ids) ? user.center_ids : [];
+        return [...new Set([...ids, ...(user.center_id ? [user.center_id] : [])])];
+    }
+
+    resolveReportCenterId(centerId) {
+        const user = this.getCurrentUser();
+        if (!user || user.role === 'admin') return centerId || 'all';
+
+        const assignedIds = this.getAssignedCenterIds(user);
+        if (centerId && centerId !== 'all' && assignedIds.includes(centerId)) {
+            return centerId;
+        }
+        const activeCenterId = window.UserCenterAccess?.getActiveCenterId(user);
+        if (activeCenterId && assignedIds.includes(activeCenterId)) return activeCenterId;
+        return assignedIds.includes(user.center_id) ? user.center_id : (assignedIds[0] || null);
+    }
+
+    handleReportCenterChange(centerId) {
+        const user = this.getCurrentUser();
+        if (!user || user.role === 'admin') return;
+        if (!window.UserCenterAccess?.setActiveCenterId(centerId)) {
+            this.showGlobalError('You are not assigned to this center.');
+            return;
+        }
+
+        document.querySelectorAll(
+            '#daily-center-filter, #monthly-center-filter, #center-center-filter, #commission-center-filter, #summary-center-filter'
+        ).forEach((filter) => {
+            if (Array.from(filter.options).some((option) => option.value === centerId)) {
+                filter.value = centerId;
+            }
+        });
+        this.loadReportData();
+    }
+
     setupEventListeners() {
+        document.querySelectorAll(
+            '#daily-center-filter, #monthly-center-filter, #center-center-filter, #commission-center-filter, #summary-center-filter'
+        ).forEach((filter) => {
+            filter.addEventListener('change', () => this.handleReportCenterChange(filter.value));
+        });
+
         // Tab switching
         document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
             tab.addEventListener('shown.bs.tab', (e) => {
@@ -132,7 +183,11 @@ class ReportsController {
                 console.warn('CenterService not available');
                 return;
             }
-            const centers = await this.centerService.getAllCenters();
+            const user = this.getCurrentUser();
+            const centers = user?.role === 'admin'
+                ? await this.centerService.getAllCenters()
+                : await this.centerService.getCentersForDropdown();
+            const centerIds = this.getAssignedCenterIds(user);
 
             // Load centers for all filter dropdowns
             const centerFilters = [
@@ -146,13 +201,28 @@ class ReportsController {
             centerFilters.forEach(filterId => {
                 const centerFilter = document.getElementById(filterId);
                 if (centerFilter) {
-                    centerFilter.innerHTML = '<option value="all">All Centers</option>';
+                    centerFilter.innerHTML = user?.role === 'admin'
+                        ? '<option value="all">All Centers</option>'
+                        : '';
                     centers.forEach(center => {
                         const option = document.createElement('option');
                         option.value = center.id;
                         option.textContent = center.center_name;
                         centerFilter.appendChild(option);
                     });
+                    if (user?.role !== 'admin') {
+                        const activeCenterId = window.UserCenterAccess?.getActiveCenterId(user);
+                        const defaultCenterId = centerIds.includes(activeCenterId)
+                            ? activeCenterId
+                            : centerIds.includes(user.center_id)
+                                ? user.center_id
+                                : centerIds[0];
+                        if (defaultCenterId && centers.some((center) => center.id === defaultCenterId)) {
+                            centerFilter.value = defaultCenterId;
+                        } else {
+                            centerFilter.disabled = true;
+                        }
+                    }
                 }
             });
         } catch (error) {
@@ -187,7 +257,7 @@ class ReportsController {
     async applyDailyFilter() {
         const fromDate = document.getElementById('daily-from-date')?.value;
         const toDate = document.getElementById('daily-to-date')?.value;
-        const centerId = document.getElementById('daily-center-filter')?.value;
+        const centerId = this.resolveReportCenterId(document.getElementById('daily-center-filter')?.value);
 
         await this.loadDailySalesData(fromDate, toDate, centerId);
     }
@@ -195,7 +265,7 @@ class ReportsController {
     async applyMonthlyFilter() {
         const year = document.getElementById('monthly-year-filter')?.value;
         const month = document.getElementById('monthly-month-filter')?.value;
-        const centerId = document.getElementById('monthly-center-filter')?.value;
+        const centerId = this.resolveReportCenterId(document.getElementById('monthly-center-filter')?.value);
 
         await this.loadMonthlySalesData(year, month, centerId);
     }
@@ -203,7 +273,7 @@ class ReportsController {
     async applyCenterFilter() {
         const fromDate = document.getElementById('center-from-date')?.value;
         const toDate = document.getElementById('center-to-date')?.value;
-        const centerId = document.getElementById('center-center-filter')?.value;
+        const centerId = this.resolveReportCenterId(document.getElementById('center-center-filter')?.value);
 
         await this.loadCenterWiseData(fromDate, toDate, centerId);
     }
@@ -212,7 +282,7 @@ class ReportsController {
         const fromDate = document.getElementById('commission-from-date')?.value;
         const toDate = document.getElementById('commission-to-date')?.value;
         const referenceName = document.getElementById('commission-reference-filter')?.value;
-        const centerId = document.getElementById('commission-center-filter')?.value;
+        const centerId = this.resolveReportCenterId(document.getElementById('commission-center-filter')?.value);
 
         await this.loadCommissionData(fromDate, toDate, referenceName, centerId);
     }
@@ -220,7 +290,7 @@ class ReportsController {
     async applySummaryFilter() {
         const fromDate = document.getElementById('summary-from-date')?.value;
         const toDate = document.getElementById('summary-to-date')?.value;
-        const centerId = document.getElementById('summary-center-filter')?.value;
+        const centerId = this.resolveReportCenterId(document.getElementById('summary-center-filter')?.value);
 
         await this.loadTestCostSummary(fromDate, toDate, centerId);
     }
@@ -252,7 +322,7 @@ class ReportsController {
                 return;
             }
             this.showLoading('daily');
-            const data = await this.reportsService.getDailySalesReport(fromDate, toDate, centerId);
+            const data = await this.reportsService.getDailySalesReport(fromDate, toDate, this.resolveReportCenterId(centerId));
             this.displayDailySalesData(data);
         } catch (error) {
             console.error('Error loading daily sales data:', error);
@@ -267,7 +337,7 @@ class ReportsController {
                 return;
             }
             this.showLoading('monthly');
-            const data = await this.reportsService.getMonthlySalesReport(year, month, centerId);
+            const data = await this.reportsService.getMonthlySalesReport(year, month, this.resolveReportCenterId(centerId));
             this.displayMonthlySalesData(data);
         } catch (error) {
             console.error('Error loading monthly sales data:', error);
@@ -282,7 +352,7 @@ class ReportsController {
                 return;
             }
             this.showLoading('center');
-            const data = await this.reportsService.getCenterWiseReport(fromDate, toDate, centerId);
+            const data = await this.reportsService.getCenterWiseReport(fromDate, toDate, this.resolveReportCenterId(centerId));
             this.displayCenterWiseData(data);
         } catch (error) {
             console.error('Error loading center wise data:', error);
@@ -297,7 +367,7 @@ class ReportsController {
                 return;
             }
             this.showLoading('summary');
-            const data = await this.reportsService.getTestCostSummary(fromDate, toDate, centerId);
+            const data = await this.reportsService.getTestCostSummary(fromDate, toDate, this.resolveReportCenterId(centerId));
             this.displayTestCostSummary(data);
         } catch (error) {
             console.error('Error loading test cost summary:', error);
@@ -312,7 +382,7 @@ class ReportsController {
                 return;
             }
             this.showLoading('commission');
-            const data = await this.reportsService.getCommissionReport(fromDate, toDate, referenceName, centerId);
+            const data = await this.reportsService.getCommissionReport(fromDate, toDate, referenceName, this.resolveReportCenterId(centerId));
             this.displayCommissionData(data);
         } catch (error) {
             console.error('Error loading commission data:', error);

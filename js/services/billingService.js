@@ -32,6 +32,17 @@ class BillingService {
     return window.UserCenterAccess?.getActiveCenterId(user) || user?.center_id || null;
   }
 
+  getBillingHistoryCenterId(selectedCenterId = null) {
+    const user = this.getCurrentUser();
+    if (user?.role === "admin") return selectedCenterId || null;
+
+    const assignedIds = window.UserCenterAccess?.getAssignedCenterIds(user) || [];
+    if (selectedCenterId && !assignedIds.includes(selectedCenterId)) {
+      throw new Error("You are not assigned to this center");
+    }
+    return selectedCenterId || this.getUserCenterId();
+  }
+
   // Check if Supabase is available
   isSupabaseAvailable() {
     return this.supabase !== null;
@@ -616,10 +627,10 @@ class BillingService {
     }
   }
 
-  // Get matching patient details across all centers without exposing other-center bill history.
-  async getPatientsByPhone(phone) {
+  // Get matching patient details for the active center.
+  async getPatientsByPhone(phone, selectedCenterId = null) {
     try {
-      const { data: bills, error } = await this.supabase
+      let query = this.supabase
         .from("bills")
         .select(
           `
@@ -636,6 +647,13 @@ class BillingService {
         .eq("patient_phone", phone)
         .order("bill_date", { ascending: false });
 
+      const centerId = this.getBillingHistoryCenterId(selectedCenterId);
+      if (centerId) {
+        query = query.eq("center_id", centerId);
+      }
+
+      const { data: bills, error } = await query;
+
       if (error) throw error;
 
       const uniquePatients = new Map();
@@ -651,7 +669,7 @@ class BillingService {
   }
 
   // Get patient history by phone (filtered by user's center unless admin)
-  async getPatientHistory(phone) {
+  async getPatientHistory(phone, selectedCenterId = null) {
     try {
       let query = this.supabase
         .from("bills")
@@ -683,8 +701,9 @@ class BillingService {
         .eq("patient_phone", phone)
         .order("bill_date", { ascending: false });
 
-      if (this.getUserCenterId()) {
-        query = query.eq("center_id", this.getUserCenterId());
+      const centerId = this.getBillingHistoryCenterId(selectedCenterId);
+      if (centerId) {
+        query = query.eq("center_id", centerId);
       }
 
       const { data: bills, error } = await query;
@@ -698,7 +717,8 @@ class BillingService {
   }
 
   // Get recent bills
-  async getRecentBills(limit = 10) {
+  async getRecentBills(limit = 10, selectedCenterId = null) {
+    const centerId = this.getBillingHistoryCenterId(selectedCenterId);
     try {
       if (!this.isSupabaseAvailable()) {
         console.warn("Supabase not available, returning empty recent bills");
@@ -720,8 +740,8 @@ class BillingService {
         .order("created_at", { ascending: false })
         .limit(limit);
 
-      if (this.getUserCenterId()) {
-        query = query.eq("center_id", this.getUserCenterId());
+      if (centerId) {
+        query = query.eq("center_id", centerId);
       }
 
       const { data: bills, error } = await query;
@@ -735,7 +755,7 @@ class BillingService {
   }
 
   // Search bills
-  async searchBills(searchTerm) {
+  async searchBills(searchTerm, selectedCenterId = null) {
     try {
       let query = this.supabase
         .from("bills")
@@ -752,8 +772,9 @@ class BillingService {
         .or(`bill_no.ilike.%${searchTerm}%,patient_name.ilike.%${searchTerm}%`)
         .order("created_at", { ascending: false });
 
-      if (this.getUserCenterId()) {
-        query = query.eq("center_id", this.getUserCenterId());
+      const centerId = this.getBillingHistoryCenterId(selectedCenterId);
+      if (centerId) {
+        query = query.eq("center_id", centerId);
       }
 
       const { data: bills, error } = await query;

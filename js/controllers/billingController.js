@@ -115,6 +115,14 @@ class BillingController {
     const centerSelect = document.getElementById("center-dropdown");
     if (centerSelect) {
       centerSelect.addEventListener("change", (event) => {
+        const user = window.UserCenterAccess?.getCurrentUser();
+        if (
+          user?.role !== "admin" &&
+          !window.UserCenterAccess?.setActiveCenterId(event.target.value)
+        ) {
+          window.app.showError("You are not assigned to this center");
+          return;
+        }
         this.handleCenterChange(event).catch((error) => {
           console.error("Error handling center change:", error);
           window.app.showError("Failed to refresh center prices");
@@ -494,13 +502,14 @@ class BillingController {
     }
 
     try {
+      const selectedCenterId = this.getSelectedCenterId();
       const [history, patients] = await Promise.all([
-        this.billingService.getPatientHistory(phone),
-        this.billingService.getPatientsByPhone(phone),
+        this.billingService.getPatientHistory(phone, selectedCenterId),
+        this.billingService.getPatientsByPhone(phone, selectedCenterId),
       ]);
       this.displayPatientHistory(history);
 
-      // Show matching patients from any center, while keeping bill history center-scoped.
+      // Keep patient suggestions and history scoped to the selected center.
       this.displayPatientSuggestions(patients, event.target);
 
       // Keep the choice explicit when a phone number belongs to multiple people.
@@ -1292,6 +1301,20 @@ class BillingController {
           option.textContent = center.center_name;
           dropdown.appendChild(option);
         });
+        const user = window.UserCenterAccess?.getCurrentUser();
+        if (user?.role !== "admin") {
+          const assignedIds = window.UserCenterAccess?.getAssignedCenterIds(user) || [];
+          const activeCenterId =
+            window.UserCenterAccess?.getActiveCenterId(user) ||
+            (assignedIds.includes(user?.center_id) ? user.center_id : assignedIds[0]);
+          if (activeCenterId && assignedIds.includes(activeCenterId)) {
+            dropdown.value = activeCenterId;
+            window.UserCenterAccess?.setActiveCenterId(activeCenterId);
+          } else {
+            dropdown.disabled = true;
+            dropdown.innerHTML = "<option value=''>No assigned centers</option>";
+          }
+        }
       } else {
         dropdown.innerHTML = "<option>No centers found</option>";
       }
@@ -1368,8 +1391,35 @@ class BillingController {
   }
 
   async handleCenterChange() {
+    const centerId = this.getSelectedCenterId();
+    const user = window.UserCenterAccess?.getCurrentUser();
+    if (user?.role !== "admin" && !window.UserCenterAccess?.setActiveCenterId(centerId)) {
+      throw new Error("You are not assigned to this center");
+    }
     await this.populatePackagesDropdown();
     await this.repriceSelectedItems();
+    await this.refreshCenterScopedHistory();
+  }
+
+  async refreshCenterScopedHistory() {
+    const recentBillsSearch = document.querySelector(
+      'input[placeholder*="Search by Bill No or Patient Name"]'
+    );
+    const searchTerm = recentBillsSearch?.value.trim() || "";
+    if (searchTerm.length >= 2) {
+      await this.handleRecentBillsSearch({ target: recentBillsSearch });
+    } else {
+      await this.loadRecentBills();
+    }
+
+    const phoneInput = document.querySelector('input[placeholder*="phone"]');
+    const phone = phoneInput?.value.trim() || "";
+    if (phone.length >= 3) {
+      await this.handlePatientPhoneSearch({ target: phoneInput });
+    } else {
+      this.clearPatientHistory();
+      this.removePatientDropdown();
+    }
   }
 
   async repriceSelectedItems() {
@@ -2326,7 +2376,7 @@ class BillingController {
   // Load recent bills
   async loadRecentBills() {
     try {
-      const bills = await this.billingService.getRecentBills(10);
+      const bills = await this.billingService.getRecentBills(10, this.getSelectedCenterId());
       this.displayRecentBills(bills);
 
       // Clear search results counter
@@ -2437,7 +2487,10 @@ class BillingController {
     }
 
     try {
-      const bills = await this.billingService.searchBills(searchTerm);
+      const bills = await this.billingService.searchBills(
+        searchTerm,
+        this.getSelectedCenterId()
+      );
       this.displayRecentBills(bills);
 
       // Update search results counter
