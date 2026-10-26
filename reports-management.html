@@ -271,16 +271,6 @@
             color: #007bff;
         }
 
-        /* Filter section enhancements */
-        .filter-section .btn-primary {
-            transition: all 0.3s ease;
-        }
-
-        .filter-section .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
-        }
-
         /* Loading spinner styles */
         .spinner-border {
             width: 2rem;
@@ -362,27 +352,19 @@
                         <!-- Filter Section -->
                         <div class="filter-section">
                             <div class="row">
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">From Date</label>
                                     <input type="date" class="form-control" id="daily-from-date">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">To Date</label>
                                     <input type="date" class="form-control" id="daily-to-date">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">Center</label>
                                     <select class="form-control" id="daily-center-filter">
                                         <option value="all">All Centers</option>
                                     </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">&nbsp;</label>
-                                    <div class="d-grid">
-                                        <button class="btn btn-primary" id="daily-filter-btn">
-                                            <i class="fas fa-filter"></i> Apply Filter
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -448,7 +430,7 @@
                         <!-- Filter Section -->
                         <div class="filter-section">
                             <div class="row">
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">Year</label>
                                     <select class="form-control" id="monthly-year-filter">
                                         <option value="2025">2025</option>
@@ -472,7 +454,7 @@
                                         <option value="2022">2022</option>
                                     </select>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">Month</label>
                                     <select class="form-control" id="monthly-month-filter">
                                         <option value="all">All Months</option>
@@ -490,19 +472,11 @@
                                         <option value="11">December</option>
                                     </select>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">Center</label>
                                     <select class="form-control" id="monthly-center-filter">
                                         <option value="all">All Centers</option>
                                     </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">&nbsp;</label>
-                                    <div class="d-grid">
-                                        <button class="btn btn-primary" id="monthly-filter-btn">
-                                            <i class="fas fa-filter"></i> Apply Filter
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -533,27 +507,19 @@
                         <!-- Filter Section -->
                         <div class="filter-section">
                             <div class="row">
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">From Date</label>
                                     <input type="date" class="form-control" id="center-from-date">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">To Date</label>
                                     <input type="date" class="form-control" id="center-to-date">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">Center</label>
                                     <select class="form-control" id="center-center-filter">
                                         <option value="all">All Centers</option>
                                     </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">&nbsp;</label>
-                                    <div class="d-grid">
-                                        <button class="btn btn-primary" id="center-filter-btn">
-                                            <i class="fas fa-filter"></i> Apply Filter
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -582,27 +548,19 @@
                     <div class="tab-pane fade" id="summary" role="tabpanel">
                         <div class="filter-section">
                             <div class="row">
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">From Date</label>
                                     <input type="date" class="form-control" id="summary-from-date">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">To Date</label>
                                     <input type="date" class="form-control" id="summary-to-date">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">Center</label>
                                     <select class="form-control" id="summary-center-filter">
                                         <option value="all">All Centers</option>
                                     </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">&nbsp;</label>
-                                    <div class="d-grid">
-                                        <button class="btn btn-primary" id="summary-filter-btn">
-                                            <i class="fas fa-filter"></i> Apply Filter
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -675,14 +633,6 @@
                                     <select class="form-control" id="commission-reference-filter">
                                         <option value="all">All References</option>
                                     </select>
-                                </div>
-                                <div class="col-md">
-                                    <label class="form-label">&nbsp;</label>
-                                    <div class="d-grid">
-                                        <button class="btn btn-primary" id="commission-filter-btn">
-                                            <i class="fas fa-filter"></i> Apply Filter
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
                         </div>

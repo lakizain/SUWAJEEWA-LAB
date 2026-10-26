@@ -80,19 +80,20 @@ class ReportsController {
 
     handleReportCenterChange(centerId) {
         const user = this.getCurrentUser();
-        if (!user || user.role === 'admin') return;
-        if (!window.UserCenterAccess?.setActiveCenterId(centerId)) {
-            this.showGlobalError('You are not assigned to this center.');
-            return;
-        }
-
-        document.querySelectorAll(
-            '#daily-center-filter, #monthly-center-filter, #center-center-filter, #commission-center-filter, #summary-center-filter'
-        ).forEach((filter) => {
-            if (Array.from(filter.options).some((option) => option.value === centerId)) {
-                filter.value = centerId;
+        if (user && user.role !== 'admin') {
+            if (!window.UserCenterAccess?.setActiveCenterId(centerId)) {
+                this.showGlobalError('You are not assigned to this center.');
+                return;
             }
-        });
+
+            document.querySelectorAll(
+                '#daily-center-filter, #monthly-center-filter, #center-center-filter, #commission-center-filter, #summary-center-filter'
+            ).forEach((filter) => {
+                if (Array.from(filter.options).some((option) => option.value === centerId)) {
+                    filter.value = centerId;
+                }
+            });
+        }
         this.loadReportData();
     }
 
@@ -101,6 +102,14 @@ class ReportsController {
             '#daily-center-filter, #monthly-center-filter, #center-center-filter, #commission-center-filter, #summary-center-filter'
         ).forEach((filter) => {
             filter.addEventListener('change', () => this.handleReportCenterChange(filter.value));
+        });
+
+        document.querySelectorAll(
+            '#daily-from-date, #daily-to-date, #monthly-year-filter, #monthly-month-filter, ' +
+            '#center-from-date, #center-to-date, #summary-from-date, #summary-to-date, ' +
+            '#commission-from-date, #commission-to-date, #commission-reference-filter'
+        ).forEach((filter) => {
+            filter.addEventListener('change', () => this.loadReportData());
         });
 
         // Tab switching
@@ -123,27 +132,6 @@ class ReportsController {
 
         document.getElementById('export-csv-btn')?.addEventListener('click', () => {
             this.exportToCSV();
-        });
-
-        // Filter buttons
-        document.getElementById('daily-filter-btn')?.addEventListener('click', () => {
-            this.applyDailyFilter();
-        });
-
-        document.getElementById('monthly-filter-btn')?.addEventListener('click', () => {
-            this.applyMonthlyFilter();
-        });
-
-        document.getElementById('center-filter-btn')?.addEventListener('click', () => {
-            this.applyCenterFilter();
-        });
-
-        document.getElementById('commission-filter-btn')?.addEventListener('click', () => {
-            this.applyCommissionFilter();
-        });
-
-        document.getElementById('summary-filter-btn')?.addEventListener('click', () => {
-            this.applySummaryFilter();
         });
     }
 
@@ -298,19 +286,19 @@ class ReportsController {
     async loadReportData() {
         switch (this.currentTab) {
             case 'daily':
-                await this.loadDailySalesData();
+                await this.applyDailyFilter();
                 break;
             case 'monthly':
-                await this.loadMonthlySalesData();
+                await this.applyMonthlyFilter();
                 break;
             case 'center':
-                await this.loadCenterWiseData();
+                await this.applyCenterFilter();
                 break;
             case 'summary':
-                await this.loadTestCostSummary();
+                await this.applySummaryFilter();
                 break;
             case 'commission':
-                await this.loadCommissionData();
+                await this.applyCommissionFilter();
                 break;
         }
     }
