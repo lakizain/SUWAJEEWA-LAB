@@ -50,6 +50,7 @@ const DB_SCHEMA = {
     bill_date: "bill_date",
     bill_type: "bill_type",
     center_id: "center_id",
+    cashier: "cashier",
     patient_phone: "patient_phone",
     patient_name: "patient_name",
     patient_title: "patient_title",

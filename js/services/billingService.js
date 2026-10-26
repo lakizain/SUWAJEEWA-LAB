@@ -382,6 +382,7 @@ class BillingService {
         bill_date: new Date().toISOString(),
         bill_type: billData.bill_type || "Main Lab",
         center_id: centerId !== "" ? centerId : null,
+        cashier: this.getCurrentUser()?.username || null,
         patient_phone: billData.patient_phone,
         patient_name: billData.patient_name,
         patient_title: billData.patient_title,
@@ -734,6 +735,7 @@ class BillingService {
                     patient_name,
                     bill_date,
                     final_amount,
+                    cashier,
                     status
                 `
         )
@@ -766,6 +768,7 @@ class BillingService {
           patient_name,
           bill_date,
           final_amount,
+          cashier,
           status
         `
         )

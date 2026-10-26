@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS bills (
     bill_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     bill_type VARCHAR(50) DEFAULT 'Main Lab',
     center_id UUID REFERENCES centers(id),
+    cashier VARCHAR(120),
     patient_phone VARCHAR(20),
     patient_name VARCHAR(255) NOT NULL,
     patient_title VARCHAR(10),

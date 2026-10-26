@@ -667,6 +667,10 @@ class ReportEntryController {
           break;
       }
       const statusBadge = this.createStatusBadge(effectiveStatus);
+      const reportHeaders = Array.isArray(item?.test_report_headers)
+        ? item.test_report_headers[0]
+        : item?.test_report_headers;
+      const reportUser = reportHeaders?.created_by || reportHeaders?.updated_by || "—";
 
       const row = document.createElement("tr");
       row.className = statusClass;
@@ -695,6 +699,7 @@ class ReportEntryController {
           <td>${this.safeText(bill.patient_name)}</td>
           <td>${this.safeText(testName)}</td>
           <td>${statusBadge}</td>
+          <td>${this.safeText(reportUser)}</td>
         `;
       } else {
         row.innerHTML = `

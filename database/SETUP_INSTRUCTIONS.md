@@ -92,6 +92,15 @@ Read [../MULTI_CENTER_USERS_GUIDE.md](../MULTI_CENTER_USERS_GUIDE.md) before
 enabling this in production. The current custom login and anonymous database
 policies do not provide secure center-level authorization.
 
+## Cashier and report-entry user columns
+
+Run `database/add_bill_cashier.sql` in the Supabase SQL Editor to add the bill
+cashier field to an existing database. New bills will store the logged-in
+username in `bills.cashier`. Ready report rows use the existing
+`test_report_headers.created_by` and `updated_by` fields to show the user who
+last entered or updated the report. Existing rows remain blank until their
+attribution is recorded; it cannot be inferred reliably for historical data.
+
 ## Next Steps
 
 Once the database is set up:

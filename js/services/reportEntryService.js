@@ -75,9 +75,9 @@ class ReportEntryService {
         status: status === "final" ? "ready" : status, // Map final to ready
         updated_at: new Date().toISOString(),
       };
-      if (user) {
-        payload.updated_by = user;
-      }
+      const currentUser = this.getCurrentUser();
+      const enteredBy = user || currentUser?.username || null;
+      payload.updated_by = enteredBy;
 
       // Use explicit select -> update or insert to avoid ON CONFLICT dependency
       const { data: existingList, error: findErr } = await this.supabase
@@ -112,6 +112,7 @@ class ReportEntryService {
         }
         return { success: true, data: updated };
       } else {
+        payload.created_by = enteredBy;
         const { data: inserted, error: insErr } = await this.supabase
           .from("test_report_headers")
           .insert(payload)
@@ -207,7 +208,8 @@ class ReportEntryService {
           bill_items (
             *,
             tests (test_name, short_name, price, duration, footer_text),
-            packages (package_name, price)
+            packages (package_name, price),
+            test_report_headers (created_by, updated_by)
           ),
           centers (center_name)
         `
@@ -244,7 +246,8 @@ class ReportEntryService {
           bill_items (
             *,
             tests (test_name, short_name, price, duration, footer_text),
-            packages (package_name, price)
+            packages (package_name, price),
+            test_report_headers (created_by, updated_by)
           ),
           centers (center_name)
         `
@@ -281,7 +284,8 @@ class ReportEntryService {
           bill_items (
             *,
             tests (test_name, short_name, price, duration, footer_text),
-            packages (package_name, price)
+            packages (package_name, price),
+            test_report_headers (created_by, updated_by)
           ),
           centers (center_name)
         `
@@ -325,7 +329,8 @@ class ReportEntryService {
           bill_items (
             *,
             tests (test_name, short_name, price, duration, footer_text),
-            packages (package_name, price)
+            packages (package_name, price),
+            test_report_headers (created_by, updated_by)
           ),
           centers (center_name)
         `
@@ -362,7 +367,8 @@ class ReportEntryService {
           bill_items (
             *,
             tests (test_name, short_name, price, duration, footer_text),
-            packages (package_name, price)
+            packages (package_name, price),
+            test_report_headers (created_by, updated_by)
           ),
           centers (center_name)
         `
@@ -398,7 +404,8 @@ class ReportEntryService {
           bill_items (
             *,
             tests (test_name, short_name, price, duration, footer_text),
-            packages (package_name, price)
+            packages (package_name, price),
+            test_report_headers (created_by, updated_by)
           ),
           centers (center_name)
         `

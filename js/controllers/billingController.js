@@ -2404,7 +2404,7 @@ class BillingController {
     if (bills.length === 0) {
       tableBody.innerHTML = `
                 <tr>
-                    <td colspan="5" class="empty-state">
+                    <td colspan="6" class="empty-state">
                         <i class="fas fa-info-circle"></i>
                         <div>No recent bills found</div>
                     </td>
@@ -2425,6 +2425,7 @@ class BillingController {
                 <td><span class="badge bg-success">${window.app.formatCurrency(
                   bill.final_amount || 0
                 )}</span></td>
+                <td>${this.escapeHistoryText(bill.cashier || "—")}</td>
                 <td>
                     <div class="btn-group" role="group">
                         <button class="btn btn-sm btn-outline-primary" data-action="view" data-bill-no="${
@@ -2469,7 +2470,7 @@ class BillingController {
 
     if (tableBody) {
       tableBody.innerHTML =
-        '<tr><td colspan="5" class="text-center"><i class="fas fa-spinner fa-spin"></i> Searching...</td></tr>';
+        '<tr><td colspan="6" class="text-center"><i class="fas fa-spinner fa-spin"></i> Searching...</td></tr>';
     }
 
     if (searchTerm.length === 0) {
@@ -2481,7 +2482,7 @@ class BillingController {
       // Show message for short search terms
       if (tableBody) {
         tableBody.innerHTML =
-          '<tr><td colspan="5" class="text-center text-muted">Please enter at least 2 characters to search</td></tr>';
+          '<tr><td colspan="6" class="text-center text-muted">Please enter at least 2 characters to search</td></tr>';
       }
       return;
     }
@@ -2515,7 +2516,7 @@ class BillingController {
       // Show error state in table
       if (tableBody) {
         tableBody.innerHTML =
-          '<tr><td colspan="5" class="text-center text-danger"><i class="fas fa-exclamation-triangle"></i> Error loading search results</td></tr>';
+          '<tr><td colspan="6" class="text-center text-danger"><i class="fas fa-exclamation-triangle"></i> Error loading search results</td></tr>';
       }
     }
   }
