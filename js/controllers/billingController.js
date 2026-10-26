@@ -2425,7 +2425,6 @@ class BillingController {
                 <td><span class="badge bg-success">${window.app.formatCurrency(
                   bill.final_amount || 0
                 )}</span></td>
-                <td>${this.escapeHistoryText(bill.cashier || "—")}</td>
                 <td>
                     <div class="btn-group" role="group">
                         <button class="btn btn-sm btn-outline-primary" data-action="view" data-bill-no="${
@@ -2445,6 +2444,7 @@ class BillingController {
                         </button>
                     </div>
                 </td>
+                <td>${this.escapeHistoryText(bill.cashier || "—")}</td>
             </tr>
         `
       )
