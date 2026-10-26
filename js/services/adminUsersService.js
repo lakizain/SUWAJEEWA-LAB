@@ -16,7 +16,7 @@ class AdminUsersService {
     try {
       const { data, error } = await this.supabase
         .from('admin_users')
-        .select('*, centers(*)')
+        .select('*, admin_user_centers(center_id, centers(id, center_name))')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -24,9 +24,40 @@ class AdminUsersService {
         throw error;
       }
 
-      return data || [];
+      return (data || []).map((user) => this.includeAssignedCenters(user));
     } catch (error) {
       console.error('Error in getAllUsers:', error);
+      throw error;
+    }
+  }
+
+  includeAssignedCenters(user) {
+    const assignedCenters = (user.admin_user_centers || [])
+      .map((assignment) => assignment.centers)
+      .filter(Boolean);
+    if (assignedCenters.length === 0 && user.centers) {
+      assignedCenters.push(user.centers);
+    }
+    const centerIds = (user.admin_user_centers || [])
+      .map((assignment) => assignment.center_id)
+      .filter(Boolean);
+    if (centerIds.length === 0 && user.center_id) {
+      centerIds.push(user.center_id);
+    }
+    return {
+      ...user,
+      assigned_centers: assignedCenters,
+      center_ids: [...new Set(centerIds)],
+    };
+  }
+
+  async setUserCenters(userId, centerIds) {
+    const { error } = await this.supabase.rpc('set_admin_user_centers', {
+      p_admin_user_id: userId,
+      p_center_ids: [...new Set((centerIds || []).filter(Boolean))],
+    });
+    if (error) {
+      console.error('Error setting admin user centers:', error);
       throw error;
     }
   }
@@ -42,7 +73,7 @@ class AdminUsersService {
    */
   async createUser(userData) {
     try {
-      const { username, email, password, role = 'staff', center_id } = userData;
+      const { username, email, password, role = 'staff', center_ids = [], center_id = null } = userData;
 
       // Validate required fields
       if (!username || !email || !password) {
@@ -76,7 +107,11 @@ class AdminUsersService {
         throw new Error('Email already exists');
       }
 
-      // Create user in admin_users table
+      const assignedCenterIds = [...new Set(center_ids.filter(Boolean))];
+      if (role === 'staff' && (!center_id || !assignedCenterIds.includes(center_id))) {
+        throw new Error('Main center must be one of the authorized centers');
+      }
+
       const { data, error } = await this.supabase
         .from('admin_users')
         .insert([{
@@ -84,7 +119,7 @@ class AdminUsersService {
           email,
           password, // Store as plain text as requested
           role,
-          center_id,
+          center_id: role === 'admin' ? null : center_id,
           is_active: true
         }])
         .select()
@@ -93,6 +128,19 @@ class AdminUsersService {
       if (error) {
         console.error('Error creating admin user:', error);
         throw error;
+      }
+
+      try {
+        await this.setUserCenters(data.id, assignedCenterIds);
+      } catch (assignmentError) {
+        const { error: cleanupError } = await this.supabase
+          .from('admin_users')
+          .delete()
+          .eq('id', data.id);
+        if (cleanupError) {
+          console.error('Failed to remove user after center assignment failed:', cleanupError);
+        }
+        throw assignmentError;
       }
 
       return data;
@@ -110,12 +158,26 @@ class AdminUsersService {
    */
   async updateUser(userId, updateData) {
     try {
+      const nextData = { ...updateData };
+      const shouldUpdateCenters = Array.isArray(nextData.center_ids);
+      const centerIds = shouldUpdateCenters
+        ? [...new Set(nextData.center_ids.filter(Boolean))]
+        : null;
+      delete nextData.center_ids;
+      if (shouldUpdateCenters) {
+        const mainCenterId = nextData.center_id || null;
+        if (nextData.role === 'staff' && (!mainCenterId || !centerIds.includes(mainCenterId))) {
+          throw new Error('Main center must be one of the authorized centers');
+        }
+        nextData.center_id = nextData.role === 'admin' ? null : mainCenterId;
+      }
+
       // If username is being updated, check if it already exists (excluding current user)
-      if (updateData.username) {
+      if (nextData.username) {
         const { data: existingUser } = await this.supabase
           .from('admin_users')
           .select('id')
-          .eq('username', updateData.username)
+          .eq('username', nextData.username)
           .neq('id', userId)
           .single();
 
@@ -125,11 +187,11 @@ class AdminUsersService {
       }
 
       // If email is being updated, check if it already exists (excluding current user)
-      if (updateData.email) {
+      if (nextData.email) {
         const { data: existingEmail } = await this.supabase
           .from('admin_users')
           .select('id')
-          .eq('email', updateData.email)
+          .eq('email', nextData.email)
           .neq('id', userId)
           .single();
 
@@ -140,7 +202,7 @@ class AdminUsersService {
 
       const { data, error } = await this.supabase
         .from('admin_users')
-        .update(updateData)
+        .update(nextData)
         .eq('id', userId)
         .select()
         .single();
@@ -148,6 +210,10 @@ class AdminUsersService {
       if (error) {
         console.error('Error updating admin user:', error);
         throw error;
+      }
+
+      if (shouldUpdateCenters) {
+        await this.setUserCenters(userId, centerIds);
       }
 
       return data;
@@ -205,7 +271,7 @@ class AdminUsersService {
     try {
       const { data, error } = await this.supabase
         .from('admin_users')
-        .select('*, centers(*)')
+        .select('*, admin_user_centers(center_id, centers(id, center_name))')
         .eq('id', userId)
         .single();
 
@@ -214,7 +280,7 @@ class AdminUsersService {
         throw error;
       }
 
-      return data;
+      return this.includeAssignedCenters(data);
     } catch (error) {
       console.error('Error in getUserById:', error);
       throw error;
@@ -304,25 +370,84 @@ class AdminUsersService {
     try {
       const { data, error } = await this.supabase
         .from('admin_users')
-        .select('*, centers(*)')
+        .select('*')
         .eq('username', username)
         .eq('password', password)
         .eq('is_active', true)
         .single();
 
       if (error) {
-        console.error('Error validating credentials:', error);
-        return null;
+        if (error.code === 'PGRST116') {
+          return null;
+        }
+        console.error('Credential lookup failed:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        throw new Error(
+          `Login database lookup failed${error.code ? ` (${error.code})` : ''}: ${error.message}`
+        );
       }
 
-      return data;
+      if (!data) return null;
+
+      const { data: assignments, error: assignmentError } = await this.supabase
+        .from('admin_user_centers')
+        .select('center_id')
+        .eq('admin_user_id', data.id);
+
+      if (assignmentError) {
+        console.error('Center assignment lookup failed:', {
+          message: assignmentError.message,
+          code: assignmentError.code,
+          details: assignmentError.details,
+          hint: assignmentError.hint,
+        });
+        throw new Error(
+          `Center assignment lookup failed${assignmentError.code ? ` (${assignmentError.code})` : ''}: ${assignmentError.message}`
+        );
+      }
+
+      const centerIds = [...new Set([
+        ...(assignments || []).map((assignment) => assignment.center_id),
+        ...(data.center_id ? [data.center_id] : []),
+      ].filter(Boolean))];
+
+      let assignedCenters = [];
+      if (centerIds.length > 0) {
+        const { data: centers, error: centersError } = await this.supabase
+          .from('centers')
+          .select('*')
+          .in('id', centerIds);
+
+        if (centersError) {
+          console.error('Assigned center details lookup failed:', {
+            message: centersError.message,
+            code: centersError.code,
+            details: centersError.details,
+            hint: centersError.hint,
+          });
+          throw new Error(
+            `Assigned center lookup failed${centersError.code ? ` (${centersError.code})` : ''}: ${centersError.message}`
+          );
+        }
+        assignedCenters = centers || [];
+      }
+
+      return {
+        ...data,
+        center_ids: centerIds,
+        assigned_centers: assignedCenters,
+        centers: assignedCenters.find((center) => center.id === data.center_id) || null,
+      };
     } catch (error) {
-      console.error('Error in validateCredentials:', error);
-      return null;
+      console.error('Credential validation could not be completed:', error.message || error);
+      throw error;
     }
   }
 }
 
 // Export the service class
 window.AdminUsersService = AdminUsersService;
-

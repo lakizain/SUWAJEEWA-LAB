@@ -174,3 +174,41 @@ window.SUPABASE_CONFIG = {
   DB_SCHEMA,
   initializeSupabase,
 };
+
+window.UserCenterAccess = {
+  getCurrentUser() {
+    try {
+      const user = sessionStorage.getItem("loggedInUser");
+      return user ? JSON.parse(user) : null;
+    } catch (error) {
+      console.warn("Failed to read logged-in user center access", error);
+      return null;
+    }
+  },
+
+  getAssignedCenterIds(user = this.getCurrentUser()) {
+    if (!user || user.role === "admin") return [];
+    const ids = Array.isArray(user.center_ids) ? user.center_ids : [];
+    const legacyId = user.center_id;
+    return [...new Set([...ids, ...(legacyId ? [legacyId] : [])].filter(Boolean))];
+  },
+
+  getActiveCenterId(user = this.getCurrentUser()) {
+    if (!user || user.role === "admin") return null;
+    const assignedIds = this.getAssignedCenterIds(user);
+    if (user.active_center_id && assignedIds.includes(user.active_center_id)) {
+      return user.active_center_id;
+    }
+    return assignedIds.length === 1 ? assignedIds[0] : null;
+  },
+
+  setActiveCenterId(centerId) {
+    const user = this.getCurrentUser();
+    if (!user || user.role === "admin") return false;
+    const assignedIds = this.getAssignedCenterIds(user);
+    if (!assignedIds.includes(centerId)) return false;
+    user.active_center_id = centerId;
+    sessionStorage.setItem("loggedInUser", JSON.stringify(user));
+    return true;
+  },
+};

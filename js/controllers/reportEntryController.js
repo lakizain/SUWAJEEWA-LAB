@@ -431,11 +431,11 @@ class ReportEntryController {
       if (this.dateFromInput) this.dateFromInput.value = today;
       if (this.dateToInput) this.dateToInput.value = today;
 
-      // Load today's bills
-      await this.loadTodaysBills();
-
       // Populate dropdowns
       await this.populateDropdowns();
+
+      // Load bills after the authorized center selection is initialized.
+      await this.loadTodaysBills();
 
       // Periodically refresh table row colors for overdue computation
       try {
@@ -575,15 +575,31 @@ class ReportEntryController {
       }
 
       // Load centers
-      const centers = await this.centerService.getActiveCenters();
+      const user = window.UserCenterAccess?.getCurrentUser();
+      const centers = user?.role === "admin"
+        ? await this.centerService.getActiveCenters()
+        : (user?.assigned_centers || []);
       if (this.centerFilter) {
-        this.centerFilter.innerHTML = '<option value="all">All</option>';
+        this.centerFilter.innerHTML = user?.role === "admin"
+          ? '<option value="all">All centers</option>'
+          : "";
         centers.forEach((center) => {
           const option = document.createElement("option");
           option.value = center.id;
           option.textContent = center.center_name;
           this.centerFilter.appendChild(option);
         });
+        if (user?.role !== "admin") {
+          const selectedCenterId =
+            window.UserCenterAccess?.getActiveCenterId(user) || centers[0]?.id;
+          if (selectedCenterId) {
+            this.centerFilter.value = selectedCenterId;
+            window.UserCenterAccess?.setActiveCenterId(selectedCenterId);
+          } else {
+            this.centerFilter.disabled = true;
+            this.showError("Your account has no assigned center. Contact an administrator.");
+          }
+        }
       }
     } catch (error) {
       console.error("Error populating dropdowns:", error);
@@ -1943,6 +1959,11 @@ class ReportEntryController {
       this.setLoading(true);
 
       const centerId = this.centerFilter?.value;
+
+      const user = window.UserCenterAccess?.getCurrentUser();
+      if (user?.role !== "admin" && !window.UserCenterAccess?.setActiveCenterId(centerId)) {
+        throw new Error("You are not assigned to this center");
+      }
 
       if (centerId === "all") {
         await this.loadTodaysBills();

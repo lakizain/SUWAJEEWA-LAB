@@ -80,6 +80,18 @@ After setup, you can use these test accounts:
 2. Check the Supabase logs for any error messages
 3. Ensure you're connecting to the correct database
 
+## Multi-center staff access
+
+After the base schema is installed, run `database/multi_center_user_access.sql`
+in the Supabase SQL Editor. Existing `admin_users.center_id` assignments are
+copied into the new assignment table. Assign additional centers to each staff
+account from **Admin User Management**, then have staff choose an authorized
+center from **Report Entry**.
+
+Read [../MULTI_CENTER_USERS_GUIDE.md](../MULTI_CENTER_USERS_GUIDE.md) before
+enabling this in production. The current custom login and anonymous database
+policies do not provide secure center-level authorization.
+
 ## Next Steps
 
 Once the database is set up:

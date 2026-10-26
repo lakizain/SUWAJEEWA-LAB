@@ -250,10 +250,17 @@
           </select>
         </div>
         <div class="field">
-          <label for="center">Center</label>
-          <select id="center" name="center">
-            <option value="">-- Select Center --</option>
+          <label for="center">Authorized centers</label>
+          <select id="center" name="center" multiple size="5" aria-describedby="centerHelp">
           </select>
+          <small id="centerHelp" class="muted">Select every center where this staff member may enter reports.</small>
+        </div>
+        <div class="field">
+          <label for="mainCenter">Main center</label>
+          <select id="mainCenter" name="mainCenter" required>
+            <option value="">-- Select main center --</option>
+          </select>
+          <small class="muted">This center is selected by default when the staff member signs in.</small>
         </div>
         <div id="formMsg" class="muted"></div>
       </div>
@@ -284,5 +291,3 @@
   <script src="js/tab.js"></script>
 </body>
 </html>
-
-

@@ -29,7 +29,8 @@ class AdminBillsService {
   // Helper to get user's center id
   getUserCenterId() {
     const user = this.getCurrentUser();
-    return user?.role === 'admin' ? null : user?.center_id;
+    if (user?.role === 'admin') return null;
+    return window.UserCenterAccess?.getActiveCenterId(user) || user?.center_id || null;
   }
 
   getCenterIdForQuery(selectedCenterId = null) {

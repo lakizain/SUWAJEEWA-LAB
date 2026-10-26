@@ -31,7 +31,7 @@ class ReportEntryService {
   // Helper to get user's center id
   getUserCenterId() {
     const user = this.getCurrentUser();
-    return user?.center_id;
+    return window.UserCenterAccess?.getActiveCenterId(user) || user?.center_id || null;
   }
 
   // Simple UUID v4-ish validator (loose)
@@ -303,6 +303,14 @@ class ReportEntryService {
 
   // Get bills by center filter
   async getBillsByCenter(centerId) {
+    const user = this.getCurrentUser();
+    if (
+      user?.role !== "admin" &&
+      !window.UserCenterAccess?.getAssignedCenterIds(user).includes(centerId)
+    ) {
+      throw new Error("You are not assigned to this center");
+    }
+
     try {
       if (!this.isSupabaseAvailable()) {
         console.log("Supabase not available, returning sample data");

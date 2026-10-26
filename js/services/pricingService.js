@@ -29,7 +29,8 @@ class PricingService {
   }
 
   getUserCenterId() {
-    return this.getCurrentUser()?.center_id || null;
+    const user = this.getCurrentUser();
+    return window.UserCenterAccess?.getActiveCenterId(user) || user?.center_id || null;
   }
 
   ensureAllowedCenterId(centerId) {

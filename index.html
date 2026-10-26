@@ -283,6 +283,11 @@
             // Validate credentials against admin_users table
             const userData = await adminUsersService.validateCredentials(username, password);
             if (userData) {
+              const centerIds = userData.center_ids || (userData.center_id ? [userData.center_id] : []);
+              if (userData.role !== 'admin' && centerIds.length === 0) {
+                setMessage('Your account has no assigned center. Please contact an administrator.', 'error');
+                return;
+              }
               // Store user session data
               sessionStorage.setItem('loggedInUser', JSON.stringify({
                 id: userData.id,
@@ -290,6 +295,9 @@
                 email: userData.email,
                 role: userData.role,
                 center_id: userData.center_id,
+                center_ids: centerIds,
+                assigned_centers: userData.assigned_centers || [],
+                active_center_id: userData.role === 'admin' ? null : (userData.center_id || centerIds[0]),
                 centers: userData.centers
               }));
               setMessage('Login successful. Redirecting…', 'success');
@@ -298,7 +306,12 @@
               setMessage('Invalid username or password. Please try again.', 'error');
             }
           } catch (err) {
-            setMessage('An error occurred. Please try again.', 'error');
+            console.error('Login could not be completed:', err);
+            setMessage(
+              'Login service error. Please try again later or contact an administrator.' +
+                (err && err.message ? ` (${err.message})` : ''),
+              'error'
+            );
           } finally {
             if (button) { button.disabled = false; button.classList.remove('loading'); button.querySelector('.btn-text').textContent = 'Sign in'; }
           }
@@ -308,5 +321,3 @@
   </script>
 </body>
 </html>
-
-

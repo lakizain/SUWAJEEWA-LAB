@@ -29,7 +29,7 @@ class BillingService {
   // Helper to get user's center id
   getUserCenterId() {
     const user = this.getCurrentUser();
-    return user?.center_id;
+    return window.UserCenterAccess?.getActiveCenterId(user) || user?.center_id || null;
   }
 
   // Check if Supabase is available

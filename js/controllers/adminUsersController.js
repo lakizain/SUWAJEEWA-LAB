@@ -13,6 +13,36 @@
   function setStatus(text) { const el = $('status'); if (el) el.textContent = text || ''; }
   function setFormMsg(text) { const el = $('formMsg'); if (el) el.textContent = text || ''; }
 
+  function syncMainCenterOptions(preferredCenterId = null) {
+    const authorizedSelect = $('center');
+    const mainSelect = $('mainCenter');
+    if (!authorizedSelect || !mainSelect) return;
+    const isStaff = $('role').value === 'staff';
+    mainSelect.required = isStaff;
+    mainSelect.disabled = !isStaff;
+
+    const authorizedIds = Array.from(authorizedSelect.selectedOptions)
+      .map((option) => option.value)
+      .filter(Boolean);
+    const currentMainId = preferredCenterId || mainSelect.value;
+    mainSelect.innerHTML = '<option value="">-- Select main center --</option>';
+
+    Array.from(authorizedSelect.options)
+      .filter((option) => authorizedIds.includes(option.value))
+      .forEach((authorizedOption) => {
+        const option = document.createElement('option');
+        option.value = authorizedOption.value;
+        option.textContent = authorizedOption.textContent;
+        mainSelect.appendChild(option);
+      });
+
+    if (authorizedIds.includes(currentMainId)) {
+      mainSelect.value = currentMainId;
+    } else if (authorizedIds.length === 1) {
+      mainSelect.value = authorizedIds[0];
+    }
+  }
+
   async function ensureSupabase() {
     if (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.supabase) {
       return window.SUPABASE_CONFIG.supabase;
@@ -33,7 +63,7 @@
       const centerSelect = $('center');
       if (!centerSelect) return;
       
-      centerSelect.innerHTML = '<option value="">-- Select Center --</option>';
+      centerSelect.innerHTML = '';
       
       centers.forEach(center => {
         const option = document.createElement('option');
@@ -66,7 +96,13 @@
     }
     const html = rows.map(function (u) {
       const roleBadge = '<span class="badge ' + (u.role === 'admin' ? 'admin' : 'staff') + '">' + (u.role || 'staff') + '</span>';
-      const centerName = u.centers ? u.centers.center_name : '<span class="muted">--</span>';
+      const assignedCenters = u.assigned_centers || (u.centers ? [u.centers] : []);
+      const centerName = assignedCenters.length
+        ? assignedCenters.map((center) => {
+          const name = escapeHtml(center.center_name);
+          return u.center_id === center.id ? `${name} <strong>(Main)</strong>` : name;
+        }).join(', ')
+        : '<span class="muted">--</span>';
       return (
         '<tr>' +
           '<td>' + (u.username || '') + '</td>' +
@@ -82,6 +118,18 @@
       );
     }).join('');
     body.innerHTML = html;
+  }
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, function (character) {
+      return {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[character];
+    });
   }
 
   async function fetchUsers() {
@@ -117,7 +165,11 @@
         $('email').value = userData.email || '';
         $('password').value = ''; // Don't show existing password
         $('role').value = userData.role || 'staff';
-        $('center').value = userData.center_id || '';
+        const assignedIds = userData.center_ids || (userData.center_id ? [userData.center_id] : []);
+        Array.from($('center').options).forEach((option) => {
+          option.selected = assignedIds.includes(option.value);
+        });
+        syncMainCenterOptions(userData.center_id);
         
         // Username is editable in edit mode
         $('username').readOnly = false;
@@ -132,7 +184,8 @@
         $('email').value = '';
         $('password').value = '';
         $('role').value = 'staff';
-        $('center').value = '';
+        Array.from($('center').options).forEach((option) => { option.selected = false; });
+        syncMainCenterOptions();
         
         // Make username editable
         $('username').readOnly = false;
@@ -161,8 +214,10 @@
     const email = String(($('email') && $('email').value) || '').trim();
     const password = String(($('password') && $('password').value) || '');
     const role = String(($('role') && $('role').value) || 'staff');
-    const centerValue = $('center').value;
-    const center_id = centerValue || null;
+    const center_ids = Array.from($('center').selectedOptions)
+      .map((option) => option.value)
+      .filter(Boolean);
+    const center_id = $('mainCenter').value || null;
     
     // Validation
     if (!username || !email) { 
@@ -175,6 +230,14 @@
       setFormMsg('Password is required for new users.');
       return;
     }
+    if (role === 'staff' && center_ids.length === 0) {
+      setFormMsg('Select at least one center for a staff user.');
+      return;
+    }
+    if (role === 'staff' && (!center_id || !center_ids.includes(center_id))) {
+      setFormMsg('Select a main center from the authorized centers.');
+      return;
+    }
     
     $('btnCreate').disabled = true;
     try {
@@ -184,6 +247,7 @@
           username,
           email,
           role,
+          center_ids,
           center_id
         };
         
@@ -201,6 +265,7 @@
           email,
           password,
           role,
+          center_ids,
           center_id
         };
         
@@ -213,7 +278,8 @@
       $('email').value = '';
       $('password').value = '';
       $('role').value = 'staff';
-      $('center').value = '';
+      Array.from($('center').options).forEach((option) => { option.selected = false; });
+      syncMainCenterOptions();
       
       closeDialog();
       await fetchUsers();
@@ -564,11 +630,22 @@
     const addBtn = $('btnAddUser'); if (addBtn) addBtn.addEventListener('click', () => openDialog(false));
     const cancelBtn = $('btnCancel'); if (cancelBtn) cancelBtn.addEventListener('click', function(){ closeDialog(); });
     const form = $('addUserForm'); if (form) form.addEventListener('submit', onCreateUser);
+    const centersSelect = $('center');
+    if (centersSelect) {
+      centersSelect.addEventListener('change', function () {
+        syncMainCenterOptions();
+      });
+    }
+    const roleSelect = $('role');
+    if (roleSelect) {
+      roleSelect.addEventListener('change', function () {
+        syncMainCenterOptions();
+      });
+      syncMainCenterOptions();
+    }
     const body = $('usersBody'); if (body) body.addEventListener('click', onTableClick);
     
     // Setup bills event listeners
     setupBillsEventListeners();
   })();
 })();
-
-
