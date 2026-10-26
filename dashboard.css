@@ -4,66 +4,6 @@ body {
   min-height: 100vh;
 }
 
-.header {
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.07);
-  padding: 1.5rem 0 1rem 0;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.logo-section {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.logo-icon {
-  width: 60px;
-  height: 60px;
-  font-size: 2.2rem;
-  background: #fff;
-  color: #111;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
-}
-
-.company-name {
-  color: #6366f1;
-  font-weight: 900;
-  font-size: 1.4rem;
-  margin: 0;
-  letter-spacing: 1px;
-}
-.company-subtitle {
-  color: #64748b;
-  font-size: 1rem;
-  margin: 0;
-  letter-spacing: 2px;
-}
-
-.btn-logout {
-  background: linear-gradient(90deg, #f43f5e 0%, #f59e42 100%);
-  border: none;
-  color: white;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.1);
-  transition: background 0.2s, box-shadow 0.2s;
-}
-.btn-logout:hover {
-  background: linear-gradient(90deg, #be185d 0%, #ea580c 100%);
-  color: white;
-  box-shadow: 0 4px 16px rgba(244, 63, 94, 0.18);
-}
-
 .welcome-section {
   padding: 2.5rem 0 1.5rem;
   text-align: center;
@@ -235,26 +175,6 @@ body {
   backdrop-filter: blur(1.5px);
 }
 
-.logo-icon {
-  width: 64px;
-  height: 64px;
-  font-size: 2.3rem;
-  background: white;
-  color: #111;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
-}
-
-.logo-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 50%;
-}
-
 .notification-icon {
   position: fixed;
   bottom: 24px;
@@ -309,8 +229,7 @@ body {
     flex: 0 0 50%;
     max-width: 50%;
   }
-  .tile-icon,
-  .logo-icon {
+  .tile-icon {
     width: 48px;
     height: 48px;
     font-size: 1.5rem;

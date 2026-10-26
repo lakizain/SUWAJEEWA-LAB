@@ -18,67 +18,6 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        .header {
-            background: white;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            padding: 1rem 0;
-        }
-
-        .logo-section {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .logo-icon {
-            width: 40px;
-            height: 40px;
-            background: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #111;
-            font-size: 1.2rem;
-        }
-
-        .logo-image {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            border-radius: 50%;
-        }
-
-        .company-name {
-            color: #007bff;
-            font-weight: bold;
-            font-size: 1.2rem;
-            margin: 0;
-        }
-
-        .company-subtitle {
-            color: #6c757d;
-            font-size: 0.8rem;
-            margin: 0;
-        }
-
-        .btn-logout {
-            background: #dc3545;
-            border: none;
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn-logout:hover {
-            background: #c82333;
-            color: white;
-        }
-
         .content-section {
             padding: 2rem 0;
         }
@@ -450,10 +389,10 @@
             word-break: break-word;
         }
     </style>
+    <script src="nav-loader.js" defer></script>
 </head>
 
 <body>
-    <!-- Navigation will be loaded here by nav.js -->
 
     <!-- Content Section -->
     <section class="content-section">
@@ -671,7 +610,6 @@
 
     <!-- Load main app -->
     <script src="js/app.js"></script>
-    <script src="js/nav.js"></script>
     <script>
         // Wait for Supabase to be ready before initializing TestService
         let testService;
