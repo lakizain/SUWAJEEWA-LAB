@@ -13,6 +13,11 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function firstRelation<T>(relation: T | T[] | null | undefined): T | null {
+  if (relation == null) return null;
+  return Array.isArray(relation) ? relation[0] ?? null : relation;
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -97,19 +102,32 @@ Deno.serve(async (request: Request) => {
 
   const reports = await Promise.all(
     readyItems.map(async (item) => {
-      const { data: results, error: resultsError } = await supabase
-        .from("test_results")
-        .select(
+      const [resultsResponse, subcategoriesResponse] = await Promise.all([
+        supabase
+          .from("test_results")
+          .select(
+            `
+            subcategory_id,
+            value, unit, status, comments,
+            test_subcategories(subcategory_name)
           `
-          subcategory_id,
-          value, unit, status, comments,
-          test_subcategories(subcategory_name)
-        `
-        )
-        .eq("bill_item_id", item.id)
-        .order("created_at", { ascending: true });
+          )
+          .eq("bill_item_id", item.id)
+          .order("created_at", { ascending: true }),
+        item.test_id
+          ? supabase
+              .from("test_subcategories")
+              .select("id, subcategory_name")
+              .eq("test_id", item.test_id)
+              .order("created_at", { ascending: true })
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+      const { data: results, error: resultsError } = resultsResponse;
+      const { data: subcategories, error: subcategoriesError } =
+        subcategoriesResponse;
 
       if (resultsError) throw resultsError;
+      if (subcategoriesError) throw subcategoriesError;
       const header = Array.isArray(item.test_report_headers)
         ? item.test_report_headers[0]
         : item.test_report_headers;
@@ -130,35 +148,76 @@ Deno.serve(async (request: Request) => {
         : ["miss", "mrs"].includes(title)
           ? "Female"
           : null;
+      type TestResult = NonNullable<typeof results>[number];
+      const resultRowsBySubcategory = new Map<
+        string | null,
+        TestResult[]
+      >();
+      (results || []).forEach((result) => {
+        const existing = resultRowsBySubcategory.get(result.subcategory_id) || [];
+        existing.push(result);
+        resultRowsBySubcategory.set(result.subcategory_id, existing);
+      });
+      const formatResult = (result: TestResult, name: string) => ({
+        name,
+        value: result.value || "",
+        unit: result.unit || "",
+        remark: result.comments || "",
+        referenceRange: (() => {
+          const available = (ranges || []).filter(
+            (range) => range.subcategory_id === result.subcategory_id
+          );
+          const selected =
+            (preferredGender &&
+              available.find((range) => range.gender === preferredGender)) ||
+            available[0];
+          if (!selected) return "";
+          const min = selected.min_value == null ? "" : String(selected.min_value).trim();
+          const max = selected.max_value == null ? "" : String(selected.max_value).trim();
+          const core = min && max ? `${min} - ${max}` : min || max;
+          return core
+            ? `${core}${selected.unit ? ` ${selected.unit}` : ""}`
+            : "";
+        })(),
+      });
+      const resultRows = (subcategories || []).flatMap((subcategory) => {
+        const matchingResults = resultRowsBySubcategory.get(subcategory.id) || [];
+        if (matchingResults.length === 0) {
+          return [{
+            name: subcategory.subcategory_name || "",
+            value: "",
+            unit: "",
+            remark: "",
+            referenceRange: "",
+          }];
+        }
+        return matchingResults.map((result) =>
+          formatResult(result, subcategory.subcategory_name || "")
+        );
+      });
+      const knownSubcategoryIds = new Set(
+        (subcategories || []).map((subcategory) => subcategory.id)
+      );
+      const unmatchedResults = (results || []).filter(
+        (result) => !knownSubcategoryIds.has(result.subcategory_id)
+      );
+      const test = firstRelation(item.tests);
+      const packageInfo = firstRelation(item.packages);
       return {
-        testName:
-          item.tests?.test_name || item.packages?.package_name || "Report",
-        specimen: item.tests?.specimen || "",
-        footerImage: item.tests?.footer_text || "",
+        testName: test?.test_name || packageInfo?.package_name || "Report",
+        specimen: test?.specimen || "",
+        footerImage: test?.footer_text || "",
         comments: header?.comments_result || "",
         specialNotes: header?.special_notes || "",
-        results: (results || []).map((result) => ({
-          name: result.test_subcategories?.subcategory_name || "",
-          value: result.value || "",
-          unit: result.unit || "",
-          remark: result.comments || "",
-          referenceRange: (() => {
-            const available = (ranges || []).filter(
-              (range) => range.subcategory_id === result.subcategory_id
-            );
-            const selected =
-              (preferredGender &&
-                available.find((range) => range.gender === preferredGender)) ||
-              available[0];
-            if (!selected) return "";
-            const min = selected.min_value == null ? "" : String(selected.min_value).trim();
-            const max = selected.max_value == null ? "" : String(selected.max_value).trim();
-            const core = min && max ? `${min} - ${max}` : min || max;
-            return core
-              ? `${core}${selected.unit ? ` ${selected.unit}` : ""}`
-              : "";
-          })(),
-        })),
+        results: [
+          ...resultRows,
+          ...unmatchedResults.map((result) =>
+            formatResult(
+              result,
+              firstRelation(result.test_subcategories)?.subcategory_name || ""
+            )
+          ),
+        ],
       };
     })
   ).catch((error) => {
@@ -170,6 +229,7 @@ Deno.serve(async (request: Request) => {
     return jsonResponse({ error: "Could not load report results" }, 500);
   }
 
+  const center = firstRelation(bill.centers);
   return jsonResponse({
     status: "ready",
     bill: {
@@ -182,9 +242,9 @@ Deno.serve(async (request: Request) => {
       ageDays: bill.patient_age_days,
       gender: bill.patient_gender,
       requestedBy: bill.ref_by,
-      centerName: bill.centers?.center_name || "",
+      centerName: center?.center_name || "",
       companyName: bill.company_name || "",
-      isOutMedical: bill.centers?.is_out_medical === true,
+      isOutMedical: center?.is_out_medical === true,
     },
     reports,
   });

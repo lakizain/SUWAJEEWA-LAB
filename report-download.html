@@ -17,7 +17,7 @@
     .test-download-item .btn { flex: 0 0 auto; }
     .test-name { margin: 0; font-weight: 600; }
     .pdf-render-area { position: fixed; top: 0; left: -10000px; width: 210mm; pointer-events: none; }
-    .report-page { position: relative; display: flex; flex-direction: column; background: white; width: 210mm; height: 297mm; margin: 24px auto; padding: 0; box-shadow: 0 2px 14px #0002; overflow: hidden; }
+    .report-page { position: relative; display: flex; flex-direction: column; background: white; width: 210mm; height: 297mm; margin: 0; padding: 0; box-shadow: none; overflow: hidden; }
     .letterhead { position: absolute; left: 0; width: 100vw; z-index: 10; }
     .letterhead img { display: block; width: 100%; height: auto; }
     .letterhead-header { top: 0; }
@@ -27,7 +27,7 @@
     .signature-image img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; }
     .signature-line { width: 100%; height: 1px; border-bottom: 1px dashed #000; margin-bottom: 2px; }
     .signature-label { font-size: 14px; font-weight: 500; text-align: center; }
-    .report-container { width: 100%; padding-bottom: 51mm; box-sizing: border-box; }
+    .report-container { width: 100%; padding: 0 20px 51mm; box-sizing: border-box; }
     .content-area { flex: 1 0 auto; }
     .top-space { height: 50mm; }
     .report-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 14px; line-height: 1.4; margin-bottom: 4px; }
@@ -38,21 +38,23 @@
     .label { font-weight: 700; text-transform: uppercase; letter-spacing: .2px; white-space: nowrap; }
     .investigation-line { display: grid; grid-template-columns: 140px 8px 1fr; align-items: baseline; margin-top: 16px; font-size: 14px; line-height: 1.4; }
     .investigation-value { font-weight: 700; }
-    .results { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 1.5px; font-size: 14px; margin-top: 8px; line-height: 1.4; }
-    .results th, .results td { border: none; padding: 3px 6px; vertical-align: top; }
-    .results th { font-weight: 700; text-align: left; }
-    .results td:first-child { font-size: 12px; white-space: nowrap; vertical-align: middle; }
-    .results td:nth-child(2) { padding-left: 0; }
-    .results td:nth-child(2)::before { content: ":"; display: inline-block; width: 10px; text-align: center; margin-right: 6px; }
+    .results-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 1.5px; font-size: 14px; margin-top: 8px; line-height: 1.4; }
+    .results-table th, .results-table td { border: none; padding: 3px 6px; vertical-align: top; }
+    .results-table th { font-weight: 700; text-align: left; }
+    .results-table td:first-child { font-size: 12px; white-space: nowrap; vertical-align: middle; }
+    .results-table td:nth-child(2) { padding-left: 0; }
+    .results-table td:nth-child(2)::before { content: ":"; display: inline-block; width: 10px; text-align: center; margin-right: 6px; }
+    .results-table tr.hide-value-colon td:nth-child(2)::before { content: ""; }
     .remarks { margin-top: 18mm; font-size: 14px; line-height: 1.4; white-space: pre-wrap; }
     .footer-image { width: 100%; margin-top: 12mm; }
     .pdf-render-area .report-page { width: 210mm; height: 297mm; margin: 0; box-shadow: none; }
     .pdf-render-area .letterhead { width: 210mm; }
-    .pdf-render-area .report-container { padding: 0 0 51mm; }
+    .pdf-render-area .report-container { padding: 0 20px 51mm; }
     .pdf-render-area .top-space { height: 50mm; }
     .pdf-render-area .report-info { grid-template-columns: 1fr 1fr; padding: 0; }
     .pdf-render-area .info-col:last-child { margin-left: calc(15mm + 3px); }
-    .pdf-render-area .info-row, .pdf-render-area .info-col:first-child .info-row { grid-template-columns: 140px 8px 1fr; }
+    .pdf-render-area .info-row { grid-template-columns: 180px 8px 1fr; }
+    .pdf-render-area .info-col:first-child .info-row { grid-template-columns: 140px 8px 1fr; }
     @media print {
       @page { size: A4; margin: 0; }
       body { background: white; }
@@ -71,7 +73,7 @@
     @media screen and (max-width: 850px) {
       .pdf-render-area .report-info { grid-template-columns: 1fr 1fr; padding: 0; }
       .pdf-render-area .info-col:last-child { margin-left: calc(15mm + 3px); }
-      .pdf-render-area .report-container { padding: 0 0 51mm; }
+      .pdf-render-area .report-container { padding: 0 20px 51mm; }
       .pdf-render-area .top-space { height: 50mm; }
     }
   </style>

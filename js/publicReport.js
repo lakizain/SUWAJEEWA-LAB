@@ -58,7 +58,6 @@
     const centerValue = bill.isOutMedical ? bill.companyName : bill.centerName;
     const results = report.results || [];
     const hasRemark = results.some((result) => result.remark);
-    const hasUnit = results.some((result) => result.unit);
     return `
       <section class="report-page">
         <div class="letterhead letterhead-header"><img src="Imgs/suwajeewa-header.svg" alt="Suwajeewa Laboratories"></div>
@@ -85,19 +84,17 @@
             <div class="investigation-value">${escapeHtml(report.testName.toUpperCase())}</div>
           </div>
           <div style="margin-top:8px;border-top:1px solid #999"></div>
-          <table class="results">
+          <table class="results-table">
             <thead><tr>
-              <th style="width:35%">INVESTIGATION</th>
-              <th style="width:18%">RESULT</th>
-              ${hasUnit ? '<th style="width:12%">UNIT</th>' : ""}
-              <th style="width:20%">REFERENCE RANGE</th>
-              ${hasRemark ? '<th style="width:15%">REMARK</th>' : ""}
+              <th style="width:${hasRemark ? "44%" : "52%"}">INVESTIGATION</th>
+              <th style="width:${hasRemark ? "24%" : "28%"}">RESULT</th>
+              <th style="width:${hasRemark ? "16%" : "20%"}">UNIT</th>
+              ${hasRemark ? '<th style="width:16%">REMARK</th>' : ""}
             </tr></thead>
-            <tbody>${results.map((result) => `<tr>
+            <tbody>${results.map((result) => `<tr${result.value ? "" : ' class="hide-value-colon"'}>
               <td>${escapeHtml(result.name.toUpperCase())}</td>
               <td>${escapeHtml(result.value)}</td>
-              ${hasUnit ? `<td>${escapeHtml(result.unit)}</td>` : ""}
-              <td>${escapeHtml(result.referenceRange)}</td>
+              <td>${escapeHtml(result.unit)}</td>
               ${hasRemark ? `<td>${escapeHtml(result.remark)}</td>` : ""}
             </tr>`).join("")}</tbody>
           </table>
