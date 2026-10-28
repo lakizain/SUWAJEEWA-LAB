@@ -11,6 +11,7 @@ window.APP_CONFIG = {
   app: {
     name: "SUWAJEEWA LABORATORIES",
     version: "1.0.0",
+    publicReportBaseUrl: "https://suwajeewa-lab.vercel.app/",
     debug: false,
     currency: "LKR",
     dateFormat: "si-LK",

@@ -85,6 +85,11 @@ lab-new/
    - Replace `YOUR_SUPABASE_URL` with your project URL
    - Replace `YOUR_SUPABASE_ANON_KEY` with your anon key
 
+4. **Enable online report QR links**
+   - Set `publicReportBaseUrl` in `config/config.js` to the public HTTPS URL of the deployed website. QR links use this address even when billing is opened locally.
+   - From the linked Supabase project, deploy the report endpoint with `supabase functions deploy public-report`.
+   - Run `database/add_report_qr_access.sql` if the `bills.report_access_token` column has not been added yet.
+
 ### 2. Local Development Setup
 
 1. **Clone/Download the project**

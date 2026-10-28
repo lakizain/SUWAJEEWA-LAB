@@ -73,7 +73,10 @@ class BillingController {
       bill.report_access_token = accessToken;
     }
 
-    const reportUrl = new URL("report-download.html", window.location.href);
+    const reportUrl = new URL(
+      "report-download.html",
+      window.APP_CONFIG.app.publicReportBaseUrl
+    );
     reportUrl.searchParams.set("bill", bill.id);
     reportUrl.searchParams.set("token", accessToken);
 
