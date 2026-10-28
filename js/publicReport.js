@@ -2,8 +2,13 @@
   "use strict";
 
   const state = document.getElementById("state");
-  const content = document.getElementById("report-content");
-  const actions = document.getElementById("report-actions");
+  const patientHeading = document.getElementById("patient-heading");
+  const patientName = document.getElementById("patient-name");
+  const billDate = document.getElementById("bill-date");
+  const reportList = document.getElementById("report-list");
+  const pdfRenderArea = document.getElementById("pdf-render-area");
+  let bill;
+  let reports = [];
   const escapeHtml = (value) =>
     String(value ?? "").replace(/[&<>"']/g, (character) => ({
       "&": "&amp;",
@@ -25,6 +30,24 @@
       bill.ageMonths ? `${bill.ageMonths} MONTHS` : "",
       bill.ageDays ? `${bill.ageDays} DAYS` : "",
     ].filter(Boolean).join(" ");
+  }
+
+  function formatBillDate(value) {
+    if (!value) return "DATE UNAVAILABLE";
+
+    const dateValue = String(value);
+    const date = new Date(
+      /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
+        ? `${dateValue}T00:00:00`
+        : dateValue
+    );
+    if (Number.isNaN(date.getTime())) return "DATE UNAVAILABLE";
+
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   }
 
   function renderReport(bill, report) {
@@ -128,35 +151,59 @@
         return;
       }
 
-      content.innerHTML = data.reports.map((report) => renderReport(data.bill, report)).join("");
+      const fullPatientName = `${data.bill.patientTitle || ""} ${data.bill.patientName || ""}`
+        .trim()
+        .toUpperCase();
+      bill = data.bill;
+      reports = data.reports;
+      patientName.textContent = fullPatientName || "PATIENT REPORTS";
+      billDate.textContent = formatBillDate(bill.billDate);
+      reportList.innerHTML = data.reports.map((report, index) => `
+        <article class="test-download-item">
+          <button class="btn btn-primary" type="button" data-report-index="${index}">
+            Download PDF
+          </button>
+          <h2 class="test-name">${escapeHtml(report.testName)}</h2>
+        </article>`).join("");
       state.classList.add("d-none");
-      actions.classList.remove("d-none");
+      patientHeading.classList.remove("d-none");
     } catch (error) {
       console.error("Could not load the public report:", error);
       showMessage("Unable to connect to the report service. Please try again later.", "danger");
     }
   }
 
-  document.getElementById("download-pdf").addEventListener("click", async () => {
-    const button = document.getElementById("download-pdf");
+  reportList.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-report-index]");
+    if (!button) return;
+
+    const reportIndex = Number(button.dataset.reportIndex);
+    if (!Number.isInteger(reportIndex) || !reports?.[reportIndex]) return;
+
     button.disabled = true;
     button.textContent = "Preparing PDF…";
     try {
+      const pdfReport = renderReport(bill, reports[reportIndex]);
+      pdfRenderArea.innerHTML = pdfReport;
+      const filename = `${reports[reportIndex].testName || "Report"}-${bill.billNo || "Report"}`
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+        .replace(/\s+/g, "-");
       await window.html2pdf()
         .set({
           margin: 0,
-          filename: "Suwajeewa-Report.pdf",
+          filename: `${filename}.pdf`,
           image: { type: "jpeg", quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
           pagebreak: { mode: ["css", "legacy"] },
         })
-        .from(content)
+        .from(pdfRenderArea.firstElementChild)
         .save();
     } catch (error) {
       console.error("Could not generate the report PDF:", error);
-      showMessage("Could not create the PDF. Please use your browser's Print option and choose Save as PDF.", "danger");
+      showMessage("Could not create the PDF. Please try again.", "danger");
     } finally {
+      pdfRenderArea.replaceChildren();
       button.disabled = false;
       button.textContent = "Download PDF";
     }
