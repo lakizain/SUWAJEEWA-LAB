@@ -59,7 +59,7 @@
     const results = report.results || [];
     const hasRemark = results.some((result) => result.remark);
     return `
-      <section class="report-page">
+      <section class="report-page pdf-report">
         <div class="letterhead letterhead-header"><img src="Imgs/suwajeewa-header.svg" alt="Suwajeewa Laboratories"></div>
         <div class="letterhead letterhead-footer"><img src="Imgs/suwajeewa-footer.png" alt=""></div>
         <div class="report-container content-area">
@@ -182,19 +182,42 @@
     try {
       const pdfReport = renderReport(bill, reports[reportIndex]);
       pdfRenderArea.innerHTML = pdfReport;
+      const reportImages = Array.from(pdfRenderArea.querySelectorAll("img"));
+      await Promise.all(reportImages.map((image) => {
+        if (image.complete) {
+          return image.naturalWidth > 0
+            ? Promise.resolve()
+            : Promise.reject(new Error(`Could not load report image: ${image.src}`));
+        }
+        return new Promise((resolve, reject) => {
+          image.addEventListener("load", resolve, { once: true });
+          image.addEventListener("error", () => {
+            reject(new Error(`Could not load report image: ${image.src}`));
+          }, { once: true });
+        });
+      }));
       const filename = `${reports[reportIndex].testName || "Report"}-${bill.billNo || "Report"}`
         .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
         .replace(/\s+/g, "-");
+      const pdfPage = pdfRenderArea.firstElementChild;
+      const pageBounds = pdfPage.getBoundingClientRect();
       await window.html2pdf()
         .set({
           margin: 0,
           filename: `${filename}.pdf`,
           image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: Math.ceil(pageBounds.width),
+            windowHeight: Math.ceil(pageBounds.height),
+          },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
           pagebreak: { mode: ["css", "legacy"] },
         })
-        .from(pdfRenderArea.firstElementChild)
+        .from(pdfPage)
         .save();
     } catch (error) {
       console.error("Could not generate the report PDF:", error);

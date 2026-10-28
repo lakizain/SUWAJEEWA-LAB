@@ -18,7 +18,7 @@
     .test-name { margin: 0; font-weight: 600; }
     .pdf-render-area { position: fixed; top: 0; left: -10000px; width: 210mm; pointer-events: none; }
     .report-page { position: relative; display: flex; flex-direction: column; background: white; width: 210mm; height: 297mm; margin: 0; padding: 0; box-shadow: none; overflow: hidden; }
-    .letterhead { position: absolute; left: 0; width: 100vw; z-index: 10; }
+    .letterhead { position: absolute; left: 0; width: 100%; z-index: 10; }
     .letterhead img { display: block; width: 100%; height: auto; }
     .letterhead-header { top: 0; }
     .letterhead-footer { bottom: 0; }
@@ -47,14 +47,14 @@
     .results-table tr.hide-value-colon td:nth-child(2)::before { content: ""; }
     .remarks { margin-top: 18mm; font-size: 14px; line-height: 1.4; white-space: pre-wrap; }
     .footer-image { width: 100%; margin-top: 12mm; }
-    .pdf-render-area .report-page { width: 210mm; height: 297mm; margin: 0; box-shadow: none; }
-    .pdf-render-area .letterhead { width: 210mm; }
-    .pdf-render-area .report-container { padding: 0 20px 51mm; }
-    .pdf-render-area .top-space { height: 50mm; }
-    .pdf-render-area .report-info { grid-template-columns: 1fr 1fr; padding: 0; }
-    .pdf-render-area .info-col:last-child { margin-left: calc(15mm + 3px); }
-    .pdf-render-area .info-row { grid-template-columns: 180px 8px 1fr; }
-    .pdf-render-area .info-col:first-child .info-row { grid-template-columns: 140px 8px 1fr; }
+    .pdf-report { width: 210mm; height: 297mm; margin: 0; box-shadow: none; }
+    .pdf-report .letterhead { width: 100%; }
+    .pdf-report .report-container { padding: 0 20px 51mm; }
+    .pdf-report .top-space { height: 50mm; }
+    .pdf-report .report-info { grid-template-columns: 1fr 1fr; padding: 0; }
+    .pdf-report .info-col:last-child { margin-left: calc(15mm + 3px); }
+    .pdf-report .info-row { grid-template-columns: 180px 8px 1fr; }
+    .pdf-report .info-col:first-child .info-row { grid-template-columns: 140px 8px 1fr; }
     @media print {
       @page { size: A4; margin: 0; }
       body { background: white; }
@@ -71,10 +71,10 @@
       .info-row, .info-col:first-child .info-row { grid-template-columns: 140px 8px 1fr; }
     }
     @media screen and (max-width: 850px) {
-      .pdf-render-area .report-info { grid-template-columns: 1fr 1fr; padding: 0; }
-      .pdf-render-area .info-col:last-child { margin-left: calc(15mm + 3px); }
-      .pdf-render-area .report-container { padding: 0 20px 51mm; }
-      .pdf-render-area .top-space { height: 50mm; }
+      .pdf-report .report-info { grid-template-columns: 1fr 1fr; padding: 0; }
+      .pdf-report .info-col:last-child { margin-left: calc(15mm + 3px); }
+      .pdf-report .report-container { padding: 0 20px 51mm; }
+      .pdf-report .top-space { height: 50mm; }
     }
   </style>
 </head>
