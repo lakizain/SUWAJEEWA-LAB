@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS centers (
     cid VARCHAR(10) UNIQUE NOT NULL,
     center_name VARCHAR(255) NOT NULL,
     is_active BOOLEAN DEFAULT true,
+    is_out_medical BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -116,6 +117,8 @@ CREATE TABLE IF NOT EXISTS bills (
     center_id UUID REFERENCES centers(id),
     cashier VARCHAR(120),
     patient_phone VARCHAR(20),
+    company_name VARCHAR(255),
+    report_access_token TEXT UNIQUE,
     patient_name VARCHAR(255) NOT NULL,
     patient_title VARCHAR(10),
     patient_age_years INTEGER,

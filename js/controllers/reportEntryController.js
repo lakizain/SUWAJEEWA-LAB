@@ -2718,7 +2718,13 @@ class ReportEntryController {
       .toUpperCase();
     
     const gender = this.safeText(this.genderInput?.value || "").toUpperCase();
-    const centerName = this.safeText(bill.centers?.center_name || "").toUpperCase();
+    const isOutMedicalCenter = bill.centers?.is_out_medical === true;
+    const centerLabel = isOutMedicalCenter ? "COMPANY NAME" : "CENTER";
+    const centerDisplayName = this.safeText(
+      isOutMedicalCenter
+        ? bill.company_name || ""
+        : bill.centers?.center_name || ""
+    ).toUpperCase();
     const commentsRaw = this.commentsResultInput?.value || "";
     const commentsText = this.safeText(commentsRaw).toUpperCase();
     const hasComments = commentsRaw.trim().length > 0;
@@ -2921,7 +2927,7 @@ class ReportEntryController {
                 <div class="row"><div class="label">REQUESTED BY</div><div class="colon">:</div><div>${this.safeText(
                   this.refByInput?.value || ""
                 ).toUpperCase()}</div></div>
-                <div class="row"><div class="label">CENTER</div><div class="colon">:</div><div>${centerName}</div></div>
+                <div class="row"><div class="label">${centerLabel}</div><div class="colon">:</div><div>${centerDisplayName}</div></div>
               </div>
               <div class="info-col">
                 <div class="row"><div class="label">SAMPLE RECEIVED ON</div><div class="colon">:</div><div>${reportDate}</div></div>

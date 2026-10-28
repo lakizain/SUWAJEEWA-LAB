@@ -77,6 +77,8 @@ lab-new/
    - Navigate to SQL Editor
    - Run the contents of `database/setup.sql`
    - This will create all necessary tables, indexes, and sample data
+   - For an existing database, also run `database/add_center_out_medical.sql` to add the Out Medical setting (existing centers default to off)
+   - Also run `database/add_company_name_to_bills.sql` to save Company Name on bills
 
 3. **Update Configuration**
    - Open `config/supabase.js`

@@ -384,6 +384,7 @@ class BillingService {
         center_id: centerId !== "" ? centerId : null,
         cashier: this.getCurrentUser()?.username || null,
         patient_phone: billData.patient_phone,
+        company_name: billData.company_name || null,
         patient_name: billData.patient_name,
         patient_title: billData.patient_title,
         patient_age_years:

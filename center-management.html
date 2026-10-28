@@ -68,6 +68,10 @@
                             <input class="form-check-input" type="checkbox" id="center-active" checked>
                             <label class="form-check-label" for="center-active">Center is Active</label>
                         </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="center-out-medical">
+                            <label class="form-check-label" for="center-out-medical">Provides Out Medical</label>
+                        </div>
                         <div class="d-flex gap-2">
                             <button class="btn btn-primary flex-fill"><i class="bi bi-plus-lg"></i> Create New</button>
                             <button class="btn btn-success flex-fill"><i class="bi bi-save"></i> Save</button>
@@ -93,32 +97,11 @@
                                         <th>Center Name</th>
                                         <th>Contact</th>
                                         <th>Status</th>
+                                        <th>Out Medical</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <!-- Example rows -->
-                                    <tr>
-                                        <td><span class="badge bg-info">CID001</span></td>
-                                        <td><span class="badge bg-secondary fw-bold">MG</span></td>
-                                        <td>
-                                            <span class="fw-bold">MADHIPOLA SUWAJEEWA LAB</span><br>
-                                            <small class="text-muted">123 Main St, Madhipola</small>
-                                        </td>
-                                        <td>
-                                            <small><i class="bi bi-telephone"></i> 037-1234567</small><br>
-                                            <small class="text-muted">Created: 8/3/2025</small>
-                                        </td>
-                                        <td><span class="badge bg-success">Active</span></td>
-                                        <td>
-                                            <button class="btn btn-outline-primary btn-sm"><i
-                                                    class="bi bi-pencil"></i></button>
-                                            <button class="btn btn-outline-danger btn-sm"><i
-                                                    class="bi bi-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <!-- More rows as needed -->
-                                </tbody>
+                                <tbody></tbody>
                             </table>
                         </div>
                     </div>
@@ -146,6 +129,7 @@
                 const addressInput = document.getElementById('center-address');
                 const emailInput = document.getElementById('center-email');
                 const activeInput = document.getElementById('center-active');
+                const outMedicalInput = document.getElementById('center-out-medical');
                 const createBtn = document.querySelector('.btn-primary');
                 const saveBtn = document.querySelector('.btn-success');
                 const deleteBtn = document.querySelector('.btn-danger');
@@ -167,6 +151,7 @@
                     addressInput.value = '';
                     emailInput.value = '';
                     activeInput.checked = true;
+                    outMedicalInput.checked = false;
                     cidInput.value = 'Auto-generated';
                     deleteBtn.disabled = true;
                     saveBtn.innerHTML = '<i class="bi bi-save"></i> Save';
@@ -181,6 +166,7 @@
                     addressInput.value = center.address || '';
                     emailInput.value = center.email || '';
                     activeInput.checked = center.is_active !== false;
+                    outMedicalInput.checked = center.is_out_medical === true;
                     cidInput.value = center.cid;
                     deleteBtn.disabled = false;
                     saveBtn.innerHTML = '<i class="bi bi-save"></i> Update';
@@ -188,7 +174,7 @@
 
                 // Helper: Render center list
                 async function renderCenters(searchTerm = '') {
-                    centerTableBody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+                    centerTableBody.innerHTML = '<tr><td colspan="7">Loading...</td></tr>';
                     let centers = [];
                     try {
                         if (searchTerm) {
@@ -198,11 +184,11 @@
                         }
                     } catch (e) {
                         window.app.showError('Failed to load centers');
-                        centerTableBody.innerHTML = '<tr><td colspan="6">Error loading data</td></tr>';
+                        centerTableBody.innerHTML = '<tr><td colspan="7">Error loading data</td></tr>';
                         return;
                     }
                     if (!centers || centers.length === 0) {
-                        centerTableBody.innerHTML = '<tr><td colspan="6">No centers found</td></tr>';
+                        centerTableBody.innerHTML = '<tr><td colspan="7">No centers found</td></tr>';
                         return;
                     }
                     centerTableBody.innerHTML = '';
@@ -234,6 +220,9 @@
                                 <small class="text-muted">Created: ${window.app.formatDate(center.created_at)}</small>
                             </td>
                             <td>${activeBadge}</td>
+                            <td>${center.is_out_medical === true
+                                ? '<span class="badge bg-success">Yes</span>'
+                                : '<span class="badge bg-secondary">No</span>'}</td>
                             <td>
                                 <button class="btn btn-outline-primary btn-sm edit-btn"><i class="bi bi-pencil"></i></button>
                                 <button class="btn btn-outline-danger btn-sm delete-btn"><i class="bi bi-trash"></i></button>
@@ -281,6 +270,7 @@
                         address: addressInput.value.trim() || null,
                         email: emailInput.value.trim() || null,
                         is_active: activeInput.checked,
+                        is_out_medical: outMedicalInput.checked,
                     };
                     try {
                         if (selectedCenterId) {

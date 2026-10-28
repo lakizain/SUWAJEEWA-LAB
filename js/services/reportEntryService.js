@@ -211,7 +211,7 @@ class ReportEntryService {
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
-          centers (center_name)
+          centers (center_name, is_out_medical)
         `
         )
         .gte("created_at", startOfDay)
@@ -249,7 +249,7 @@ class ReportEntryService {
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
-          centers (center_name)
+          centers (center_name, is_out_medical)
         `
         )
         .gte("bill_date", fromDate)
@@ -287,7 +287,7 @@ class ReportEntryService {
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
-          centers (center_name)
+          centers (center_name, is_out_medical)
         `
         )
         .eq("bill_items.test_id", testId)
@@ -332,7 +332,7 @@ class ReportEntryService {
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
-          centers (center_name)
+          centers (center_name, is_out_medical)
         `
         )
         .eq("center_id", centerId)
@@ -370,7 +370,7 @@ class ReportEntryService {
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
-          centers (center_name)
+          centers (center_name, is_out_medical)
         `
         )
         .or(`bill_no.ilike.%${searchTerm}%,patient_name.ilike.%${searchTerm}%`)
@@ -407,7 +407,7 @@ class ReportEntryService {
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
-          centers (center_name)
+          centers (center_name, is_out_medical)
         `
         )
         .eq("bill_no", billNo);

@@ -47,6 +47,52 @@ class BillingController {
     }
   }
 
+  async createReportQrCode(bill) {
+    if (!bill?.id || !this.billingService?.isSupabaseAvailable()) return "";
+    if (typeof window.QRCode !== "function") {
+      throw new Error("QR code generator is unavailable. Please reload the billing page.");
+    }
+
+    let accessToken = bill.report_access_token;
+    if (!accessToken) {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      accessToken = Array.from(bytes, (byte) =>
+        byte.toString(16).padStart(2, "0")
+      ).join("");
+
+      const { error } = await this.billingService.supabase
+        .from("bills")
+        .update({ report_access_token: accessToken })
+        .eq("id", bill.id);
+      if (error) {
+        console.error("Could not save report access token:", error);
+        throw new Error(
+          "Could not enable report QR access. Apply the report QR database migration and try again."
+        );
+      }
+      bill.report_access_token = accessToken;
+    }
+
+    const reportUrl = new URL("report-download.html", window.location.href);
+    reportUrl.searchParams.set("bill", bill.id);
+    reportUrl.searchParams.set("token", accessToken);
+
+    const qrContainer = document.createElement("div");
+    new window.QRCode(qrContainer, {
+      text: reportUrl.href,
+      width: 120,
+      height: 120,
+      correctLevel: window.QRCode.CorrectLevel.M,
+    });
+
+    const qrCanvas = qrContainer.querySelector("canvas");
+    if (qrCanvas) return qrCanvas.toDataURL("image/png");
+
+    const qrImage = qrContainer.querySelector("img");
+    if (qrImage?.src) return qrImage.src;
+    throw new Error("Failed to generate the report QR code.");
+  }
+
   // Wait for app to be initialized
   waitForApp() {
     return new Promise((resolve) => {
@@ -1237,6 +1283,10 @@ class BillingController {
         : null,
       patient_phone:
         document.getElementById("patient-phone")?.value.trim() || "",
+      company_name:
+        this.isSelectedCenterOutMedical()
+          ? document.getElementById("company-name")?.value.trim() || null
+          : null,
       patient_name: document.getElementById("patient-name")?.value.trim() || "",
       patient_title:
         document.querySelector('select[name="patient_title"]')?.value || "Mr.",
@@ -1299,6 +1349,7 @@ class BillingController {
           const option = document.createElement("option");
           option.value = center.id;
           option.textContent = center.center_name;
+          option.dataset.isOutMedical = center.is_out_medical === true ? "true" : "false";
           dropdown.appendChild(option);
         });
         const user = window.UserCenterAccess?.getCurrentUser();
@@ -1315,8 +1366,10 @@ class BillingController {
             dropdown.innerHTML = "<option value=''>No assigned centers</option>";
           }
         }
+        this.updateCompanyNameVisibility();
       } else {
         dropdown.innerHTML = "<option>No centers found</option>";
+        this.updateCompanyNameVisibility();
       }
     } catch (e) {
       dropdown.innerHTML = "<option>Error loading centers</option>";
@@ -1390,8 +1443,25 @@ class BillingController {
     return null;
   }
 
+  isSelectedCenterOutMedical() {
+    const dropdown = document.getElementById("center-dropdown");
+    return dropdown?.selectedOptions[0]?.dataset.isOutMedical === "true";
+  }
+
+  updateCompanyNameVisibility() {
+    const dropdown = document.getElementById("center-dropdown");
+    const companyNameField = document.getElementById("company-name-field");
+    const companyNameInput = document.getElementById("company-name");
+    if (!dropdown || !companyNameField || !companyNameInput) return;
+
+    const isOutMedical = this.isSelectedCenterOutMedical();
+    companyNameField.classList.toggle("d-none", !isOutMedical);
+    if (!isOutMedical) companyNameInput.value = "";
+  }
+
   async handleCenterChange() {
     const centerId = this.getSelectedCenterId();
+    this.updateCompanyNameVisibility();
     const user = window.UserCenterAccess?.getCurrentUser();
     if (user?.role !== "admin" && !window.UserCenterAccess?.setActiveCenterId(centerId)) {
       throw new Error("You are not assigned to this center");
@@ -1794,6 +1864,7 @@ class BillingController {
       patient_age_days: bill.patient_age_days,
       patient_gender: bill.patient_gender,
       patient_phone: bill.patient_phone,
+      company_name: bill.company_name,
       ref_by: bill.ref_by,
       reference_rid: bill.reference_rid,
       new_referral: bill.new_referral,
@@ -1868,6 +1939,7 @@ class BillingController {
 
       const { bill: resolvedBill, billData, selectedTests, centerInfo } =
         await this.resolvePrintContext(bill, printContext);
+      const reportQrCode = await this.createReportQrCode(resolvedBill);
 
       console.log("Bill data for printing:", billData);
       console.log("Selected tests for printing:", selectedTests);
@@ -1882,13 +1954,15 @@ class BillingController {
         resolvedBill,
         billData,
         selectedTests,
-        centerInfo
+        centerInfo,
+        reportQrCode
       );
       const labBillHTML = this.generateBillHTML(
         resolvedBill,
         billData,
         selectedTests,
-        centerInfo
+        centerInfo,
+        reportQrCode
       );
 
       // Generate PDF with two identical pages
@@ -2037,6 +2111,18 @@ class BillingController {
                 text-align: center !important;
                 font-size: 8px !important;
                 line-height: 1.2 !important;
+              }
+              .report-qr {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 5px !important;
+                margin-top: 4px !important;
+                font-size: 8px !important;
+              }
+              .report-qr img {
+                width: 42px !important;
+                height: 42px !important;
               }
               
               .note-text {
@@ -2220,6 +2306,20 @@ class BillingController {
               font-size: 8px;
               line-height: 1.2;
             }
+
+            .report-qr {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 5px;
+              margin-top: 4px;
+              font-size: 8px;
+            }
+
+            .report-qr img {
+              width: 42px;
+              height: 42px;
+            }
             
             .note-text {
               color: #666;
@@ -2297,7 +2397,6 @@ class BillingController {
       .forEach((input) => {
         input.value = "";
       });
-
     // Specifically clear the new reference field
     const newReferralInput = document.getElementById("new-referral-input");
     if (newReferralInput) {
@@ -2308,6 +2407,7 @@ class BillingController {
     document.querySelectorAll("select").forEach((select) => {
       select.selectedIndex = 0;
     });
+    this.updateCompanyNameVisibility();
 
     // Clear bill items table
     this.clearBillItemsTable();
@@ -2611,6 +2711,10 @@ class BillingController {
     if (bill.patient_phone) {
       document.getElementById("patient-phone").value = bill.patient_phone;
     }
+    const companyNameInput = document.getElementById("company-name");
+    if (companyNameInput) {
+      companyNameInput.value = bill.company_name || "";
+    }
     if (bill.patient_name) {
       document.getElementById("patient-name").value = bill.patient_name;
     }
@@ -2651,6 +2755,7 @@ class BillingController {
       const centerSelect = document.getElementById("center-dropdown");
       if (centerSelect) {
         centerSelect.value = bill.center_id;
+        this.updateCompanyNameVisibility();
       }
     }
     if (bill.ref_by) {
@@ -3270,7 +3375,7 @@ class BillingController {
   }
 
   // Generate bill HTML
-  generateBillHTML(bill, billData, selectedTests, centerInfo) {
+  generateBillHTML(bill, billData, selectedTests, centerInfo, reportQrCode = "") {
     const DEFAULT_CENTER = {
       center_name: "Suwajeewa Laboratories",
       address: "No 62, Akuramboda Road Pallepola, Matale",
@@ -3368,6 +3473,16 @@ class BillingController {
             billData.patient_title ? billData.patient_title + " " : ""
           }${billData.patient_name || ""}</span>
         </div>
+        ${
+          billData.company_name
+            ? `<div class="info-row">
+          <span class="info-label">Company Name :</span>
+          <span class="info-value">${this.escapeHistoryText(
+            billData.company_name
+          )}</span>
+        </div>`
+            : ""
+        }
 
         <div class="info-row">
           <span class="info-label">Age :</span>
@@ -3446,6 +3561,11 @@ class BillingController {
           <div class="software-credit">SOFTWARE BY LAKSHAN SACHINTHA</div>
         </div>
       </div>
+      ${
+        reportQrCode
+          ? `<div class="report-qr"><img src="${reportQrCode}" alt="Scan to view report"><span>Scan to view report</span></div>`
+          : ""
+      }
     `;
 
     return `

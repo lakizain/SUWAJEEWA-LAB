@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Download Laboratory Report - Suwajeewa Laboratories</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f1f5f9; color: #172033; font-family: Arial, sans-serif; }
+    .viewer { max-width: 900px; margin: 36px auto; padding: 24px; }
+    .report-page { position: relative; display: flex; flex-direction: column; background: white; width: 210mm; height: 297mm; margin: 24px auto; padding: 0; box-shadow: 0 2px 14px #0002; overflow: hidden; }
+    .letterhead { position: absolute; left: 0; width: 100vw; z-index: 10; }
+    .letterhead img { display: block; width: 100%; height: auto; }
+    .letterhead-header { top: 0; }
+    .letterhead-footer { bottom: 0; }
+    .signature-section { position: absolute; right: 18mm; bottom: 31mm; display: flex; flex-direction: column; align-items: stretch; width: 32%; z-index: 30; }
+    .signature-image { display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 11mm; margin-bottom: 1mm; overflow: hidden; }
+    .signature-image img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; }
+    .signature-line { width: 100%; height: 1px; border-bottom: 1px dashed #000; margin-bottom: 2px; }
+    .signature-label { font-size: 14px; font-weight: 500; text-align: center; }
+    .report-container { width: 100%; padding-bottom: 51mm; box-sizing: border-box; }
+    .content-area { flex: 1 0 auto; }
+    .top-space { height: 50mm; }
+    .report-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 14px; line-height: 1.4; margin-bottom: 4px; }
+    .info-col { display: grid; grid-auto-rows: min-content; gap: 4px; }
+    .info-col:last-child { margin-left: calc(15mm + 3px); }
+    .info-row { display: grid; grid-template-columns: 180px 8px 1fr; align-items: baseline; }
+    .info-col:first-child .info-row { grid-template-columns: 140px 8px 1fr; }
+    .label { font-weight: 700; text-transform: uppercase; letter-spacing: .2px; white-space: nowrap; }
+    .investigation-line { display: grid; grid-template-columns: 140px 8px 1fr; align-items: baseline; margin-top: 16px; font-size: 14px; line-height: 1.4; }
+    .investigation-value { font-weight: 700; }
+    .results { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 1.5px; font-size: 14px; margin-top: 8px; line-height: 1.4; }
+    .results th, .results td { border: none; padding: 3px 6px; vertical-align: top; }
+    .results th { font-weight: 700; text-align: left; }
+    .results td:first-child { font-size: 12px; white-space: nowrap; vertical-align: middle; }
+    .results td:nth-child(2) { padding-left: 0; }
+    .results td:nth-child(2)::before { content: ":"; display: inline-block; width: 10px; text-align: center; margin-right: 6px; }
+    .remarks { margin-top: 18mm; font-size: 14px; line-height: 1.4; white-space: pre-wrap; }
+    .footer-image { width: 100%; margin-top: 12mm; }
+    @media print {
+      @page { size: A4; margin: 0; }
+      body { background: white; }
+      .viewer { max-width: none; margin: 0; padding: 0; }
+      .no-print { display: none !important; }
+      .report-page { width: 210mm; height: 297mm; min-height: 0; margin: 0; padding: 0; box-shadow: none; overflow: hidden; page-break-after: always; break-after: page; }
+    }
+    @media screen and (max-width: 850px) {
+      .viewer { margin: 12px auto; padding: 12px; }
+      .report-page { width: 100%; min-height: 900px; height: auto; }
+      .top-space { height: 180px; }
+      .report-info { grid-template-columns: 1fr; padding: 0 12px; }
+      .report-container { padding: 0 12px 160px; }
+      .info-col:last-child { margin-left: 0; }
+      .info-row, .info-col:first-child .info-row { grid-template-columns: 140px 8px 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="viewer">
+    <div id="state" class="alert alert-info" role="status">Loading report…</div>
+    <div id="report-actions" class="text-center mb-3 no-print d-none">
+      <button id="download-pdf" class="btn btn-primary">Download PDF</button>
+    </div>
+    <div id="report-content"></div>
+  </main>
+  <script src="config/config.js"></script>
+  <script src="config/supabase.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
+  <script src="js/publicReport.js"></script>
+</body>
+</html>

@@ -90,6 +90,7 @@ class CenterService {
         address: centerData.address || null,
         email: centerData.email || null,
         is_active: centerData.is_active !== undefined ? centerData.is_active : true,
+        is_out_medical: centerData.is_out_medical === true,
       };
 
       const { data: center, error } = await this.supabase
@@ -171,7 +172,7 @@ class CenterService {
       }
 
       const centers = await this.queryCenters({
-        selectClause: "id, center_name, cid",
+        selectClause: "id, center_name, cid, is_out_medical",
         activeOnly: true,
       });
       this._centersDropdownCache = { data: centers || [], ts: now, key: cacheKey };
@@ -195,7 +196,7 @@ class CenterService {
     }
 
     const centers = await this.queryCenters({
-      selectClause: "id, center_name, cid",
+      selectClause: "id, center_name, cid, is_out_medical",
       activeOnly: true,
     });
     this._centersDropdownCache = { data: centers, ts: now, key: cacheKey };

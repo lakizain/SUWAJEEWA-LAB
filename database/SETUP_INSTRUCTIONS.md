@@ -32,6 +32,8 @@ You need to create the database tables in your Supabase project.
    - Click "Run"
    - You should see: "SUCCESS: admin_users table exists!"
 
+For an existing database, run `database/add_center_out_medical.sql` and `database/add_company_name_to_bills.sql` in the SQL Editor to enable Out Medical centers and save Company Name on bills. Existing centers default to Out Medical off.
+
 ### Option 2: Admin Users Only Setup
 
 If you only want to set up the admin users table:
