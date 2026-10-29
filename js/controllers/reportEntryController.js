@@ -164,6 +164,18 @@ class ReportEntryController {
     this.clearReadySelectionBtn = document.getElementById("clearReadySelectionBtn");
     this.readySelectedCountEl = document.getElementById("readySelectedCount");
     this.readySelectAllCheckbox = document.getElementById("readySelectAll");
+    this.readyDownloadOptionsModal = document.getElementById(
+      "readyDownloadOptionsModal"
+    );
+    this.readyDownloadWithSignatureCheckbox = document.getElementById(
+      "readyDownloadWithSignature"
+    );
+    this.readyDownloadWithLetterheadCheckbox = document.getElementById(
+      "readyDownloadWithLetterhead"
+    );
+    this.confirmReadyDownloadBtn = document.getElementById(
+      "confirmReadyDownloadBtn"
+    );
 
     // Summary form elements (order in DOM within Summary tab)
     // 0: Report ID, 1: Bill No, 2: Patient, 3: Age, 4: Gender,
@@ -321,8 +333,24 @@ class ReportEntryController {
     }
     if (this.downloadReadyReportsBtn) {
       this.downloadReadyReportsBtn.addEventListener("click", () =>
-        this.handleDownloadReadyReports()
+        this.openReadyDownloadOptions()
       );
+    }
+    if (this.confirmReadyDownloadBtn) {
+      this.confirmReadyDownloadBtn.addEventListener("click", () => {
+        const options = {
+          includeSignature: Boolean(
+            this.readyDownloadWithSignatureCheckbox?.checked
+          ),
+          includeLetterhead: Boolean(
+            this.readyDownloadWithLetterheadCheckbox?.checked
+          ),
+        };
+        window.bootstrap?.Modal
+          .getOrCreateInstance(this.readyDownloadOptionsModal)
+          .hide();
+        this.handleDownloadReadyReports(options);
+      });
     }
     if (this.clearReadySelectionBtn) {
       this.clearReadySelectionBtn.addEventListener("click", () =>
@@ -891,7 +919,7 @@ class ReportEntryController {
     }
   }
 
-  async handleDownloadReadyReports() {
+  openReadyDownloadOptions() {
     const items = Array.from(this.readySelectionKeys)
       .map((key) => this.readySelectionItems.get(key))
       .filter(Boolean);
@@ -901,7 +929,40 @@ class ReportEntryController {
       return;
     }
 
-    if (typeof window.html2pdf !== "function") {
+    if (typeof window.jspdf?.jsPDF !== "function") {
+      this.showError("PDF generator is unavailable. Please refresh and try again.");
+      return;
+    }
+
+    const modal = window.bootstrap?.Modal;
+    if (
+      !modal ||
+      !this.readyDownloadOptionsModal ||
+      !this.confirmReadyDownloadBtn
+    ) {
+      this.showError("Download options are unavailable. Please refresh and try again.");
+      return;
+    }
+
+    this.confirmReadyDownloadBtn.disabled = false;
+    this.confirmReadyDownloadBtn.textContent = `Download ${items.length} report${items.length === 1 ? "" : "s"}`;
+    modal.getOrCreateInstance(this.readyDownloadOptionsModal).show();
+  }
+
+  async handleDownloadReadyReports(
+    options = { includeSignature: true, includeLetterhead: true }
+  ) {
+    const items = Array.from(this.readySelectionKeys)
+      .map((key) => this.readySelectionItems.get(key))
+      .filter(Boolean);
+
+    if (items.length === 0) {
+      this.showError("Please select at least one test from Ready Reports");
+      return;
+    }
+
+    const JsPDF = window.jspdf?.jsPDF;
+    if (typeof JsPDF !== "function") {
       this.showError("PDF generator is unavailable. Please refresh and try again.");
       return;
     }
@@ -935,15 +996,38 @@ class ReportEntryController {
       specialNotes: this.specialNotesInput?.value ?? "",
       topCategory: this.topCategoryInput?.value ?? "",
       topValue: this.topValueInput?.value ?? "",
+      downloadButtonHTML: this.downloadReadyReportsBtn?.innerHTML ?? "",
     };
 
     if (this.downloadReadyReportsBtn) this.downloadReadyReportsBtn.disabled = true;
+    if (this.confirmReadyDownloadBtn) this.confirmReadyDownloadBtn.disabled = true;
 
     try {
+      const pdf = new JsPDF({
+        unit: "mm",
+        format: "a4",
+        orientation: "portrait",
+        compress: true,
+      });
+      const assets = {};
+      if (options.includeLetterhead) {
+        assets.header = await this.loadPdfImageData("Imgs/suwajeewa-header.svg");
+        assets.footer = await this.loadPdfImageData("Imgs/suwajeewa-footer.png");
+      }
+      if (options.includeSignature) {
+        assets.signature = await this.loadPdfImageData("Imgs/signature.svg");
+      }
+
       let downloadedCount = 0;
       for (const item of items) {
+        if (this.downloadReadyReportsBtn) {
+          this.downloadReadyReportsBtn.textContent =
+            `Preparing ${downloadedCount + 1} of ${items.length}…`;
+        }
         const bill = await this.reportEntryService.getBillByNumber(item.billNo);
-        if (!bill) continue;
+        if (!bill) {
+          throw new Error(`Could not load bill ${item.billNo || ""}`.trim());
+        }
 
         const billItem = bill.bill_items?.find((candidate) =>
           item.billItemId
@@ -951,7 +1035,9 @@ class ReportEntryController {
             : candidate.tests?.test_name === item.testName ||
               candidate.packages?.package_name === item.testName
         );
-        if (!billItem) continue;
+        if (!billItem) {
+          throw new Error(`Could not find the selected test "${item.testName}".`);
+        }
 
         this.selectedBill = bill;
         this.selectedTestItem = billItem;
@@ -959,21 +1045,35 @@ class ReportEntryController {
         await this.renderTestResults(bill, billItem);
         await this.loadReportHeaderForItem(billItem.id);
 
-        const reportHTML = this.generatePrintHTML();
-        const patientName = bill.patient_name || "Patient";
-        const testName =
-          billItem.tests?.test_name || billItem.packages?.package_name || "Test";
-        await this.downloadReportPdf(
+        const reportHTML = this.generatePrintHTML(options);
+        const reportData = await this.loadReportPdfData(
           reportHTML,
-          `${this.sanitizePdfFilenamePart(patientName)}_${this.sanitizePdfFilenamePart(testName)}.pdf`
+          options.includeLetterhead
+        );
+        if (options.includeLetterhead && reportData.footerImage) {
+          assets.reportFooter = await this.loadPdfImageData(reportData.footerImage);
+        } else {
+          delete assets.reportFooter;
+        }
+        this.drawReadyReport(
+          pdf,
+          reportData,
+          assets,
+          options,
+          downloadedCount > 0
         );
         downloadedCount++;
       }
 
-      if (downloadedCount === 0) this.showError("No selected reports could be downloaded");
+      if (downloadedCount === 0) {
+        throw new Error("No selected reports could be downloaded.");
+      }
+      pdf.save(
+        `Selected-Reports-${new Date().toISOString().slice(0, 10)}.pdf`
+      );
     } catch (e) {
       console.error("Failed to download ready reports", e);
-      this.showError("Failed to download reports");
+      this.showError(e?.message || "Failed to download reports");
     } finally {
       this.selectedBill = originalState.bill;
       this.selectedTestItem = originalState.testItem;
@@ -1014,20 +1114,47 @@ class ReportEntryController {
       if (this.specialNotesInput) this.specialNotesInput.value = originalState.specialNotes;
       if (this.topCategoryInput) this.topCategoryInput.value = originalState.topCategory;
       if (this.topValueInput) this.topValueInput.value = originalState.topValue;
+      if (this.downloadReadyReportsBtn) {
+        this.downloadReadyReportsBtn.innerHTML = originalState.downloadButtonHTML;
+      }
+      if (this.confirmReadyDownloadBtn) {
+        this.confirmReadyDownloadBtn.disabled = false;
+      }
       this.updateReadySendControls();
     }
   }
 
-  sanitizePdfFilenamePart(value) {
-    return String(value || "")
-      .trim()
-      .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
-      .replace(/\s+/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^[_.]+|[_.]+$/g, "") || "Report";
+  async loadPdfImageData(source) {
+    const image = new Image();
+    const imageUrl = new URL(source, document.baseURI);
+    if (imageUrl.origin !== window.location.origin) {
+      image.crossOrigin = "anonymous";
+    }
+    image.src = imageUrl.href;
+
+    try {
+      await image.decode();
+    } catch (error) {
+      throw new Error(`Could not load report image: ${imageUrl.href}`, {
+        cause: error,
+      });
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not prepare report image for PDF.");
+    context.drawImage(image, 0, 0);
+
+    return {
+      data: canvas.toDataURL("image/png"),
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    };
   }
 
-  async downloadReportPdf(reportHTML, filename) {
+  async loadReportPdfData(reportHTML, includeLetterhead) {
     const frame = document.createElement("iframe");
     frame.setAttribute("aria-hidden", "true");
     frame.style.position = "fixed";
@@ -1044,39 +1171,264 @@ class ReportEntryController {
         frame.onerror = reject;
         frame.srcdoc = reportHTML;
       });
-
       const reportDocument = frame.contentDocument;
-      const reportPage = reportDocument?.querySelector(".page");
-      if (!reportDocument || !reportPage) {
-        throw new Error("Generated report template is missing its page content");
+      if (!reportDocument?.querySelector(".page")) {
+        throw new Error("Generated report template is missing its page content.");
       }
-
-      if (reportDocument.fonts?.ready) await reportDocument.fonts.ready;
-      await Promise.all(
-        Array.from(reportDocument.images).map((image) =>
-          image.decode().catch(() => undefined)
-        )
+      const images = Array.from(reportDocument.images).filter(
+        (image) =>
+          includeLetterhead || !image.closest(".footer-link-section")
       );
+      await Promise.all(images.map((image) => image.decode()));
 
-      await window
-        .html2pdf()
-        .set({
-          margin: this.shouldIncludeLetterhead() ? [0, 0, 0, 0] : [16, 2, 16, 2],
-          filename,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            allowTaint: false,
-            backgroundColor: "#ffffff",
-          },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-          pagebreak: { mode: ["css", "legacy"], avoid: [".page"] },
-        })
-        .from(reportPage)
-        .save();
+      const readFields = (column) =>
+        Array.from(reportDocument.querySelectorAll(`.info-col:nth-child(${column}) .row`))
+          .map((row) => ({
+            label: row.children[0]?.textContent.trim() || "",
+            value: row.children[2]?.textContent.trim() || "",
+          }));
+      const table = reportDocument.querySelector(".results-table");
+      const headers = Array.from(table?.querySelectorAll("thead th") || [])
+        .map((cell) => cell.textContent.trim().toUpperCase());
+      const results = Array.from(table?.querySelectorAll("tbody tr") || [])
+        .map((row) => Array.from(row.cells).map((cell) => cell.textContent.trim()))
+        .filter((cells) => cells.length >= 2 && !cells[0].includes("No results entered"))
+        .map((cells) => ({
+          name: cells[0] || "",
+          value: cells[1] || "",
+          unit: cells[2] || "",
+          referenceRange: headers.includes("REFERENCE RANGE")
+            ? cells[headers.indexOf("REFERENCE RANGE")] || ""
+            : "",
+          remark: headers.includes("REMARK")
+            ? cells[headers.indexOf("REMARK")] || ""
+            : "",
+        }));
+      const footerImage = includeLetterhead
+        ? reportDocument.querySelector(".footer-link-section img")?.src || ""
+        : "";
+      const comments = reportDocument.querySelector(".remarks")?.textContent
+        .replace(/^\s*COMMENT:\s*/i, "")
+        .trim() || "";
+
+      return {
+        leftFields: readFields(1),
+        rightFields: readFields(2),
+        testName:
+          reportDocument.querySelector(".investigation-value")?.textContent.trim() ||
+          "REPORT",
+        headers,
+        results,
+        footerImage,
+        comments,
+      };
     } finally {
       frame.remove();
+    }
+  }
+
+  drawReadyReport(pdf, report, assets, options, startOnNewPage) {
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const x = 10.5;
+    const headerHeight = options.includeLetterhead
+      ? pageWidth * assets.header.height / assets.header.width
+      : 0;
+    const footerHeight = options.includeLetterhead
+      ? pageWidth * assets.footer.height / assets.footer.width
+      : 0;
+    const footerTop = pageHeight - footerHeight;
+    const hasRemark = report.headers.includes("REMARK");
+    const hasReferenceRange = report.headers.includes("REFERENCE RANGE");
+    const tableWidth = pageWidth - 2 * x;
+    const columnRatios = hasReferenceRange && hasRemark
+      ? [0.32, 0.18, 0.12, 0.21, 0.17]
+      : hasReferenceRange
+        ? [0.42, 0.22, 0.14, 0.22]
+        : hasRemark
+          ? [0.44, 0.24, 0.16, 0.16]
+          : [0.52, 0.28, 0.2];
+    const columnWidths = columnRatios.map((width) => tableWidth * width);
+    const infoY = options.includeLetterhead ? Math.max(57, headerHeight + 10) : 22;
+    const rowGap = 6.3;
+    const investigationY = infoY + 35;
+    const tableY = investigationY + 7;
+    const headerY = tableY + 6;
+    const firstResultY = headerY + 7;
+    const maxRowsPerPage = report.footerImage ? 22 : 28;
+    const pageCount = Math.max(1, Math.ceil(report.results.length / maxRowsPerPage));
+
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+      if (pageIndex > 0 || startOnNewPage) pdf.addPage("a4", "portrait");
+      const start = pageIndex * maxRowsPerPage;
+      const pageResults = report.results.slice(start, start + maxRowsPerPage);
+      const isLastPage = pageIndex === pageCount - 1;
+      const reservedFooterSpace =
+        isLastPage && report.footerImage ? 28 : 0;
+      const resultsBottom = Math.min(
+        footerTop - 8 - reservedFooterSpace,
+        235 - reservedFooterSpace
+      );
+      const resultGap = pageResults.length
+        ? Math.min(6.2, (resultsBottom - firstResultY) / pageResults.length)
+        : 6.2;
+      const fontSize = resultGap < 4.5 ? 7 : resultGap < 5.3 ? 8 : 9.5;
+
+      if (options.includeLetterhead) {
+        pdf.addImage(assets.header.data, "PNG", 0, 0, pageWidth, headerHeight);
+        pdf.addImage(
+          assets.footer.data,
+          "PNG",
+          0,
+          footerTop,
+          pageWidth,
+          footerHeight
+        );
+      }
+
+      pdf.setFontSize(9.5);
+      report.leftFields.forEach(({ label, value }, index) => {
+        this.drawReadyReportField(
+          pdf,
+          label,
+          value,
+          x,
+          infoY + index * rowGap,
+          38,
+          58
+        );
+      });
+      report.rightFields.forEach(({ label, value }, index) => {
+        this.drawReadyReportField(
+          pdf,
+          label,
+          value,
+          121.5,
+          infoY + index * rowGap,
+          49,
+          28
+        );
+      });
+
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("INVESTIGATION", x, investigationY);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(":", 49, investigationY);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(report.testName.toUpperCase(), 52, investigationY, {
+        maxWidth: pageWidth - 2 * x - 42,
+      });
+
+      pdf.setDrawColor(120, 120, 120);
+      pdf.setLineWidth(0.25);
+      pdf.line(x, tableY, pageWidth - x, tableY);
+      pdf.setFontSize(8.5);
+      pdf.setFont("helvetica", "bold");
+      let columnX = x;
+      report.headers.forEach((header, index) => {
+        pdf.text(header, columnX + 1.5, headerY, {
+          maxWidth: columnWidths[index] - 3,
+        });
+        columnX += columnWidths[index];
+      });
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(fontSize);
+      pageResults.forEach((result, index) => {
+        const y = firstResultY + index * resultGap;
+        pdf.text(result.name.toUpperCase(), x + 1.5, y, {
+          maxWidth: columnWidths[0] - 3,
+        });
+        if (result.value) {
+          pdf.text(":", x + columnWidths[0] - 3, y);
+          pdf.text(result.value, x + columnWidths[0], y, {
+            maxWidth: columnWidths[1] - 5,
+          });
+        }
+        pdf.text(result.unit, x + columnWidths[0] + columnWidths[1] + 1.5, y, {
+          maxWidth: columnWidths[2] - 3,
+        });
+        let nextColumnX = x + columnWidths[0] + columnWidths[1] + columnWidths[2];
+        if (hasReferenceRange) {
+          pdf.text(result.referenceRange, nextColumnX + 1.5, y, {
+            maxWidth: columnWidths[3] - 3,
+          });
+          nextColumnX += columnWidths[3];
+        }
+        if (hasRemark) {
+          pdf.text(result.remark, nextColumnX + 1.5, y, {
+            maxWidth: columnWidths[columnWidths.length - 1] - 3,
+          });
+        }
+      });
+
+      let extraContentY = firstResultY + pageResults.length * resultGap + 5;
+      if (isLastPage && assets.reportFooter && extraContentY < footerTop - 10) {
+        const maxHeight = Math.min(22, footerTop - 10 - extraContentY);
+        const imageWidth = Math.min(
+          pageWidth - 2 * x,
+          maxHeight * assets.reportFooter.width / assets.reportFooter.height
+        );
+        const imageHeight =
+          imageWidth * assets.reportFooter.height / assets.reportFooter.width;
+        pdf.addImage(
+          assets.reportFooter.data,
+          "PNG",
+          x,
+          extraContentY,
+          imageWidth,
+          imageHeight
+        );
+        extraContentY += imageHeight + 4;
+      }
+
+      if (isLastPage && report.comments && extraContentY < pageHeight - 55) {
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("COMMENT:", x, extraContentY);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(report.comments.toUpperCase(), x + 24, extraContentY, {
+          maxWidth: pageWidth - 2 * x - 24,
+        });
+      }
+
+      if (isLastPage) {
+        const signatureX = pageWidth - 18 - 67;
+        const signatureY = pageHeight - 49;
+        if (options.includeSignature) {
+          const signatureHeight = 11;
+          const signatureWidth =
+            signatureHeight * assets.signature.width / assets.signature.height;
+          pdf.addImage(
+            assets.signature.data,
+            "PNG",
+            signatureX + (67 - signatureWidth) / 2,
+            signatureY,
+            signatureWidth,
+            signatureHeight
+          );
+        }
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineDashPattern([1, 0.8], 0);
+        pdf.line(signatureX, signatureY + 12, signatureX + 67, signatureY + 12);
+        pdf.setLineDashPattern([], 0);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        pdf.text("Medical Laboratory Technologist", signatureX + 33.5, signatureY + 16, {
+          align: "center",
+        });
+      }
+    }
+  }
+
+  drawReadyReportField(pdf, label, value, x, y, labelWidth, valueWidth) {
+    pdf.setFont("helvetica", "bold");
+    pdf.text(label, x, y, { maxWidth: labelWidth });
+    pdf.setFont("helvetica", "normal");
+    pdf.text(":", x + labelWidth, y);
+    if (value) {
+      pdf.text(value, x + labelWidth + 2, y, { maxWidth: valueWidth });
     }
   }
 
@@ -2685,16 +3037,18 @@ class ReportEntryController {
     return this.generatePrintLayoutHTML(false);
   }
 
-  generatePrintHTML() {
-    return this.generatePrintLayoutHTML(true);
+  generatePrintHTML(options) {
+    return this.generatePrintLayoutHTML(true, options);
   }
 
   // Build a print-ready HTML using a clean template that mirrors the PDF layout
-  generatePrintLayoutHTML(isForPrint) {
+  generatePrintLayoutHTML(isForPrint, options = {}) {
     const bill = this.selectedBill;
     const billItem = this.selectedTestItem;
-    const includeLetterhead = this.shouldIncludeLetterhead();
-    const includeSignature = this.shouldIncludeSignature();
+    const includeLetterhead =
+      options.includeLetterhead ?? this.shouldIncludeLetterhead();
+    const includeSignature =
+      options.includeSignature ?? this.shouldIncludeSignature();
     const now = new Date();
     const reportDate = this.safeText(
       new Date(bill.bill_date).toISOString().split("T")[0]
