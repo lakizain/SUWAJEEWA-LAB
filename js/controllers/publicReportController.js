@@ -5,7 +5,6 @@ class PublicReportController {
     this.patientName = document.getElementById("patient-name");
     this.billDate = document.getElementById("bill-date");
     this.reportList = document.getElementById("report-list");
-    this.pdfRenderArea = document.getElementById("pdf-render-area");
     this.bill = null;
     this.reports = [];
 
@@ -57,63 +56,212 @@ class PublicReportController {
     });
   }
 
-  renderReport(bill, report) {
-    const date = bill.billDate
-      ? new Date(bill.billDate).toISOString().slice(0, 10)
+  async loadImageData(source) {
+    const image = new Image();
+    const imageUrl = new URL(source, document.baseURI);
+    if (imageUrl.origin !== window.location.origin) {
+      image.crossOrigin = "anonymous";
+    }
+
+    image.src = imageUrl.href;
+    try {
+      await image.decode();
+    } catch (error) {
+      throw new Error(`Could not load report image: ${imageUrl.href}`, { cause: error });
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not prepare report image for PDF.");
+    context.drawImage(image, 0, 0);
+
+    return {
+      data: canvas.toDataURL("image/png"),
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    };
+  }
+
+  drawField(pdf, label, value, x, y, labelWidth, valueWidth) {
+    pdf.setFont("helvetica", "bold");
+    pdf.text(label, x, y, { maxWidth: labelWidth });
+    pdf.setFont("helvetica", "normal");
+    pdf.text(":", x + labelWidth, y);
+    if (value) {
+      pdf.text(String(value), x + labelWidth + 2, y, {
+        maxWidth: valueWidth,
+      });
+    }
+  }
+
+  drawReportPage(pdf, bill, report, results, assets, pageIndex, pageCount) {
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const headerHeight = pageWidth * assets.header.height / assets.header.width;
+    const footerHeight = pageWidth * assets.footer.height / assets.footer.width;
+    const footerTop = pageHeight - footerHeight;
+    const x = 10.5;
+    const rightX = 121.5;
+    const rowGap = 6.3;
+    const firstInfoY = 61;
+    const leftFields = [
+      ["NAME", `${bill.patientTitle || ""} ${bill.patientName || ""}`.trim().toUpperCase()],
+      ["AGE", this.formatAge(bill)],
+      ["GENDER", (bill.gender || "").toUpperCase()],
+      ["REQUESTED BY", (bill.requestedBy || "").toUpperCase()],
+      [
+        bill.isOutMedical ? "COMPANY NAME" : "CENTER",
+        String((bill.isOutMedical ? bill.companyName : bill.centerName) || "").toUpperCase(),
+      ],
+    ];
+    const reportDate = bill.billDate
+      ? String(bill.billDate).slice(0, 10)
       : "";
-    const centerLabel = bill.isOutMedical ? "COMPANY NAME" : "CENTER";
-    const centerValue = bill.isOutMedical ? bill.companyName : bill.centerName;
-    const results = report.results || [];
+    const rightFields = [
+      ["SAMPLE RECEIVED ON", reportDate],
+      ["SAMPLE REPORTED ON", new Date().toLocaleTimeString()],
+      ["INV NO", (bill.billNo || "").toUpperCase()],
+      ["SAMPLE TYPE", (report.specimen || "").toUpperCase()],
+    ];
+
+    pdf.addImage(assets.header.data, "PNG", 0, 0, pageWidth, headerHeight);
+    pdf.addImage(assets.footer.data, "PNG", 0, footerTop, pageWidth, footerHeight);
+
+    pdf.setFontSize(9.5);
+    leftFields.forEach(([label, value], index) => {
+      this.drawField(pdf, label, value, x, firstInfoY + index * rowGap, 38, 58);
+    });
+    rightFields.forEach(([label, value], index) => {
+      this.drawField(pdf, label, value, rightX, firstInfoY + index * rowGap, 49, 28);
+    });
+
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("INVESTIGATION", x, 96);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(":", 49, 96);
+    pdf.setFont("helvetica", "bold");
+    pdf.text((report.testName || "REPORT").toUpperCase(), 52, 96, {
+      maxWidth: 145,
+    });
+
     const hasRemark = results.some((result) => result.remark);
-    return `
-      <section class="report-page pdf-report${results.length > 24 ? " compact-results" : ""}">
-        <div class="letterhead letterhead-header"><img src="Imgs/suwajeewa-header.svg" alt="Suwajeewa Laboratories"></div>
-        <div class="letterhead letterhead-footer"><img src="Imgs/suwajeewa-footer.png" alt=""></div>
-        <div class="report-container content-area">
-          <div class="top-space"></div>
-          <div class="report-info">
-            <div class="info-col">
-              <div class="info-row"><div class="label">NAME</div><div>:</div><div>${this.escapeHtml(`${bill.patientTitle || ""} ${bill.patientName || ""}`.trim().toUpperCase())}</div></div>
-              <div class="info-row"><div class="label">AGE</div><div>:</div><div>${this.escapeHtml(this.formatAge(bill))}</div></div>
-              <div class="info-row"><div class="label">GENDER</div><div>:</div><div>${this.escapeHtml(bill.gender || "")}</div></div>
-              <div class="info-row"><div class="label">REQUESTED BY</div><div>:</div><div>${this.escapeHtml(bill.requestedBy || "").toUpperCase()}</div></div>
-              <div class="info-row"><div class="label">${centerLabel}</div><div>:</div><div>${this.escapeHtml(centerValue || "").toUpperCase()}</div></div>
-            </div>
-            <div class="info-col">
-              <div class="info-row"><div class="label">SAMPLE RECEIVED ON</div><div>:</div><div>${this.escapeHtml(date)}</div></div>
-              <div class="info-row"><div class="label">SAMPLE REPORTED ON</div><div>:</div><div>${this.escapeHtml(new Date().toLocaleTimeString())}</div></div>
-              <div class="info-row"><div class="label">INV NO</div><div>:</div><div>${this.escapeHtml(bill.billNo || "").toUpperCase()}</div></div>
-              <div class="info-row"><div class="label">SAMPLE TYPE</div><div>:</div><div>${this.escapeHtml(report.specimen || "").toUpperCase()}</div></div>
-            </div>
-          </div>
-          <div class="investigation-line">
-            <div class="label">INVESTIGATION</div><div>:</div>
-            <div class="investigation-value">${this.escapeHtml((report.testName || "REPORT").toUpperCase())}</div>
-          </div>
-          <div class="report-divider"></div>
-          <table class="results-table">
-            <thead><tr>
-              <th style="width:${hasRemark ? "44%" : "52%"}">INVESTIGATION</th>
-              <th style="width:${hasRemark ? "24%" : "28%"}">RESULT</th>
-              <th style="width:${hasRemark ? "16%" : "20%"}">UNIT</th>
-              ${hasRemark ? '<th style="width:16%">REMARK</th>' : ""}
-            </tr></thead>
-            <tbody>${results.map((result) => `<tr${result.value ? "" : ' class="hide-value-colon"'}>
-              <td>${this.escapeHtml((result.name || "").toUpperCase())}</td>
-              <td>${this.escapeHtml(result.value)}</td>
-              <td>${this.escapeHtml(result.unit)}</td>
-              ${hasRemark ? `<td>${this.escapeHtml(result.remark)}</td>` : ""}
-            </tr>`).join("")}</tbody>
-          </table>
-          ${report.footerImage ? `<div class="footer-image"><img src="${this.escapeHtml(report.footerImage)}" alt=""></div>` : ""}
-          ${report.comments ? `<div class="remarks"><span class="label">COMMENT:</span><span>${this.escapeHtml(report.comments.toUpperCase())}</span></div>` : ""}
-        </div>
-        <div class="signature-section">
-          <div class="signature-image"><img src="Imgs/signature.svg" alt="Authorized signature"></div>
-          <div class="signature-line"></div>
-          <div class="signature-label">Medical Laboratory Technologist</div>
-        </div>
-      </section>`;
+    const tableWidth = pageWidth - 2 * x;
+    const columns = hasRemark
+      ? [tableWidth * 0.44, tableWidth * 0.24, tableWidth * 0.16, tableWidth * 0.16]
+      : [tableWidth * 0.52, tableWidth * 0.28, tableWidth * 0.2];
+    const tableY = 103;
+    const headerY = 109;
+    const firstResultY = 116;
+    const hasReportFooter = pageIndex === pageCount - 1 && assets.reportFooter;
+    const reservedFooterSpace = hasReportFooter ? 28 : 0;
+    const resultsBottom = Math.min(
+      footerTop - 8 - reservedFooterSpace,
+      235 - reservedFooterSpace
+    );
+    const rowGapMm = results.length
+      ? Math.min(6.2, (resultsBottom - firstResultY) / results.length)
+      : 6.2;
+    const rowFontSize = rowGapMm < 4.5 ? 7 : rowGapMm < 5.3 ? 8 : 9.5;
+
+    pdf.setDrawColor(120, 120, 120);
+    pdf.setLineWidth(0.25);
+    pdf.line(x, tableY, pageWidth - x, tableY);
+    pdf.setFontSize(9.5);
+    pdf.setFont("helvetica", "bold");
+    const headers = hasRemark
+      ? ["INVESTIGATION", "RESULT", "UNIT", "REMARK"]
+      : ["INVESTIGATION", "RESULT", "UNIT"];
+    let columnX = x;
+    headers.forEach((header, index) => {
+      pdf.text(header, columnX + 1.5, headerY, {
+        maxWidth: columns[index] - 3,
+      });
+      columnX += columns[index];
+    });
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(rowFontSize);
+    results.forEach((result, index) => {
+      const y = firstResultY + index * rowGapMm;
+      const name = (result.name || "").toUpperCase();
+      const value = String(result.value || "");
+      pdf.text(name, x + 1.5, y, { maxWidth: columns[0] - 3 });
+      if (value) {
+        pdf.text(":", x + columns[0] - 3, y);
+        pdf.text(value, x + columns[0], y, {
+          maxWidth: columns[1] - 5,
+        });
+      }
+      pdf.text(String(result.unit || ""), x + columns[0] + columns[1] + 1.5, y, {
+        maxWidth: columns[2] - 3,
+      });
+      if (hasRemark) {
+        pdf.text(
+          String(result.remark || ""),
+          x + columns[0] + columns[1] + columns[2] + 1.5,
+          y,
+          { maxWidth: columns[3] - 3 }
+        );
+      }
+    });
+
+    let extraContentY = firstResultY + results.length * rowGapMm + 5;
+    if (hasReportFooter && extraContentY < footerTop - 10) {
+      const maxHeight = Math.min(22, footerTop - 10 - extraContentY);
+      const imageWidth = Math.min(
+        pageWidth - 2 * x,
+        maxHeight * assets.reportFooter.width / assets.reportFooter.height
+      );
+      const imageHeight = imageWidth * assets.reportFooter.height / assets.reportFooter.width;
+      pdf.addImage(
+        assets.reportFooter.data,
+        "PNG",
+        x,
+        extraContentY,
+        imageWidth,
+        imageHeight
+      );
+      extraContentY += imageHeight + 4;
+    }
+
+    if (pageIndex === pageCount - 1) {
+      const signatureX = pageWidth - 18 - 67;
+      const signatureY = pageHeight - 49;
+      const signatureHeight = 11;
+      const signatureWidth = signatureHeight * assets.signature.width / assets.signature.height;
+      pdf.addImage(
+        assets.signature.data,
+        "PNG",
+        signatureX + (67 - signatureWidth) / 2,
+        signatureY,
+        signatureWidth,
+        signatureHeight
+      );
+      pdf.setDrawColor(0, 0, 0);
+      pdf.setLineDashPattern([1, 0.8], 0);
+      pdf.line(signatureX, signatureY + 12, signatureX + 67, signatureY + 12);
+      pdf.setLineDashPattern([], 0);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.text("Medical Laboratory Technologist", signatureX + 33.5, signatureY + 16, {
+        align: "center",
+      });
+
+      if (report.comments) {
+        if (extraContentY < signatureY - 5) {
+          pdf.setFontSize(9);
+          pdf.setFont("helvetica", "bold");
+          pdf.text("COMMENT:", x, extraContentY);
+          pdf.setFont("helvetica", "normal");
+          pdf.text(report.comments.toUpperCase(), x + 24, extraContentY, {
+            maxWidth: pageWidth - x * 2 - 24,
+          });
+        }
+      }
+    }
   }
 
   async loadReport() {
@@ -179,23 +327,6 @@ class PublicReportController {
     }
   }
 
-  async waitForReportImages() {
-    const images = Array.from(this.pdfRenderArea.querySelectorAll("img"));
-    await Promise.all(images.map((image) => {
-      if (image.complete) {
-        return image.naturalWidth > 0
-          ? Promise.resolve()
-          : Promise.reject(new Error(`Could not load report image: ${image.src}`));
-      }
-      return new Promise((resolve, reject) => {
-        image.addEventListener("load", resolve, { once: true });
-        image.addEventListener("error", () => {
-          reject(new Error(`Could not load report image: ${image.src}`));
-        }, { once: true });
-      });
-    }));
-  }
-
   async handleReportDownload(event) {
     const button = event.target.closest("[data-report-index]");
     if (!button) return;
@@ -203,7 +334,8 @@ class PublicReportController {
     const reportIndex = Number(button.dataset.reportIndex);
     if (!Number.isInteger(reportIndex) || !this.reports[reportIndex]) return;
 
-    if (typeof window.html2pdf !== "function") {
+    const JsPDF = window.jspdf?.jsPDF;
+    if (typeof JsPDF !== "function") {
       this.showMessage("PDF generation is unavailable. Please reload and try again.", "danger");
       return;
     }
@@ -211,49 +343,40 @@ class PublicReportController {
     button.disabled = true;
     button.textContent = "Preparing PDF…";
     try {
-      this.pdfRenderArea.innerHTML = this.renderReport(
-        this.bill,
-        this.reports[reportIndex]
-      );
-      await this.waitForReportImages();
-
       const report = this.reports[reportIndex];
+      const assets = {
+        header: await this.loadImageData("Imgs/suwajeewa-header.svg"),
+        footer: await this.loadImageData("Imgs/suwajeewa-footer.png"),
+        signature: await this.loadImageData("Imgs/signature.svg"),
+      };
+      if (report.footerImage) {
+        assets.reportFooter = await this.loadImageData(report.footerImage);
+      }
+
+      const pdf = new JsPDF({
+        unit: "mm",
+        format: "a4",
+        orientation: "portrait",
+        compress: true,
+      });
+      const results = report.results || [];
+      const maxRowsPerPage = report.footerImage ? 22 : 30;
+      const pageCount = Math.max(1, Math.ceil(results.length / maxRowsPerPage));
+      for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+        if (pageIndex > 0) pdf.addPage("a4", "portrait");
+        const start = pageIndex * maxRowsPerPage;
+        const pageResults = results.slice(start, start + maxRowsPerPage);
+        this.drawReportPage(pdf, this.bill, report, pageResults, assets, pageIndex, pageCount);
+      }
+
       const filename = `${report.testName || "Report"}-${this.bill.billNo || "Report"}`
         .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
         .replace(/\s+/g, "-");
-      const pdfPage = this.pdfRenderArea.firstElementChild;
-      const pageBounds = pdfPage.getBoundingClientRect();
-      await window.html2pdf()
-        .set({
-          margin: 0,
-          filename: `${filename}.pdf`,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            scrollX: 0,
-            scrollY: 0,
-            windowWidth: Math.ceil(pageBounds.width),
-            windowHeight: Math.ceil(pageBounds.height),
-            onclone: (clonedDocument) => {
-              const clonedRenderArea = clonedDocument.getElementById("pdf-render-area");
-              if (!clonedRenderArea) {
-                throw new Error("The PDF render area could not be prepared.");
-              }
-              clonedRenderArea.style.visibility = "visible";
-              clonedRenderArea.style.zIndex = "1";
-            },
-          },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-          pagebreak: { mode: ["css"] },
-        })
-        .from(pdfPage)
-        .save();
+      pdf.save(`${filename}.pdf`);
     } catch (error) {
       console.error("Could not generate the report PDF:", error);
       this.showMessage("Could not create the PDF. Please try again.", "danger");
     } finally {
-      this.pdfRenderArea.replaceChildren();
       button.disabled = false;
       button.textContent = "Download PDF";
     }

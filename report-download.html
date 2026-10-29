@@ -16,68 +16,14 @@
     .test-download-item { display: flex; align-items: center; gap: 16px; padding: 16px; background: white; border: 1px solid #dbe2ea; border-radius: 8px; }
     .test-download-item .btn { flex: 0 0 auto; }
     .test-name { margin: 0; font-weight: 600; }
-    .pdf-render-area { position: fixed; top: 0; left: 0; z-index: -1; width: 210mm; height: 297mm; visibility: hidden; pointer-events: none; }
-    .report-page { position: relative; display: block; box-sizing: border-box; background: white; width: 210mm; height: 296.5mm; margin: 0; padding: 0; box-shadow: none; overflow: hidden; }
-    .letterhead { position: absolute; left: 0; width: 100%; z-index: 10; }
-    .letterhead img { display: block; width: 100%; height: auto; }
-    .letterhead-header { top: 0; }
-    .letterhead-footer { bottom: 0; }
-    .signature-section { position: absolute; right: 18mm; bottom: 31mm; display: flex; flex-direction: column; align-items: stretch; width: 32%; z-index: 30; }
-    .signature-image { display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 11mm; margin-bottom: 1mm; overflow: hidden; }
-    .signature-image img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; }
-    .signature-line { width: 100%; height: 1px; border-bottom: 1px dashed #000; margin-bottom: 2px; }
-    .signature-label { font-size: 14px; font-weight: 500; text-align: center; }
-    .report-container { width: 100%; padding: 0 20px 51mm; box-sizing: border-box; }
-    .top-space { height: 50mm; }
-    .report-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 14px; line-height: 1.4; margin-bottom: 4px; }
-    .info-col { display: grid; grid-auto-rows: min-content; gap: 4px; }
-    .info-col:last-child { margin-left: calc(15mm + 3px); }
-    .info-row { display: grid; grid-template-columns: 180px 8px 1fr; align-items: baseline; }
-    .info-col:first-child .info-row { grid-template-columns: 140px 8px 1fr; }
-    .label { font-weight: 700; text-transform: uppercase; letter-spacing: .2px; white-space: nowrap; }
-    .investigation-line { display: grid; grid-template-columns: 140px 8px 1fr; align-items: baseline; margin-top: 16px; font-size: 14px; line-height: 1.4; }
-    .investigation-value { font-weight: 700; }
-    .report-divider { margin-top: 8px; border-top: 1px solid #999; }
-    .results-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 0.5px; font-size: 12px; margin-top: 8px; line-height: 1.15; }
-    .results-table th, .results-table td { border: none; padding: 1px 5px; vertical-align: top; }
-    .results-table th { font-weight: 700; text-align: left; }
-    .results-table td:first-child { font-size: 11px; white-space: nowrap; vertical-align: middle; }
-    .results-table td:nth-child(2) { padding-left: 0; }
-    .results-table td:nth-child(2)::before { content: ":"; display: inline-block; width: 10px; text-align: center; margin-right: 6px; }
-    .results-table tr.hide-value-colon td:nth-child(2)::before { content: ""; }
-    .compact-results .results-table { border-spacing: 0; font-size: 10px; line-height: 1.1; }
-    .compact-results .results-table th, .compact-results .results-table td { padding: 1px 4px; }
-    .compact-results .results-table td:first-child { font-size: 9px; }
-    .remarks { margin-top: 18mm; font-size: 14px; line-height: 1.4; white-space: pre-wrap; }
-    .footer-image { width: 100%; margin-top: 12mm; }
-    .pdf-report { width: 210mm; height: 296.5mm; margin: 0; box-shadow: none; }
-    .pdf-report .letterhead { width: 100%; }
-    .pdf-report .report-container { height: 296.5mm; overflow: hidden; padding: 0 20px 51mm; }
-    .pdf-report .top-space { height: 50mm; }
-    .pdf-report .report-info { grid-template-columns: 1fr 1fr; padding: 0; }
-    .pdf-report .info-col:last-child { margin-left: calc(15mm + 3px); }
-    .pdf-report .info-row { grid-template-columns: 180px 8px 1fr; }
-    .pdf-report .info-col:first-child .info-row { grid-template-columns: 140px 8px 1fr; }
     @media print {
       @page { size: A4; margin: 0; }
       body { background: white; }
       .viewer { max-width: none; margin: 0; padding: 0; }
       .no-print { display: none !important; }
-      .report-page { width: 210mm; height: 297mm; min-height: 0; margin: 0; padding: 0; box-shadow: none; overflow: hidden; page-break-after: always; break-after: page; }
     }
     @media screen and (max-width: 850px) {
       .viewer { margin: 12px auto; padding: 12px; }
-      .top-space { height: 180px; }
-      .report-info { grid-template-columns: 1fr; padding: 0 12px; }
-      .report-container { padding: 0 12px 160px; }
-      .info-col:last-child { margin-left: 0; }
-      .info-row, .info-col:first-child .info-row { grid-template-columns: 140px 8px 1fr; }
-    }
-    @media screen and (max-width: 850px) {
-      .pdf-report .report-info { grid-template-columns: 1fr 1fr; padding: 0; }
-      .pdf-report .info-col:last-child { margin-left: calc(15mm + 3px); }
-      .pdf-report .report-container { padding: 0 20px 51mm; }
-      .pdf-report .top-space { height: 50mm; }
     }
   </style>
 </head>
@@ -89,11 +35,10 @@
       <div id="bill-date" class="bill-date"></div>
     </section>
     <div id="report-list" class="test-download-list"></div>
-    <div id="pdf-render-area" class="pdf-render-area" aria-hidden="true"></div>
   </main>
   <script src="config/config.js"></script>
   <script src="config/supabase.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="js/controllers/publicReportController.js"></script>
 </body>
 </html>
