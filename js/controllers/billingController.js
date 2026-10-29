@@ -2117,6 +2117,7 @@ class BillingController {
               }
               .report-qr {
                 display: flex !important;
+                flex-direction: column !important;
                 align-items: center !important;
                 justify-content: center !important;
                 gap: 5px !important;
@@ -2124,8 +2125,8 @@ class BillingController {
                 font-size: 8px !important;
               }
               .report-qr img {
-                width: 42px !important;
-                height: 42px !important;
+                width: 52px !important;
+                height: 52px !important;
               }
               
               .note-text {
@@ -2312,6 +2313,7 @@ class BillingController {
 
             .report-qr {
               display: flex;
+              flex-direction: column;
               align-items: center;
               justify-content: center;
               gap: 5px;
@@ -2320,8 +2322,8 @@ class BillingController {
             }
 
             .report-qr img {
-              width: 42px;
-              height: 42px;
+              width: 52px;
+              height: 52px;
             }
             
             .note-text {
