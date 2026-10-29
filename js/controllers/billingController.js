@@ -2002,7 +2002,7 @@ class BillingController {
                 padding: 2px; 
                 background: white !important;
                 color: black !important;
-                overflow: hidden !important;
+                overflow: visible !important;
                 font-size: 12px !important;
                 line-height: 1.3 !important;
               }
@@ -2015,7 +2015,7 @@ class BillingController {
                 overflow: visible !important;
                 width: 8cm !important;
                 max-width: 8cm !important;
-                height: 15cm !important;
+                height: auto !important;
                 margin: 0 !important;
                 padding: 0 !important;
               }
@@ -2146,7 +2146,7 @@ class BillingController {
               }
               
               @page {
-                size: 8cm 15cm;
+                size: 80mm auto;
                 margin: 0;
               }
               
@@ -2169,7 +2169,7 @@ class BillingController {
             .bill-container {
               max-width: 8cm;
               width: 8cm;
-              height: 15cm;
+              height: auto;
               margin: 0 auto;
               background: white;
               page-break-inside: avoid;
@@ -3587,7 +3587,7 @@ class BillingController {
               padding: 2px; 
               background: white !important;
               color: black !important;
-              overflow: hidden !important;
+              overflow: visible !important;
               font-size: 12px !important;
               line-height: 1.3 !important;
             }
