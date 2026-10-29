@@ -2125,8 +2125,8 @@ class BillingController {
                 font-size: 8px !important;
               }
               .report-qr img {
-                width: 52px !important;
-                height: 52px !important;
+                width: 70px !important;
+                height: 70px !important;
               }
               
               .note-text {
@@ -2322,8 +2322,8 @@ class BillingController {
             }
 
             .report-qr img {
-              width: 52px;
-              height: 52px;
+              width: 70px;
+              height: 70px;
             }
             
             .note-text {
