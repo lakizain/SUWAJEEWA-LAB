@@ -1607,6 +1607,33 @@ class ReportEntryController {
           this._autoCalcLock = false;
         }
       },
+      // 456fc82b...: ROW3 = ROW1 + 0.8 * (4.0 - ROW2)
+      "456fc82b-5031-46b4-9143-ad38ee788100": (inputs) => {
+        const parse = (el) => {
+          const raw = (el?.value || "").trim();
+          const n = raw === "" ? null : Number(raw);
+          return Number.isNaN(n) ? null : n;
+        };
+
+        if (!Array.isArray(inputs) || inputs.length < 3) return;
+
+        const i1 = 0, i2 = 1, i3 = 2;
+        const v1 = parse(inputs[i1]);
+        const v2 = parse(inputs[i2]);
+
+        if (this._autoCalcLock) return;
+        this._autoCalcLock = true;
+        try {
+          const r3 = v1 == null || v2 == null ? null : v1 + 0.8 * (4.0 - v2);
+          if (inputs[i3]) inputs[i3].value = this.formatValueForInput(r3);
+
+          if (inputs[i3]) {
+            inputs[i3].dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        } finally {
+          this._autoCalcLock = false;
+        }
+      },
       // 3b5166cc...: BMI test — ROW1=Age, ROW2=Height, ROW3=Weight; ROW4=BMI; ROW5=Ideal Weight Range
       "3b5166cc-755f-433e-833c-7e8c746c13ce": (inputs) => {
         const parse = (el) => {
@@ -1678,6 +1705,7 @@ class ReportEntryController {
       "9517c4cb-95fa-4aa5-86bd-2babfe6d59ce": [0, 1],
       "ebc9b307-ba15-4c2d-912b-7b82a179afe9": [0, 1],
       "3b5166cc-755f-433e-833c-7e8c746c13ce": [1, 2],
+      "456fc82b-5031-46b4-9143-ad38ee788100": [0, 1],
     };
 
     // Recalculate when source rows change
@@ -1696,6 +1724,7 @@ class ReportEntryController {
       "9517c4cb-95fa-4aa5-86bd-2babfe6d59ce": [2, 3],     // rows 3,4
       "ebc9b307-ba15-4c2d-912b-7b82a179afe9": [2, 3],     // rows 3,4
       "3b5166cc-755f-433e-833c-7e8c746c13ce": [3, 4],     // rows 4,5: BMI, Ideal Weight Range
+      "456fc82b-5031-46b4-9143-ad38ee788100": [2],        // row 3
     };
 
     const outputs = outputsByTest[testId] || [];
