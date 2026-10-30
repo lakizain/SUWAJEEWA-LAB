@@ -233,14 +233,19 @@ class AdminUsersService {
     try {
       if (permanent) {
         // Permanently delete user
-        const { error } = await this.supabase
+        const { data, error } = await this.supabase
           .from('admin_users')
           .delete()
-          .eq('id', userId);
+          .eq('id', userId)
+          .select('id')
+          .maybeSingle();
 
         if (error) {
           console.error('Error deleting admin user:', error);
           throw error;
+        }
+        if (!data) {
+          throw new Error('User was not found or could not be permanently deleted.');
         }
       } else {
         // Deactivate user

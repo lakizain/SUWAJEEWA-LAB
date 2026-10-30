@@ -141,6 +141,8 @@
       const deactivateButton = active
         ? '<button class="btn danger" data-action="deactivate" data-id="' + u.id + '">Deactivate</button>'
         : '<button class="btn danger" disabled>Deactivated</button>';
+      const deleteButton =
+        '<button class="btn danger" data-action="delete" data-id="' + u.id + '">Delete permanently</button>';
       return (
         '<tr>' +
           '<td>' + (u.username || '') + '</td>' +
@@ -151,6 +153,7 @@
           '<td class="actions">' +
             '<button class="btn secondary" data-action="edit" data-id="' + u.id + '">Edit</button>' +
             deactivateButton +
+            deleteButton +
           '</td>' +
         '</tr>'
       );
@@ -378,6 +381,30 @@
         // Re-enable button
         target.disabled = false;
         target.textContent = 'Deactivate';
+      }
+    } else if (action === 'delete') {
+      const userRow = target.closest('tr');
+      const username = userRow ? userRow.cells[0].textContent.trim() : 'this user';
+
+      if (!confirm(`Permanently delete "${username}"?\n\nThis cannot be undone. The user account and its center assignments will be removed.`)) {
+        return;
+      }
+
+      target.disabled = true;
+      target.textContent = 'Deleting...';
+
+      try {
+        await state.adminUsersService.deleteUser(id, true);
+        await fetchUsers();
+        setStatus(`User "${username}" was permanently deleted`);
+        setTimeout(() => setStatus(''), 3000);
+      } catch (error) {
+        console.error('Error permanently deleting user:', error);
+        alert('Failed to permanently delete user: ' + error.message);
+        setStatus('Error: Failed to permanently delete user');
+      } finally {
+        target.disabled = false;
+        target.textContent = 'Delete permanently';
       }
     }
   }

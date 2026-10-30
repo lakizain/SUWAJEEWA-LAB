@@ -3445,9 +3445,9 @@ class ReportEntryController {
     // Format age to use YEARS, MONTHS, DAYS instead of y, m, d
     const ageRaw = this.safeText(this.ageInput?.value || "");
     const formattedAge = ageRaw
-      .replace(/(\d+)y/g, "$1 YEARS")
-      .replace(/(\d+)m/g, "$1 MONTHS")
-      .replace(/(\d+)d/g, "$1 DAYS")
+      .replace(/(\d+)y/g, (_, value) => `${value.padStart(2, "0")} YEARS`)
+      .replace(/(\d+)m/g, (_, value) => `${value.padStart(2, "0")} MONTHS`)
+      .replace(/(\d+)d/g, (_, value) => `${value.padStart(2, "0")} DAYS`)
       .toUpperCase();
     
     const gender = this.safeText(this.genderInput?.value || "").toUpperCase();
