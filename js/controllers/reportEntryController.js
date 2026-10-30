@@ -38,6 +38,7 @@ class ReportEntryController {
     this.selectedTestItem = null;
     this.billListRequestId = 0;
     this.billSearchRequestId = 0;
+    this.activeBillSuggestionIndex = -1;
     this.copiedTestResults = null;
     this.isLoading = false;
     this.testsIndexByName = new Map();
@@ -91,9 +92,6 @@ class ReportEntryController {
     // Search panel elements
     this.dateFromInput = document.getElementById("dateFrom");
     this.dateToInput = document.getElementById("dateTo");
-    this.findBtn = document.querySelector(
-      "#reportSearchBtn"
-    );
     this.resetReportFiltersBtn = document.getElementById(
       "resetReportFiltersBtn"
     );
@@ -211,12 +209,17 @@ class ReportEntryController {
   }
 
   bindEvents() {
-    // Date range search
-    if (this.findBtn) {
-      this.findBtn.addEventListener("click", () =>
-        this.handleDateRangeSearch()
-      );
-    }
+    // Apply the date filter as soon as both selected dates are available.
+    const queueDateRangeSearch = this.debounce(
+      () => this.handleDateRangeSearch(),
+      200
+    );
+    [this.dateFromInput, this.dateToInput].forEach((input) => {
+      input?.addEventListener("change", () => {
+        this.billListRequestId++;
+        queueDateRangeSearch();
+      });
+    });
     this.resetReportFiltersBtn?.addEventListener("click", () =>
       this.resetReportFilters()
     );
@@ -265,18 +268,40 @@ class ReportEntryController {
       this.billSearchInput.addEventListener("focus", () =>
         this.showSuggestions()
       );
-      this.billSearchInput.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") {
+      this.billSearchInput.addEventListener("keydown", (e) => {
+        const suggestions = Array.from(
+          this.billSuggestions?.querySelectorAll('button[role="option"]') || []
+        );
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
           e.preventDefault();
+          if (!suggestions.length) return;
+          const direction = e.key === "ArrowDown" ? 1 : -1;
+          const nextIndex =
+            this.activeBillSuggestionIndex === -1
+              ? direction === 1
+                ? 0
+                : suggestions.length - 1
+              : (this.activeBillSuggestionIndex + direction + suggestions.length) %
+                suggestions.length;
+          this.setActiveBillSuggestion(nextIndex);
+          return;
+        }
+        if (e.key === "Escape") {
+          this.hideSuggestions();
+          return;
+        }
+        if (e.key === "Enter") {
+          const selectedSuggestion =
+            suggestions[this.activeBillSuggestionIndex] || suggestions[0];
+          if (selectedSuggestion) {
+            e.preventDefault();
+            selectedSuggestion.click();
+            return;
+          }
           const billNo = this.billSearchInput.value.trim();
           if (billNo) {
-            const firstSuggestion =
-              this.billSuggestions?.querySelector('button[role="option"]');
-            if (firstSuggestion) {
-              firstSuggestion.click();
-            } else {
-              this.selectBillFromSearch(billNo);
-            }
+            e.preventDefault();
+            this.selectBillFromSearch(billNo);
           }
         }
       });
@@ -2174,16 +2199,21 @@ class ReportEntryController {
       `tr[data-subcategory-id="${current.id}"]`
     );
     const valueInput = row?.querySelector("td:nth-child(2) input");
-    if (valueInput) valueInput.value = value;
+    const nextIndex = findNextVisibleNonEmptyIndex(currentIndex + 1);
+    const preserveFinalValue =
+      nextIndex >= this.currentSubcategories.length &&
+      !value &&
+      (valueInput?.value || "").trim();
 
-    // Trigger remark update if wired
-    valueInput?.dispatchEvent(new Event("input", { bubbles: true }));
+    if (valueInput && !preserveFinalValue) {
+      valueInput.value = value;
+      valueInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
 
     // Clear top value field
     if (this.topValueInput) this.topValueInput.value = "";
 
     // Advance to the next non-empty category
-    const nextIndex = findNextVisibleNonEmptyIndex(currentIndex + 1);
     if (nextIndex < this.currentSubcategories.length) {
       this.currentSubcategoryIndex = nextIndex;
       const next = this.currentSubcategories[nextIndex];
@@ -2762,6 +2792,7 @@ class ReportEntryController {
     if (!this.billSuggestions) return;
 
     this.billSuggestions.innerHTML = "";
+    this.activeBillSuggestionIndex = -1;
 
     if (!bills.length) {
       const emptyState = document.createElement("div");
@@ -2769,11 +2800,13 @@ class ReportEntryController {
       emptyState.textContent = "No matching bills found";
       this.billSuggestions.appendChild(emptyState);
     } else {
-      bills.slice(0, 8).forEach((bill) => {
+      bills.slice(0, 8).forEach((bill, index) => {
         const item = document.createElement("button");
         item.type = "button";
         item.className = "list-group-item list-group-item-action";
+        item.id = `bill-suggestion-${index}`;
         item.setAttribute("role", "option");
+        item.setAttribute("aria-selected", "false");
         item.innerHTML = `
           <div class="d-flex w-100 justify-content-between">
             <strong>${this.safeText(bill.bill_no)}</strong>
@@ -2800,22 +2833,42 @@ class ReportEntryController {
 
     this.billSuggestions.style.display = "block";
     this.billSearchInput?.setAttribute("aria-expanded", "true");
-    this.setResultsHeaderVisible(false);
   }
 
   showSuggestions() {
     if (this.billSuggestions && this.billSuggestions.children.length > 0) {
       this.billSuggestions.style.display = "block";
       this.billSearchInput?.setAttribute("aria-expanded", "true");
-      this.setResultsHeaderVisible(false);
     }
+  }
+
+  setActiveBillSuggestion(index) {
+    const suggestions = Array.from(
+      this.billSuggestions?.querySelectorAll('button[role="option"]') || []
+    );
+    if (!suggestions.length) return;
+
+    this.activeBillSuggestionIndex =
+      (index + suggestions.length) % suggestions.length;
+    suggestions.forEach((suggestion, suggestionIndex) => {
+      const isActive = suggestionIndex === this.activeBillSuggestionIndex;
+      suggestion.setAttribute("aria-selected", String(isActive));
+      if (isActive) {
+        this.billSearchInput?.setAttribute(
+          "aria-activedescendant",
+          suggestion.id
+        );
+        suggestion.scrollIntoView({ block: "nearest" });
+      }
+    });
   }
 
   hideSuggestions() {
     if (this.billSuggestions) {
       this.billSuggestions.style.display = "none";
+      this.activeBillSuggestionIndex = -1;
       this.billSearchInput?.setAttribute("aria-expanded", "false");
-      this.setResultsHeaderVisible(true);
+      this.billSearchInput?.removeAttribute("aria-activedescendant");
     }
   }
 
@@ -2850,15 +2903,6 @@ class ReportEntryController {
   }
 
   // Show/hide the right-panel results table header (Bill No. / Patient / Test)
-  setResultsHeaderVisible(visible) {
-    if (this.resultsTableHead)
-      this.resultsTableHead.style.visibility = visible ? "visible" : "hidden";
-    if (this.resultsTableHeadReady)
-      this.resultsTableHeadReady.style.visibility = visible
-        ? "visible"
-        : "hidden";
-  }
-
   handleUpdate() {
     if (!this.selectedBill) {
       this.showError("Please select a bill first");
@@ -4329,13 +4373,6 @@ class ReportEntryController {
 
   setLoading(loading) {
     this.isLoading = loading;
-    if (this.findBtn) {
-      this.findBtn.disabled = loading;
-      this.findBtn.setAttribute("aria-busy", String(loading));
-      this.findBtn.innerHTML = loading
-        ? '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Loading'
-        : "Find";
-    }
   }
 
   setSearchStatus(message, state = "idle") {

@@ -7,6 +7,7 @@
     centerService: null,
     editingUserId: null,
     isEditMode: false,
+    billsRequestId: 0,
   };
 
   function $(id) { return document.getElementById(id); }
@@ -74,14 +75,17 @@
 
       const billsCenterFilter = $('bills-center-filter');
       if (billsCenterFilter) {
-        billsCenterFilter.innerHTML = '<option value="">All Centers</option>';
+        const user = window.UserCenterAccess?.getCurrentUser();
+        const allCentersLabel =
+          user?.role === 'admin' ? 'All Centers' : 'All Assigned Centers';
+        billsCenterFilter.innerHTML =
+          `<option value="">${allCentersLabel}</option>`;
         centers.forEach(center => {
           const option = document.createElement('option');
           option.value = center.id;
           option.textContent = center.center_name;
           billsCenterFilter.appendChild(option);
         });
-        const user = window.UserCenterAccess?.getCurrentUser();
         const activeCenterId =
           window.UserCenterAccess?.getActiveCenterId(user);
         const defaultCenterId =
@@ -366,7 +370,15 @@
     if (!body) return;
     
     if (!bills || bills.length === 0) {
-      body.innerHTML = '<tr><td colspan="8" class="empty"><i class="fas fa-info-circle"></i><div>No bills found</div></td></tr>';
+      const emptyMessage = getCurrentBillsSearchTerm()
+        ? 'No matching bills found'
+        : 'No bills found for this center';
+      body.innerHTML = `<tr><td colspan="9" class="empty"><i class="fas fa-info-circle"></i><div>${emptyMessage}</div></td></tr>`;
+      const counter = $('bills-search-results-counter');
+      if (counter) {
+        counter.style.display = 'block';
+        counter.textContent = 'Showing 0 bills';
+      }
       return;
     }
     
@@ -391,17 +403,18 @@
       
       return (
         '<tr>' +
-          '<td>' + (bill.bill_no || '') + '</td>' +
-          '<td>' + (bill.patient_name || '') + '</td>' +
-          '<td>' + billDate + '</td>' +
-          '<td>' + (bill.patient_gender || '') + '</td>' +
-          '<td>' + testsDisplay + '</td>' +
+          '<td>' + escapeHtml(bill.bill_no || '') + '</td>' +
+          '<td>' + escapeHtml(bill.patient_name || '') + '</td>' +
+          '<td>' + escapeHtml(billDate) + '</td>' +
+          '<td><strong>' + escapeHtml(bill.centers?.center_name || 'Unknown center') + '</strong></td>' +
+          '<td>' + escapeHtml(bill.patient_gender || '') + '</td>' +
+          '<td>' + escapeHtml(testsDisplay) + '</td>' +
           '<td class="amount">' + paidAmount + '</td>' +
           '<td class="' + remainingClass + '">' + remainingAmount + '</td>' +
           '<td class="actions">' +
-            '<button class="btn view" data-action="view-bill" data-id="' + bill.id + '">View</button>' +
-            '<button class="btn print" data-action="print-bill" data-id="' + bill.id + '">Print</button>' +
-            '<button class="btn delete" data-action="delete-bill" data-id="' + bill.id + '" data-bill-no="' + (bill.bill_no || '') + '">Delete</button>' +
+            '<button class="btn view" data-action="view-bill" data-id="' + escapeHtml(bill.id) + '">View</button>' +
+            '<button class="btn print" data-action="print-bill" data-id="' + escapeHtml(bill.id) + '">Print</button>' +
+            '<button class="btn delete" data-action="delete-bill" data-id="' + escapeHtml(bill.id) + '" data-bill-no="' + escapeHtml(bill.bill_no || '') + '">Delete</button>' +
           '</td>' +
         '</tr>'
       );
@@ -413,33 +426,100 @@
     const counter = $('bills-search-results-counter');
     if (counter) {
       counter.style.display = 'block';
-      counter.textContent = `Found ${bills.length} result(s)`;
+      counter.textContent = `Showing ${bills.length} bill(s)`;
     }
   }
-  
+
+  function setBillsSearchStatus(message, stateName = 'info') {
+    const status = $('bills-search-status');
+    if (!status) return;
+    status.textContent = message || '';
+    status.dataset.state = stateName;
+    status.classList.toggle('text-danger', stateName === 'error');
+    status.classList.toggle('text-success', stateName === 'success');
+  }
+
+  function renderBillsMessage(message, stateName = 'info') {
+    const body = $('billsHistoryBody');
+    if (!body) return;
+    const icon =
+      stateName === 'loading'
+        ? '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i>'
+        : stateName === 'error'
+          ? '<i class="fas fa-triangle-exclamation" aria-hidden="true"></i>'
+          : '<i class="fas fa-info-circle" aria-hidden="true"></i>';
+    body.innerHTML =
+      `<tr><td colspan="9" class="empty">${icon}<div>${escapeHtml(message)}</div></td></tr>`;
+    const counter = $('bills-search-results-counter');
+    if (counter) counter.style.display = 'none';
+  }
+
+  function getCurrentBillsSearchTerm() {
+    return $('bills-search-input')?.value.trim() || '';
+  }
+
+  function reloadBillsForCurrentFilters() {
+    const searchTerm = getCurrentBillsSearchTerm();
+    return searchTerm ? searchBills(searchTerm) : fetchBills();
+  }
+
   async function fetchBills() {
+    const requestId = ++state.billsRequestId;
+    const centerId = $('bills-center-filter')?.value || null;
     try {
-      if (!state.adminBillsService) return;
-      
-      const centerId = $('bills-center-filter')?.value || null;
+      if (!state.adminBillsService) {
+        throw new Error('Bills service is unavailable.');
+      }
+
+      renderBillsMessage('Loading bills...', 'loading');
+      setBillsSearchStatus('Loading recent bills...', 'loading');
       const bills = await state.adminBillsService.getAllRecentBills(50, centerId);
+      if (
+        requestId !== state.billsRequestId ||
+        centerId !== ($('bills-center-filter')?.value || null)
+      ) return;
       renderBills(bills);
+      setBillsSearchStatus(
+        bills.length ? 'Recent bills loaded.' : 'No bills found for this center.',
+        'success'
+      );
     } catch (error) {
       console.error('Error fetching bills:', error);
-      renderBills([]);
+      if (requestId !== state.billsRequestId) return;
+      const errorMessage = error.message || 'Unknown database error.';
+      renderBillsMessage(`Could not load bills: ${errorMessage}`, 'error');
+      setBillsSearchStatus(errorMessage, 'error');
     }
   }
   
   async function searchBills(searchTerm) {
+    const requestId = ++state.billsRequestId;
+    const centerId = $('bills-center-filter')?.value || null;
     try {
-      if (!state.adminBillsService) return;
-      
-      const centerId = $('bills-center-filter')?.value || null;
+      if (!state.adminBillsService) {
+        throw new Error('Bills service is unavailable.');
+      }
+
+      renderBillsMessage('Searching bills and patient history...', 'loading');
+      setBillsSearchStatus('Searching...', 'loading');
       const bills = await state.adminBillsService.searchBills(searchTerm, centerId);
+      if (
+        requestId !== state.billsRequestId ||
+        centerId !== ($('bills-center-filter')?.value || null) ||
+        searchTerm !== getCurrentBillsSearchTerm()
+      ) return;
       renderBills(bills);
+      setBillsSearchStatus(
+        bills.length
+          ? `Found ${bills.length} matching bill(s).`
+          : 'No bills or patient history matched that search.',
+        bills.length ? 'success' : 'info'
+      );
     } catch (error) {
       console.error('Error searching bills:', error);
-      renderBills([]);
+      if (requestId !== state.billsRequestId) return;
+      renderBillsMessage('Could not search bills. Please try again.', 'error');
+      setBillsSearchStatus(error.message || 'Failed to search bills.', 'error');
     }
   }
   
@@ -555,17 +635,19 @@
   function setupBillsEventListeners() {
     // Search functionality
     const searchInput = $('bills-search-input');
+    let searchTimeout;
     if (searchInput) {
-      let searchTimeout;
       searchInput.addEventListener('input', function() {
+        state.billsRequestId++;
         clearTimeout(searchTimeout);
+        const searchTerm = this.value.trim();
+        if (!searchTerm) {
+          fetchBills();
+          return;
+        }
+        setBillsSearchStatus('Waiting to search...', 'loading');
         searchTimeout = setTimeout(() => {
-          const searchTerm = this.value.trim();
-          if (searchTerm) {
-            searchBills(searchTerm);
-          } else {
-            fetchBills();
-          }
+          searchBills(searchTerm);
         }, 300);
       });
     }
@@ -576,11 +658,9 @@
       clearBtn.addEventListener('click', function() {
         if (searchInput) {
           searchInput.value = '';
+          state.billsRequestId++;
+          clearTimeout(searchTimeout);
           fetchBills();
-          const counter = $('bills-search-results-counter');
-          if (counter) {
-            counter.style.display = 'none';
-          }
         }
       });
     }
@@ -589,28 +669,31 @@
     const refreshBtn = $('btn-refresh-bills');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', function() {
-        fetchBills();
-        if (searchInput) {
-          searchInput.value = '';
-          const counter = $('bills-search-results-counter');
-          if (counter) {
-            counter.style.display = 'none';
-          }
-        }
+        clearTimeout(searchTimeout);
+        reloadBillsForCurrentFilters();
       });
     }
 
     const centerFilter = $('bills-center-filter');
     if (centerFilter) {
       centerFilter.addEventListener('change', function() {
-        const searchTerm = searchInput ? searchInput.value.trim() : '';
-        if (searchTerm) {
-          searchBills(searchTerm);
-        } else {
-          fetchBills();
+        clearTimeout(searchTimeout);
+        if (!this.value) {
+          state.billsRequestId++;
+          reloadBillsForCurrentFilters();
         }
       });
     }
+
+    document.addEventListener('active-center-changed', (event) => {
+      if (
+        event.detail?.centerId &&
+        $('bills-center-filter')?.value === event.detail.centerId
+      ) {
+        clearTimeout(searchTimeout);
+        reloadBillsForCurrentFilters();
+      }
+    });
     
     // Table click events
     const billsBody = $('billsHistoryBody');

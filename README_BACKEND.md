@@ -79,6 +79,8 @@ lab-new/
    - This will create all necessary tables, indexes, and sample data
    - For an existing database, also run `database/add_center_out_medical.sql` to add the Out Medical setting (existing centers default to off)
    - Also run `database/add_company_name_to_bills.sql` to save Company Name on bills
+   - If center selection times out while generating a bill number, run `database/optimize_get_next_bill_number.sql` in the Supabase SQL Editor
+   - If the admin recent-bills list times out for a selected center, run `database/optimize_center_recent_bills.sql` in the Supabase SQL Editor
 
 3. **Update Configuration**
    - Open `config/supabase.js`

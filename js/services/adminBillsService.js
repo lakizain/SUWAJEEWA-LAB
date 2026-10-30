@@ -34,7 +34,23 @@ class AdminBillsService {
   }
 
   getCenterIdForQuery(selectedCenterId = null) {
-    return this.isUserAdmin() ? (selectedCenterId || null) : (this.getUserCenterId() || null);
+    if (this.isUserAdmin()) {
+      return selectedCenterId && selectedCenterId !== "all"
+        ? selectedCenterId
+        : null;
+    }
+
+    const user = this.getCurrentUser();
+    const assignedCenterIds =
+      window.UserCenterAccess?.getAssignedCenterIds(user) || [];
+    if (
+      selectedCenterId &&
+      selectedCenterId !== "all" &&
+      !assignedCenterIds.includes(selectedCenterId)
+    ) {
+      throw new Error("You are not assigned to this center");
+    }
+    return this.getUserCenterId() || null;
   }
 
   // Check if Supabase is available
@@ -42,12 +58,51 @@ class AdminBillsService {
     return this.supabase !== null;
   }
 
+  async attachBillDetails(bills) {
+    if (!bills.length) return bills;
+
+    const billIds = bills.map((bill) => bill.id).filter(Boolean);
+    const centerIds = [...new Set(bills.map((bill) => bill.center_id).filter(Boolean))];
+    const [itemsResult, centersResult] = await Promise.all([
+      billIds.length
+        ? this.supabase
+            .from("bill_items")
+            .select("bill_id, tests(test_name), packages(package_name)")
+            .in("bill_id", billIds)
+        : Promise.resolve({ data: [], error: null }),
+      centerIds.length
+        ? this.supabase
+            .from("centers")
+            .select("id, center_name")
+            .in("id", centerIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (itemsResult.error) throw itemsResult.error;
+    if (centersResult.error) throw centersResult.error;
+
+    const itemsByBillId = new Map();
+    (itemsResult.data || []).forEach((item) => {
+      const items = itemsByBillId.get(item.bill_id) || [];
+      items.push(item);
+      itemsByBillId.set(item.bill_id, items);
+    });
+    const centersById = new Map(
+      (centersResult.data || []).map((center) => [center.id, center])
+    );
+
+    return bills.map((bill) => ({
+      ...bill,
+      centers: centersById.get(bill.center_id) || null,
+      bill_items: itemsByBillId.get(bill.id) || [],
+    }));
+  }
+
   // Get all recent bills for admin view
   async getAllRecentBills(limit = 50, selectedCenterId = null) {
     try {
       if (!this.isSupabaseAvailable()) {
-        console.warn("Supabase not available. Returning sample data");
-        return this.getSampleBillsData();
+        throw new Error("Database connection not available. Cannot load bills.");
       }
 
       let query = this.supabase
@@ -56,16 +111,15 @@ class AdminBillsService {
           id,
           bill_no,
           patient_name,
+          patient_phone,
           patient_gender,
           bill_date,
+          created_at,
+          center_id,
           paid_amount,
           remaining_amount,
           final_amount,
-          status,
-          bill_items(
-            tests(test_name),
-            packages(package_name)
-          )
+          status
         `)
         .order("created_at", { ascending: false })
         .limit(limit);
@@ -78,19 +132,18 @@ class AdminBillsService {
       const { data: bills, error } = await query;
 
       if (error) throw error;
-      return bills || [];
+      return await this.attachBillDetails(bills || []);
     } catch (error) {
       console.error("Error getting all recent bills:", error);
-      return [];
+      throw error;
     }
   }
 
-  // Search bills by bill number or patient name
+  // Search bills by bill number, patient name, or patient phone.
   async searchBills(searchTerm, selectedCenterId = null) {
     try {
       if (!this.isSupabaseAvailable()) {
-        console.warn("Supabase not available. Returning empty results");
-        return [];
+        throw new Error("Database connection not available. Cannot search bills.");
       }
 
       if (!searchTerm || searchTerm.trim() === "") {
@@ -98,39 +151,60 @@ class AdminBillsService {
       }
 
       const term = searchTerm.trim();
-      let query = this.supabase
-        .from("bills")
-        .select(`
+      const pattern = term.replace(/[\\%_]/g, "\\$&");
+      const selectClause = `
           id,
           bill_no,
           patient_name,
+          patient_phone,
           patient_gender,
           bill_date,
+          created_at,
+          center_id,
           paid_amount,
           remaining_amount,
           final_amount,
-          status,
-          bill_items(
-            tests(test_name),
-            packages(package_name)
-          )
-        `)
-        .or(`bill_no.ilike.%${term}%,patient_name.ilike.%${term}%`)
-        .order("created_at", { ascending: false })
-        .limit(50);
-
+          status
+        `;
       const centerId = this.getCenterIdForQuery(selectedCenterId);
-      if (centerId) {
-        query = query.eq("center_id", centerId);
-      }
+      const searchField = (field) => {
+        let query = this.supabase
+          .from("bills")
+          .select(selectClause)
+          .ilike(field, `%${pattern}%`)
+          .order("created_at", { ascending: false })
+          .limit(50);
+        if (centerId) query = query.eq("center_id", centerId);
+        return query;
+      };
 
-      const { data: bills, error } = await query;
+      const [billNoResults, patientResults, phoneResults] = await Promise.all([
+        searchField("bill_no"),
+        searchField("patient_name"),
+        searchField("patient_phone"),
+      ]);
+      if (billNoResults.error) throw billNoResults.error;
+      if (patientResults.error) throw patientResults.error;
+      if (phoneResults.error) throw phoneResults.error;
 
-      if (error) throw error;
-      return bills || [];
+      const uniqueBills = new Map();
+      [
+        ...(billNoResults.data || []),
+        ...(patientResults.data || []),
+        ...(phoneResults.data || []),
+      ]
+        .forEach((bill) => uniqueBills.set(bill.id || bill.bill_no, bill));
+      const sortedBills = Array.from(uniqueBills.values())
+        .sort(
+          (left, right) =>
+            new Date(right.created_at || right.bill_date).getTime() -
+            new Date(left.created_at || left.bill_date).getTime()
+        )
+        .slice(0, 50);
+      return await this.attachBillDetails(sortedBills);
     } catch (error) {
       console.error("Error searching bills:", error);
-      return [];
+      throw error;
     }
   }
 
@@ -138,7 +212,7 @@ class AdminBillsService {
   async getBillDetails(billId) {
     try {
       if (!this.isSupabaseAvailable()) {
-        return null;
+        throw new Error("Database connection not available. Cannot load bill details.");
       }
 
       const { data: bill, error } = await this.supabase
@@ -159,7 +233,7 @@ class AdminBillsService {
       return bill;
     } catch (error) {
       console.error("Error getting bill details:", error);
-      return null;
+      throw error;
     }
   }
 
@@ -167,7 +241,11 @@ class AdminBillsService {
   async getPatientHistory(patientName, patientPhone = null, selectedCenterId = null) {
     try {
       if (!this.isSupabaseAvailable()) {
-        return [];
+        throw new Error("Database connection not available. Cannot load patient history.");
+      }
+
+      if (!patientPhone && !patientName?.trim()) {
+        throw new Error("Enter a patient name or phone number to search history.");
       }
 
       let query = this.supabase
@@ -188,7 +266,7 @@ class AdminBillsService {
         .order("bill_date", { ascending: false });
 
       if (patientPhone) {
-        query = query.eq("patient_phone", patientPhone);
+        query = query.eq("patient_phone", patientPhone.trim());
       } else if (patientName) {
         query = query.ilike("patient_name", `%${patientName.trim()}%`);
       }
@@ -198,12 +276,13 @@ class AdminBillsService {
         query = query.eq("center_id", centerId);
       }
 
+      query = query.limit(100);
       const { data: bills, error } = await query;
       if (error) throw error;
       return bills || [];
     } catch (error) {
       console.error("Error getting patient history:", error);
-      return [];
+      throw error;
     }
   }
 

@@ -50,7 +50,7 @@ class BillingController {
 
   async createReportQrCode(bill) {
     if (!bill?.id || !this.billingService?.isSupabaseAvailable()) return "";
-    if (typeof window.QRCode !== "function") {
+    if (typeof window.qrcode !== "function") {
       throw new Error("QR code generator is unavailable. Please reload the billing page.");
     }
 
@@ -81,20 +81,11 @@ class BillingController {
     reportUrl.searchParams.set("bill", bill.id);
     reportUrl.searchParams.set("token", accessToken);
 
-    const qrContainer = document.createElement("div");
-    new window.QRCode(qrContainer, {
-      text: reportUrl.href,
-      width: 120,
-      height: 120,
-      correctLevel: window.QRCode.CorrectLevel.M,
-    });
-
-    const qrCanvas = qrContainer.querySelector("canvas");
-    if (qrCanvas) return qrCanvas.toDataURL("image/png");
-
-    const qrImage = qrContainer.querySelector("img");
-    if (qrImage?.src) return qrImage.src;
-    throw new Error("Failed to generate the report QR code.");
+    const qrCode = window.qrcode(0, "M");
+    qrCode.addData(reportUrl.href);
+    qrCode.make();
+    const svg = qrCode.createSvgTag({ scalable: true, margin: 4 });
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   }
 
   // Wait for app to be initialized

@@ -180,10 +180,13 @@
           <div class="mb-3">
             <div class="input-group">
               <input type="text" class="form-control" id="bills-search-input"
-                placeholder="Search by Bill No or Patient Name...">
+                placeholder="Search bill number, patient name or phone..." autocomplete="off">
               <button class="btn btn-outline-secondary" type="button" id="clear-bills-search">
-                <i class="fas fa-times"></i>
+                <i class="fas fa-times"></i><span class="visually-hidden">Clear bill search</span>
               </button>
+            </div>
+            <div id="bills-search-status" class="muted" role="status" aria-live="polite"
+              style="margin-top: 8px; min-height: 1.25rem;">
             </div>
             <div id="bills-search-results-counter" class="muted" style="margin-top: 8px; display: none;">
               Found 0 result(s)
@@ -203,6 +206,7 @@
                   <th>BILL NO</th>
                   <th>NAME</th>
                   <th>DATE</th>
+                  <th>CENTER</th>
                   <th>GENDER</th>
                   <th>TEST</th>
                   <th>PAID AMOUNT</th>
@@ -212,7 +216,7 @@
               </thead>
               <tbody id="billsHistoryBody">
                 <tr>
-                  <td colspan="8" class="empty">
+                  <td colspan="9" class="empty">
                     <i class="fas fa-info-circle"></i>
                     <div>No bills found</div>
                   </td>

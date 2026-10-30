@@ -128,64 +128,6 @@ class BillingService {
 
   async findNextAvailableBillNumber(startBillNo, maxAttempts = 100) {
     let candidate = startBillNo;
-    const startParts = this.parseBillNumberParts(startBillNo);
-
-    if (startParts) {
-      let maxExisting = 0;
-
-      if (startParts.legacy) {
-        const { data: legacyBills, error } = await this.supabase
-          .from("bills")
-          .select("bill_no")
-          .like("bill_no", "B%")
-          .order("created_at", { ascending: false })
-          .limit(300);
-
-        if (!error) {
-          for (const row of legacyBills || []) {
-            const parts = this.parseBillNumberParts(row.bill_no);
-            if (parts?.legacy && parts.num > maxExisting) {
-              maxExisting = parts.num;
-            }
-          }
-        }
-      } else {
-        const { data: prefixBills, error } = await this.supabase
-          .from("bills")
-          .select("bill_no")
-          .like("bill_no", `${startParts.prefix}-%`)
-          .order("created_at", { ascending: false })
-          .limit(300);
-
-        if (!error) {
-          for (const row of prefixBills || []) {
-            const parts = this.parseBillNumberParts(row.bill_no);
-            if (parts?.num > maxExisting) {
-              maxExisting = parts.num;
-            }
-          }
-        }
-      }
-
-      const nextFromMax = maxExisting + 1;
-      const nextFromStart = startParts.num;
-      const resolvedNum = Math.max(nextFromStart, nextFromMax);
-
-      if (startParts.legacy) {
-        candidate = `B${String(resolvedNum).padStart(startParts.padLength, "0")}`;
-      } else {
-        candidate = `${startParts.prefix}-${String(resolvedNum).padStart(
-          startParts.padLength,
-          "0"
-        )}`;
-      }
-
-      if (candidate !== startBillNo) {
-        console.log(
-          `Adjusted bill number from ${startBillNo} to ${candidate} based on existing bills`
-        );
-      }
-    }
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const taken = await this.isBillNumberTaken(candidate);
@@ -264,7 +206,7 @@ class BillingService {
         if (error) {
           console.warn('RPC get_next_bill_number failed, falling back:', error);
         } else if (data && data.length > 0 && data[0].formatted_bill_no) {
-          return this.findNextAvailableBillNumber(data[0].formatted_bill_no);
+          return data[0].formatted_bill_no;
         }
       } catch (rpcError) {
         console.warn('RPC call error, falling back to legacy:', rpcError);
@@ -272,11 +214,7 @@ class BillingService {
     }
 
     // ======================================================
-    // FALLBACK: manual bill number generation (if RPC unavailable)
-    // To guarantee sequential (1,2,3,4...): take last 50 bills,
-    // extract numeric suffix from EVERY bill, take MAX, then +1.
-    // This avoids "random" jumps caused by created_at ordering issues
-    // when bill formats are mixed or timestamps are very close.
+    // FALLBACK: start from the center counter and check only exact bill numbers.
     // ======================================================
     try {
       let prefix = null;
@@ -289,64 +227,26 @@ class BillingService {
             .single();
 
           if (!ctrErr && ctr) {
-            prefix =
-              ctr.short_name && /^[A-Z]{2}$/.test(ctr.short_name)
-                ? ctr.short_name
-                : ctr.cid;
+            prefix = {
+              value:
+                ctr.short_name && /^[A-Z]{2}$/.test(ctr.short_name)
+                  ? ctr.short_name
+                  : ctr.cid,
+              counter: Number(ctr.bill_counter) || 0,
+            };
           }
         } catch (e) {
           // ignore, fall through to plain B format
         }
       }
 
-      const extractNum = (billNo) => {
-        const parts = this.parseBillNumberParts(
-          String(billNo).replace(/-\d{4,6}$/, "")
-        );
-        return parts?.num || 0;
-      };
-
-      let lastNumber = 0;
       if (prefix) {
-        const { data: prefixBills, error: prefixError } = await this.supabase
-          .from("bills")
-          .select("bill_no")
-          .like("bill_no", `${prefix}-%`)
-          .order("created_at", { ascending: false })
-          .limit(200);
-
-        if (prefixError) throw prefixError;
-
-        for (const row of prefixBills || []) {
-          const n = extractNum(row.bill_no);
-          if (n > lastNumber) lastNumber = n;
-        }
-      } else {
-        const { data: recentBills, error } = await this.supabase
-          .from("bills")
-          .select("bill_no")
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        if (error) throw error;
-
-        for (const row of recentBills || []) {
-          const n = extractNum(row.bill_no);
-          if (n > lastNumber) lastNumber = n;
-        }
+        const nextNumber = prefix.counter + 1;
+        const startBillNo = `${prefix.value}-${nextNumber.toString().padStart(5, "0")}`;
+        return this.findNextAvailableBillNumber(startBillNo);
       }
 
-      const nextNumber = lastNumber + 1;
-
-      if (prefix) {
-        return this.findNextAvailableBillNumber(
-          `${prefix}-${nextNumber.toString().padStart(5, "0")}`
-        );
-      }
-
-      return this.findNextAvailableBillNumber(
-        `B${nextNumber.toString().padStart(3, "0")}`
-      );
+      return this.findNextAvailableBillNumber(`B${Date.now().toString().slice(-6)}`);
     } catch (error) {
       console.error("Error generating bill number:", error);
       const timestamp = Date.now().toString().slice(-6);

@@ -456,10 +456,7 @@
                             </div>
                             <div class="col-12 col-sm-6">
                                 <label class="form-label" for="dateTo">To</label>
-                                <div class="input-group">
-                                    <input type="date" class="form-control" id="dateTo">
-                                    <button class="btn btn-primary" type="button" id="reportSearchBtn">Find</button>
-                                </div>
+                                <input type="date" class="form-control" id="dateTo">
                             </div>
                             <div class="col-12">
                                 <label class="form-label" for="filterTestSearch">Test</label>
@@ -479,14 +476,16 @@
                                     <div class="input-group">
                                         <input type="search" class="form-control" id="filterBillNo"
                                             placeholder="Search bill number or patient..." autocomplete="off"
-                                            aria-controls="billSuggestions" aria-expanded="false">
+                                            aria-autocomplete="list" aria-controls="billSuggestions"
+                                            aria-expanded="false">
                                         <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn"
                                             title="Clear bill search" aria-label="Clear bill search">
                                             <i class="fas fa-times"></i>
                                         </button>
                                     </div>
-                                    <div id="billSuggestions" class="list-group position-absolute w-100"
-                                        role="listbox" style="z-index: 1000; max-height: 240px; overflow: auto; display: none;"></div>
+                                    <div id="billSuggestions"
+                                        class="bill-search-suggestions list-group w-100"
+                                        role="listbox" style="display: none;"></div>
                                 </div>
                             </div>
 
