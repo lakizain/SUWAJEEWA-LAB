@@ -451,41 +451,53 @@
                         <!-- Filters -->
                         <div class="row g-3 align-items-end">
                             <div class="col-12 col-sm-6">
-                                <label class="form-label">Date</label>
+                                <label class="form-label" for="dateFrom">Date</label>
                                 <input type="date" class="form-control" id="dateFrom">
                             </div>
                             <div class="col-12 col-sm-6">
-                                <label class="form-label">To</label>
+                                <label class="form-label" for="dateTo">To</label>
                                 <div class="input-group">
                                     <input type="date" class="form-control" id="dateTo">
-                                    <button class="btn btn-primary" type="button">Find</button>
+                                    <button class="btn btn-primary" type="button" id="reportSearchBtn">Find</button>
                                 </div>
                             </div>
                             <div class="col-12">
-                                <label class="form-label">Test</label>
+                                <label class="form-label" for="filterTestSearch">Test</label>
                                 <select class="form-select" id="filterTest">
                                     <option value="all">All</option>
                                 </select>
                             </div>
                             <div class="col-12">
-                                <label class="form-label">Center</label>
+                                <label class="form-label" for="filterCenter">Center</label>
                                 <select class="form-select" id="filterCenter">
                                     <option value="all">All</option>
                                 </select>
                             </div>
-                            <div class="col-12 position-relative">
-                                <label class="form-label">Bill #</label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control" id="filterBillNo" autocomplete="off">
-                                    <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn"
-                                        title="Clear search">
-                                        <i class="fas fa-times"></i>
-                                    </button>
+                            <div class="col-12">
+                                <label class="form-label" for="filterBillNo">Bill # / Patient</label>
+                                <div class="position-relative">
+                                    <div class="input-group">
+                                        <input type="search" class="form-control" id="filterBillNo"
+                                            placeholder="Search bill number or patient..." autocomplete="off"
+                                            aria-controls="billSuggestions" aria-expanded="false">
+                                        <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn"
+                                            title="Clear bill search" aria-label="Clear bill search">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div id="billSuggestions" class="list-group position-absolute w-100"
+                                        role="listbox" style="z-index: 1000; max-height: 240px; overflow: auto; display: none;"></div>
                                 </div>
-                                <div id="billSuggestions" class="list-group position-absolute w-100"
-                                    style="z-index: 1000; max-height: 240px; overflow: auto; display: none;"></div>
                             </div>
 
+                        </div>
+                        <div class="report-search-toolbar d-flex justify-content-between align-items-center gap-2 mt-2">
+                            <div id="reportSearchStatus" class="report-search-status text-muted small"
+                                role="status" aria-live="polite"></div>
+                            <button class="btn btn-sm btn-outline-secondary flex-shrink-0" type="button"
+                                id="resetReportFiltersBtn">
+                                <i class="fa-solid fa-rotate-left me-1" aria-hidden="true"></i>Reset filters
+                            </button>
                         </div>
 
                         <!-- Results Tabs: Pending (default) and Ready -->

@@ -198,64 +198,37 @@ class ReportEntryService {
 
   // Get today's bills with all test details
   async getTodaysBills(centerId) {
-    try {
-      if (!this.isSupabaseAvailable()) {
-        console.log("Supabase not available, returning sample data");
-        return this.getSampleTodaysBills();
-      }
-
-      const today = new Date();
-      const startOfDay = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate()
-      ).toISOString();
-      const endOfDay = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate(),
-        23,
-        59,
-        59
-      ).toISOString();
-
-      let query = this.supabase
-        .from("bills")
-        .select(
-          `
-          *,
-          bill_items (
-            *,
-            tests (test_name, short_name, price, duration, footer_text),
-            packages (package_name, price),
-            test_report_headers (created_by, updated_by)
-          ),
-          centers (center_name, is_out_medical)
-        `
-        )
-        .gte("created_at", startOfDay)
-        .lte("created_at", endOfDay)
-        .order("created_at", { ascending: false });
-
-      query = this.applyCenterFilter(query, centerId);
-
-      const { data: bills, error } = await query;
-
-      if (error) throw error;
-      return this.normalizeBillsForReportEntry(bills);
-    } catch (error) {
-      console.error("Error getting today's bills:", error);
-      return this.getSampleTodaysBills();
-    }
+    const today = new Date();
+    const todayValue = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, "0"),
+      String(today.getDate()).padStart(2, "0"),
+    ].join("-");
+    return this.getBillsByDateRange(todayValue, todayValue, centerId);
   }
 
   // Get bills by date range
-  async getBillsByDateRange(fromDate, toDate, centerId) {
+  async getBillsByDateRange(fromDate, toDate, centerId, testId = null) {
     try {
       if (!this.isSupabaseAvailable()) {
-        console.log("Supabase not available, returning sample data");
-        return this.getSampleTodaysBills();
+        throw new Error("Report search is unavailable because the database is disconnected.");
       }
+      const isValidDate = (value) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return false;
+        const parsed = new Date(`${value}T00:00:00Z`);
+        return !Number.isNaN(parsed.getTime()) &&
+          parsed.toISOString().slice(0, 10) === value;
+      };
+      if (!isValidDate(fromDate) || !isValidDate(toDate)) {
+        throw new Error("Enter valid start and end dates.");
+      }
+      if (fromDate > toDate) {
+        throw new Error("The start date must be on or before the end date.");
+      }
+
+      const startAt = new Date(`${fromDate}T00:00:00`);
+      const endBefore = new Date(`${toDate}T00:00:00`);
+      endBefore.setDate(endBefore.getDate() + 1);
 
       let query = this.supabase
         .from("bills")
@@ -268,13 +241,17 @@ class ReportEntryService {
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
+          ${testId ? "matching_items:bill_items!inner(test_id)," : ""}
           centers (center_name, is_out_medical)
         `
         )
-        .gte("bill_date", fromDate)
-        .lte("bill_date", toDate)
+        .gte("bill_date", startAt.toISOString())
+        .lt("bill_date", endBefore.toISOString())
         .order("created_at", { ascending: false });
 
+      if (testId) {
+        query = query.eq("matching_items.test_id", testId);
+      }
       query = this.applyCenterFilter(query, centerId);
 
       const { data: bills, error } = await query;
@@ -283,7 +260,7 @@ class ReportEntryService {
       return this.normalizeBillsForReportEntry(bills);
     } catch (error) {
       console.error("Error getting bills by date range:", error);
-      return [];
+      throw error;
     }
   }
 
@@ -291,8 +268,7 @@ class ReportEntryService {
   async getBillsByTest(testId, centerId) {
     try {
       if (!this.isSupabaseAvailable()) {
-        console.log("Supabase not available, returning sample data");
-        return this.getSampleTodaysBills();
+        throw new Error("Report search is unavailable because the database is disconnected.");
       }
 
       let query = this.supabase
@@ -306,10 +282,11 @@ class ReportEntryService {
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
+          matching_items:bill_items!inner(test_id),
           centers (center_name, is_out_medical)
         `
         )
-        .eq("bill_items.test_id", testId)
+        .eq("matching_items.test_id", testId)
         .order("created_at", { ascending: false });
 
       query = this.applyCenterFilter(query, centerId);
@@ -320,7 +297,7 @@ class ReportEntryService {
       return this.normalizeBillsForReportEntry(bills);
     } catch (error) {
       console.error("Error getting bills by test:", error);
-      return [];
+      throw error;
     }
   }
 
@@ -328,8 +305,7 @@ class ReportEntryService {
   async getBillsByCenter(centerId) {
     try {
       if (!this.isSupabaseAvailable()) {
-        console.log("Supabase not available, returning sample data");
-        return this.getSampleTodaysBills();
+        throw new Error("Report search is unavailable because the database is disconnected.");
       }
 
       let query = this.supabase
@@ -356,7 +332,7 @@ class ReportEntryService {
       return this.normalizeBillsForReportEntry(bills);
     } catch (error) {
       console.error("Error getting bills by center:", error);
-      return [];
+      throw error;
     }
   }
 
@@ -364,14 +340,13 @@ class ReportEntryService {
   async searchBills(searchTerm, centerId) {
     try {
       if (!this.isSupabaseAvailable()) {
-        console.log("Supabase not available, returning sample data");
-        return this.getSampleTodaysBills();
+        throw new Error("Bill search is unavailable because the database is disconnected.");
       }
 
-      let query = this.supabase
-        .from("bills")
-        .select(
-          `
+      const term = String(searchTerm || "").trim();
+      if (!term) return [];
+      const pattern = term.replace(/[\\%_]/g, "\\$&");
+      const selectClause = `
           *,
           bill_items (
             *,
@@ -380,20 +355,38 @@ class ReportEntryService {
             test_report_headers (created_by, updated_by)
           ),
           centers (center_name, is_out_medical)
-        `
+        `;
+      const searchField = (field) => {
+        let query = this.supabase
+          .from("bills")
+          .select(selectClause)
+          .ilike(field, `%${pattern}%`)
+          .order("created_at", { ascending: false })
+          .limit(8);
+        return this.applyCenterFilter(query, centerId);
+      };
+
+      const [billNumberResult, patientResult] = await Promise.all([
+        searchField("bill_no"),
+        searchField("patient_name"),
+      ]);
+      if (billNumberResult.error) throw billNumberResult.error;
+      if (patientResult.error) throw patientResult.error;
+
+      const uniqueBills = new Map();
+      [...(billNumberResult.data || []), ...(patientResult.data || [])]
+        .forEach((bill) => uniqueBills.set(bill.id || bill.bill_no, bill));
+      const bills = Array.from(uniqueBills.values())
+        .sort(
+          (left, right) =>
+            new Date(right.created_at || right.bill_date).getTime() -
+            new Date(left.created_at || left.bill_date).getTime()
         )
-        .or(`bill_no.ilike.%${searchTerm}%,patient_name.ilike.%${searchTerm}%`)
-        .order("created_at", { ascending: false });
-
-      query = this.applyCenterFilter(query, centerId);
-
-      const { data: bills, error } = await query;
-
-      if (error) throw error;
+        .slice(0, 8);
       return this.normalizeBillsForReportEntry(bills);
     } catch (error) {
       console.error("Error searching bills:", error);
-      return [];
+      throw error;
     }
   }
 
@@ -401,8 +394,7 @@ class ReportEntryService {
   async getBillByNumber(billNo, centerId) {
     try {
       if (!this.isSupabaseAvailable()) {
-        console.log("Supabase not available, returning sample data");
-        return this.getSampleBill();
+        throw new Error("Bill details are unavailable because the database is disconnected.");
       }
 
       let query = this.supabase
@@ -423,13 +415,46 @@ class ReportEntryService {
 
       query = this.applyCenterFilter(query, centerId);
 
-      const { data: bill, error } = await query.single();
+      const { data: bill, error } = await query.maybeSingle();
 
       if (error) throw error;
       return this.normalizeBillForReportEntry(bill);
     } catch (error) {
       console.error("Error getting bill by number:", error);
-      return null;
+      throw error;
+    }
+  }
+
+  async getBillById(billId, centerId) {
+    try {
+      if (!this.isSupabaseAvailable()) {
+        throw new Error("Bill details are unavailable because the database is disconnected.");
+      }
+
+      let query = this.supabase
+        .from("bills")
+        .select(
+          `
+          *,
+          bill_items (
+            *,
+            tests (test_name, short_name, price, duration, footer_text),
+            packages (package_name, price),
+            test_report_headers (created_by, updated_by)
+          ),
+          centers (center_name, is_out_medical)
+        `
+        )
+        .eq("id", billId);
+
+      query = this.applyCenterFilter(query, centerId);
+
+      const { data: bill, error } = await query.maybeSingle();
+      if (error) throw error;
+      return this.normalizeBillForReportEntry(bill);
+    } catch (error) {
+      console.error("Error getting bill by ID:", error);
+      throw error;
     }
   }
 

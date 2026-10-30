@@ -404,9 +404,56 @@ tbody tr:nth-child(odd) {
   color: var(--text);
 }
 
-/* Extra space between Bill # search bar and the results table */
-#report-search .col-12.position-relative {
-  margin-bottom: 24px;
+#report-search .report-search-status {
+  min-height: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+#report-search .report-search-status[data-state="error"] {
+  color: var(--error) !important;
+}
+
+#report-search .report-search-status[data-state="success"] {
+  color: var(--success) !important;
+}
+
+#report-search #reportSearchBtn {
+  min-width: 4.5rem;
+}
+
+#report-search #filterTestSearch {
+  width: 100%;
+}
+
+#report-search #billSuggestions {
+  top: 100%;
+  left: 0;
+  max-height: 16rem;
+  overflow: auto;
+  box-shadow: 0 0.5rem 1rem rgba(15, 31, 75, 0.16);
+}
+
+#report-search #billSuggestions .list-group-item {
+  text-align: left;
+  white-space: normal;
+}
+
+#report-search .report-search-toolbar {
+  min-height: 2rem;
+  flex-wrap: wrap;
+}
+
+#report-search .report-search-status {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+#report-search .report-search-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 @media (max-width: 1100px) {

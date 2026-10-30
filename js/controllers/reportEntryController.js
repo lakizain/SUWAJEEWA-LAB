@@ -92,8 +92,12 @@ class ReportEntryController {
     this.dateFromInput = document.getElementById("dateFrom");
     this.dateToInput = document.getElementById("dateTo");
     this.findBtn = document.querySelector(
-      'button.btn.btn-primary[type="button"]'
+      "#reportSearchBtn"
     );
+    this.resetReportFiltersBtn = document.getElementById(
+      "resetReportFiltersBtn"
+    );
+    this.reportSearchStatus = document.getElementById("reportSearchStatus");
     this.testFilter = document.getElementById("filterTest");
     this.centerFilter = document.getElementById("filterCenter");
     this.billSearchInput = document.getElementById("filterBillNo");
@@ -111,6 +115,7 @@ class ReportEntryController {
         "placeholder",
         "Type to search tests..."
       );
+      this.testSearchInput.setAttribute("aria-label", "Search tests");
 
       // Datalist for suggestions
       this.testSearchDatalist = document.createElement("datalist");
@@ -212,6 +217,9 @@ class ReportEntryController {
         this.handleDateRangeSearch()
       );
     }
+    this.resetReportFiltersBtn?.addEventListener("click", () =>
+      this.resetReportFilters()
+    );
 
     // Test filter change
     if (this.testFilter) {
@@ -220,18 +228,16 @@ class ReportEntryController {
 
     // Typable test search: choose by name and trigger filtering
     if (this.testSearchInput) {
+      const queueTestFilter = this.debounce(
+        () => this.syncTestSelectFromSearch(true),
+        250
+      );
       this.testSearchInput.addEventListener(
         "input",
-        this.debounce(() => this.syncTestSelectFromSearch(), 200)
-      );
-      this.testSearchInput.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          this.syncTestSelectFromSearch(true);
+        () => {
+          this.billListRequestId++;
+          queueTestFilter();
         }
-      });
-      this.testSearchInput.addEventListener("change", () =>
-        this.syncTestSelectFromSearch(true)
       );
     }
 
@@ -244,9 +250,17 @@ class ReportEntryController {
 
     // Bill number search with suggestions
     if (this.billSearchInput) {
+      const queueBillSearch = this.debounce(
+        () => this.handleBillSearch(),
+        300
+      );
       this.billSearchInput.addEventListener(
         "input",
-        this.debounce(() => this.handleBillSearch(), 300)
+        () => {
+          this.billSearchRequestId++;
+          this.hideSuggestions();
+          queueBillSearch();
+        }
       );
       this.billSearchInput.addEventListener("focus", () =>
         this.showSuggestions()
@@ -256,7 +270,13 @@ class ReportEntryController {
           e.preventDefault();
           const billNo = this.billSearchInput.value.trim();
           if (billNo) {
-            this.selectBillFromSearch(billNo);
+            const firstSuggestion =
+              this.billSuggestions?.querySelector('button[role="option"]');
+            if (firstSuggestion) {
+              firstSuggestion.click();
+            } else {
+              this.selectBillFromSearch(billNo);
+            }
           }
         }
       });
@@ -457,7 +477,7 @@ class ReportEntryController {
       this.setLoading(true);
 
       // Set today's date as default
-      const today = new Date().toISOString().split("T")[0];
+      const today = this.getLocalDateValue();
       if (this.dateFromInput) this.dateFromInput.value = today;
       if (this.dateToInput) this.dateToInput.value = today;
 
@@ -560,9 +580,18 @@ class ReportEntryController {
     return this.centerFilter?.value || "all";
   }
 
+  getLocalDateValue(date = new Date()) {
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0"),
+    ].join("-");
+  }
+
   async loadTodaysBills(centerId = this.getSelectedCenterId()) {
     const requestId = ++this.billListRequestId;
     try {
+      this.setSearchStatus("Loading reports...", "loading");
       const bills = await this.reportEntryService.getTodaysBills(centerId);
       if (
         requestId !== this.billListRequestId ||
@@ -572,9 +601,17 @@ class ReportEntryController {
       }
       this.currentBills = bills;
       this.renderBillsTable();
+      this.setSearchStatus(
+        `${bills.length} bill${bills.length === 1 ? "" : "s"} found for today`,
+        "success"
+      );
     } catch (error) {
       console.error("Error loading today's bills:", error);
-      this.showError("Failed to load today's bills");
+      this.setSearchStatus(
+        error?.message || "Failed to load today's bills",
+        "error"
+      );
+      throw error;
     }
   }
 
@@ -622,6 +659,7 @@ class ReportEntryController {
         ? await this.centerService.getActiveCenters()
         : (user?.assigned_centers || []);
       if (this.centerFilter) {
+        this.centerFilter.disabled = false;
         this.centerFilter.innerHTML = user?.role === "admin"
           ? '<option value="all">All centers</option>'
           : "";
@@ -629,6 +667,9 @@ class ReportEntryController {
           const option = document.createElement("option");
           option.value = center.id;
           option.textContent = center.center_name;
+          if (center.is_active === false) {
+            option.dataset.isActive = "false";
+          }
           this.centerFilter.appendChild(option);
         });
         const activeCenterId =
@@ -650,8 +691,17 @@ class ReportEntryController {
           this.showError("Your account has no assigned center. Contact an administrator.");
         }
       }
+      if (this.testSearchInput) {
+        const testLabel = this.testSearchInput.labels?.[0];
+        if (testLabel) testLabel.htmlFor = this.testSearchInput.id;
+      }
     } catch (error) {
       console.error("Error populating dropdowns:", error);
+      this.setSearchStatus(
+        error?.message || "Failed to load report search filters",
+        "error"
+      );
+      throw error;
     }
   }
 
@@ -666,7 +716,7 @@ class ReportEntryController {
     if (this.currentBills.length === 0) {
       const row = document.createElement("tr");
       row.innerHTML =
-        '<td colspan="4" class="text-muted">No bills found for today</td>';
+        '<td colspan="4" class="text-center text-muted py-4">No reports found for the selected filters</td>';
       this.resultsTableBody.appendChild(row);
       this.pruneReadySelectionToVisible();
       this.updateReadySendControls();
@@ -2311,6 +2361,7 @@ class ReportEntryController {
     const centerId = this.getSelectedCenterId();
     try {
       this.setLoading(true);
+      this.setSearchStatus("Applying report filters...", "loading");
 
       // Check if there's a bill number search first
       const billNo = this.billSearchInput?.value.trim();
@@ -2321,16 +2372,26 @@ class ReportEntryController {
 
       const fromDate = this.dateFromInput?.value;
       const toDate = this.dateToInput?.value;
+      this.billSearchRequestId++;
+      this.hideSuggestions();
 
       if (!fromDate || !toDate) {
-        this.showError("Please select both from and to dates");
+        this.setSearchStatus("Select both start and end dates.", "error");
+        return;
+      }
+      if (fromDate > toDate) {
+        this.setSearchStatus(
+          "The start date must be on or before the end date.",
+          "error"
+        );
         return;
       }
 
       const bills = await this.reportEntryService.getBillsByDateRange(
         fromDate,
         toDate,
-        centerId
+        centerId,
+        this.testFilter?.value === "all" ? null : this.testFilter?.value
       );
       if (
         requestId !== this.billListRequestId ||
@@ -2340,11 +2401,18 @@ class ReportEntryController {
       }
       this.currentBills = bills;
       this.renderBillsTable();
+      this.setSearchStatus(
+        `${bills.length} report${bills.length === 1 ? "" : "s"} found`,
+        "success"
+      );
     } catch (error) {
       console.error("Error searching by date range:", error);
-      this.showError("Failed to search bills");
+      this.setSearchStatus(
+        error?.message || "Failed to search reports",
+        "error"
+      );
     } finally {
-      this.setLoading(false);
+      if (requestId === this.billListRequestId) this.setLoading(false);
     }
   }
 
@@ -2353,30 +2421,47 @@ class ReportEntryController {
     const centerId = this.getSelectedCenterId();
     try {
       this.setLoading(true);
-
-      const testId = this.testFilter?.value;
-
-      if (testId === "all") {
-        await this.loadTodaysBills(centerId);
-      } else {
-        const bills = await this.reportEntryService.getBillsByTest(
-          testId,
-          centerId
-        );
-        if (
-          requestId !== this.billListRequestId ||
-          centerId !== this.getSelectedCenterId()
-        ) {
-          return;
-        }
-        this.currentBills = bills;
-        this.renderBillsTable();
+      if (this.billSearchInput?.value.trim()) {
+        this.billSearchInput.value = "";
+        this.billSearchRequestId++;
+        this.hideSuggestions();
       }
+      const testId = this.testFilter?.value;
+      const fromDate = this.dateFromInput?.value;
+      const toDate = this.dateToInput?.value;
+      if (!fromDate || !toDate || fromDate > toDate) {
+        this.setSearchStatus(
+          "Choose a valid date range before filtering by test.",
+          "error"
+        );
+        return;
+      }
+
+      this.setSearchStatus("Filtering reports...", "loading");
+      const bills = await this.reportEntryService.getBillsByDateRange(
+        fromDate,
+        toDate,
+        centerId,
+        testId === "all" ? null : testId
+      );
+      if (
+        requestId !== this.billListRequestId ||
+        centerId !== this.getSelectedCenterId()
+      ) return;
+      this.currentBills = bills;
+      this.renderBillsTable();
+      this.setSearchStatus(
+        `${bills.length} report${bills.length === 1 ? "" : "s"} found`,
+        "success"
+      );
     } catch (error) {
       console.error("Error filtering by test:", error);
-      this.showError("Failed to filter bills");
+      this.setSearchStatus(
+        error?.message || "Failed to filter reports",
+        "error"
+      );
     } finally {
-      this.setLoading(false);
+      if (requestId === this.billListRequestId) this.setLoading(false);
     }
   }
 
@@ -2386,26 +2471,49 @@ class ReportEntryController {
     const raw = (this.testSearchInput.value || "").trim();
     if (raw === "" || raw.toLowerCase() === "all") {
       this.testFilter.value = "all";
+      this.setSearchStatus("Showing all tests in the selected date range.", "idle");
       if (trigger) this.handleTestFilter();
       return;
     }
 
-    // exact match by name
     const id = this.testsIndexByName.get(raw.toLowerCase());
     if (id) {
       this.testFilter.value = id;
+      this.setSearchStatus("Filtering by the selected test...", "loading");
       if (trigger) this.handleTestFilter();
       return;
     }
 
-    // partial match: pick first that starts with typed text
-    for (const [name, testId] of this.testsIndexByName.entries()) {
-      if (name.startsWith(raw.toLowerCase())) {
-        this.testFilter.value = testId;
-        if (trigger) this.handleTestFilter();
-        return;
-      }
+    const matches = Array.from(this.testsIndexByName.entries()).filter(
+      ([name]) => name.startsWith(raw.toLowerCase())
+    );
+    if (matches.length === 1) {
+      this.testFilter.value = matches[0][1];
+      this.setSearchStatus(
+        `Filtering by ${matches[0][0]}...`,
+        trigger ? "loading" : "idle"
+      );
+      if (trigger) this.handleTestFilter();
+      return;
     }
+
+    this.testFilter.value = "all";
+    if (matches.length > 1) {
+      this.billListRequestId++;
+      this.setLoading(false);
+      this.setSearchStatus(
+        "Several tests match. Choose one; the current report list is unchanged.",
+        "idle"
+      );
+      return;
+    }
+
+    this.billListRequestId++;
+    this.setLoading(false);
+    this.setSearchStatus(
+      `No test matches "${raw}". Existing results are unchanged.`,
+      "error"
+    );
   }
 
   async handleCenterFilter() {
@@ -2414,6 +2522,7 @@ class ReportEntryController {
     const centerId = this.getSelectedCenterId();
     try {
       this.setLoading(true);
+      this.setSearchStatus("Loading reports for the selected center...", "loading");
 
       const user = window.UserCenterAccess?.getCurrentUser();
       if (
@@ -2435,6 +2544,8 @@ class ReportEntryController {
       this.currentReportHeader = null;
       if (this.commentsResultInput) this.commentsResultInput.value = "";
       if (this.specialNotesInput) this.specialNotesInput.value = "";
+      if (this.billSearchInput) this.billSearchInput.value = "";
+      this.hideSuggestions();
       this.readySelectionKeys.clear();
       this.readySelectionItems.clear();
       this.syncReadySelectAllCheckboxState();
@@ -2447,10 +2558,17 @@ class ReportEntryController {
             centerId
           )
         : Promise.resolve();
-      const billsRequest =
-        centerId === "all"
-          ? this.reportEntryService.getTodaysBills(centerId)
-          : this.reportEntryService.getBillsByCenter(centerId);
+      const fromDate = this.dateFromInput?.value;
+      const toDate = this.dateToInput?.value;
+      if (!fromDate || !toDate || fromDate > toDate) {
+        throw new Error("Choose a valid date range to search reports.");
+      }
+      const billsRequest = this.reportEntryService.getBillsByDateRange(
+        fromDate,
+        toDate,
+        centerId,
+        this.testFilter?.value === "all" ? null : this.testFilter?.value
+      );
       const [bills] = await Promise.all([billsRequest, historyRefresh]);
       if (
         requestId !== this.billListRequestId ||
@@ -2460,11 +2578,18 @@ class ReportEntryController {
       }
       this.currentBills = bills;
       this.renderBillsTable();
+      this.setSearchStatus(
+        `${bills.length} report${bills.length === 1 ? "" : "s"} found`,
+        "success"
+      );
     } catch (error) {
       console.error("Error filtering by center:", error);
-      this.showError("Failed to filter bills");
+      this.setSearchStatus(
+        error?.message || "Failed to filter reports",
+        "error"
+      );
     } finally {
-      this.setLoading(false);
+      if (requestId === this.billListRequestId) this.setLoading(false);
     }
   }
 
@@ -2476,9 +2601,11 @@ class ReportEntryController {
 
       if (!searchTerm) {
         this.hideSuggestions();
+        this.setSearchStatus("", "idle");
         return;
       }
 
+      this.setSearchStatus("Searching bills...", "loading");
       const bills = await this.reportEntryService.searchBills(
         searchTerm,
         centerId
@@ -2490,30 +2617,48 @@ class ReportEntryController {
         return;
       }
       this.showBillSuggestions(bills);
+      if (!bills.length) {
+        this.setSearchStatus("No matching bills found for this center.", "idle");
+      } else {
+        this.setSearchStatus(
+          `${bills.length} matching bill${bills.length === 1 ? "" : "s"}`,
+          "success"
+        );
+      }
     } catch (error) {
       console.error("Error searching bills:", error);
       this.hideSuggestions();
+      this.setSearchStatus(
+        error?.message || "Bill search failed. Try again.",
+        "error"
+      );
     }
   }
 
   // Handle bill selection from search
-  async selectBillFromSearch(billNo, centerId = this.getSelectedCenterId()) {
+  async selectBillFromSearch(
+    billNo,
+    centerId = this.getSelectedCenterId(),
+    billId = null
+  ) {
     const requestId = ++this.billListRequestId;
     try {
       this.setLoading(true);
 
       // Get the specific bill by number
-      const bill = await this.reportEntryService.getBillByNumber(
-        billNo,
-        centerId
-      );
+      const bill = billId
+        ? await this.reportEntryService.getBillById(billId, centerId)
+        : await this.reportEntryService.getBillByNumber(billNo, centerId);
       if (
         requestId !== this.billListRequestId ||
         centerId !== this.getSelectedCenterId()
       ) return;
 
       if (!bill) {
-        this.showError("Bill not found");
+        this.setSearchStatus(
+          `Bill ${billNo} was not found in the selected center.`,
+          "error"
+        );
         return;
       }
 
@@ -2526,38 +2671,69 @@ class ReportEntryController {
 
       // Select the bill and populate forms (show all tests for this patient)
       this.selectBill(bill);
+      this.setSearchStatus("Bill loaded.", "success");
     } catch (error) {
       console.error("Error selecting bill from search:", error);
-      this.showError("Failed to load bill details");
+      this.setSearchStatus(
+        error?.message || "Failed to load bill details",
+        "error"
+      );
     } finally {
-      this.setLoading(false);
+      if (requestId === this.billListRequestId) this.setLoading(false);
     }
   }
 
   // Clear search and show all today's bills
   async clearSearch() {
     try {
-      this.setLoading(true);
-
+      this.billSearchRequestId++;
       // Clear the search input
       if (this.billSearchInput) {
         this.billSearchInput.value = "";
       }
-
-      // Load all today's bills
-      await this.loadTodaysBills();
+      this.hideSuggestions();
 
       // Clear selected bill and test
       this.selectedBill = null;
       this.selectedTestItem = null;
       this.clearSummaryForm();
       this.clearTestResults();
+      this.currentSubcategories = [];
+      this.currentSubcategoryIndex = 0;
+      this.currentReportHeader = null;
+      if (this.commentsResultInput) this.commentsResultInput.value = "";
+      if (this.specialNotesInput) this.specialNotesInput.value = "";
+      await this.handleDateRangeSearch();
     } catch (error) {
       console.error("Error clearing search:", error);
-      this.showError("Failed to clear search");
-    } finally {
-      this.setLoading(false);
+      this.setSearchStatus(error?.message || "Failed to clear search", "error");
     }
+  }
+
+  async resetReportFilters() {
+    const todayValue = this.getLocalDateValue();
+    if (this.dateFromInput) this.dateFromInput.value = todayValue;
+    if (this.dateToInput) this.dateToInput.value = todayValue;
+    if (this.testFilter) this.testFilter.value = "all";
+    if (this.testSearchInput) this.testSearchInput.value = "";
+    if (this.billSearchInput) this.billSearchInput.value = "";
+    this.billSearchRequestId++;
+    this.hideSuggestions();
+    this.selectedBill = null;
+    this.selectedTestItem = null;
+    this.clearSummaryForm();
+    this.clearTestResults();
+    this.currentSubcategories = [];
+    this.currentSubcategoryIndex = 0;
+    this.currentReportHeader = null;
+    this.copiedTestResults = null;
+    if (this.commentsResultInput) this.commentsResultInput.value = "";
+    if (this.specialNotesInput) this.specialNotesInput.value = "";
+    this.readySelectionKeys.clear();
+    this.readySelectionItems.clear();
+    this.syncReadySelectAllCheckboxState();
+    this.updateReadySendControls();
+    await this.handleDateRangeSearch();
   }
 
   // Clear summary form
@@ -2587,41 +2763,50 @@ class ReportEntryController {
 
     this.billSuggestions.innerHTML = "";
 
-    if (bills.length === 0) {
-      this.hideSuggestions();
-      return;
+    if (!bills.length) {
+      const emptyState = document.createElement("div");
+      emptyState.className = "list-group-item small text-muted";
+      emptyState.textContent = "No matching bills found";
+      this.billSuggestions.appendChild(emptyState);
+    } else {
+      bills.slice(0, 8).forEach((bill) => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "list-group-item list-group-item-action";
+        item.setAttribute("role", "option");
+        item.innerHTML = `
+          <div class="d-flex w-100 justify-content-between">
+            <strong>${this.safeText(bill.bill_no)}</strong>
+            <small class="text-muted">${this.safeText(
+              new Date(bill.bill_date).toLocaleDateString()
+            )}</small>
+          </div>
+          <div class="small">${this.safeText(bill.patient_name)}${
+            bill.centers?.center_name
+              ? ` · ${this.safeText(bill.centers.center_name)}`
+              : ""
+          }</div>
+        `;
+
+        item.addEventListener("click", () => {
+          this.billSearchInput.value = bill.bill_no;
+          this.hideSuggestions();
+          this.selectBillFromSearch(bill.bill_no, this.getSelectedCenterId(), bill.id);
+        });
+
+        this.billSuggestions.appendChild(item);
+      });
     }
 
-    bills.slice(0, 8).forEach((bill) => {
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = "list-group-item list-group-item-action";
-      item.innerHTML = `
-        <div class="d-flex w-100 justify-content-between">
-          <strong>${this.safeText(bill.bill_no)}</strong>
-          <small class="text-muted">${this.safeText(
-            new Date(bill.bill_date).toLocaleDateString()
-          )}</small>
-        </div>
-        <div class="small">${this.safeText(bill.patient_name)}</div>
-      `;
-
-      item.addEventListener("click", () => {
-        this.billSearchInput.value = bill.bill_no;
-        this.hideSuggestions();
-        this.selectBillFromSearch(bill.bill_no);
-      });
-
-      this.billSuggestions.appendChild(item);
-    });
-
     this.billSuggestions.style.display = "block";
+    this.billSearchInput?.setAttribute("aria-expanded", "true");
     this.setResultsHeaderVisible(false);
   }
 
   showSuggestions() {
     if (this.billSuggestions && this.billSuggestions.children.length > 0) {
       this.billSuggestions.style.display = "block";
+      this.billSearchInput?.setAttribute("aria-expanded", "true");
       this.setResultsHeaderVisible(false);
     }
   }
@@ -2629,6 +2814,7 @@ class ReportEntryController {
   hideSuggestions() {
     if (this.billSuggestions) {
       this.billSuggestions.style.display = "none";
+      this.billSearchInput?.setAttribute("aria-expanded", "false");
       this.setResultsHeaderVisible(true);
     }
   }
@@ -2758,7 +2944,7 @@ class ReportEntryController {
         console.log("All data saved successfully");
         savingToast?.remove();
         // Refresh the bills table in background to show updated status
-        this.loadTodaysBills().catch(e => console.warn("Failed to refresh bills:", e));
+        this.handleDateRangeSearch().catch(e => console.warn("Failed to refresh bills:", e));
       }).catch(e => {
         console.error("Error during background save:", e);
         savingToast?.remove();
@@ -3098,7 +3284,7 @@ class ReportEntryController {
       this.showSuccess("Report saved successfully!");
 
       // Refresh bills table
-      await this.loadTodaysBills();
+      await this.handleDateRangeSearch();
     } catch (e) {
       console.error("Error in handleSaveOnly:", e);
       this.showError("An error occurred while saving");
@@ -4145,7 +4331,25 @@ class ReportEntryController {
     this.isLoading = loading;
     if (this.findBtn) {
       this.findBtn.disabled = loading;
-      this.findBtn.textContent = loading ? "Loading..." : "Find";
+      this.findBtn.setAttribute("aria-busy", String(loading));
+      this.findBtn.innerHTML = loading
+        ? '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Loading'
+        : "Find";
+    }
+  }
+
+  setSearchStatus(message, state = "idle") {
+    if (!this.reportSearchStatus) return;
+    this.reportSearchStatus.replaceChildren();
+    this.reportSearchStatus.dataset.state = state;
+    if (state === "loading") {
+      const spinner = document.createElement("span");
+      spinner.className = "spinner-border spinner-border-sm";
+      spinner.setAttribute("aria-hidden", "true");
+      this.reportSearchStatus.appendChild(spinner);
+    }
+    if (message) {
+      this.reportSearchStatus.appendChild(document.createTextNode(message));
     }
   }
 
