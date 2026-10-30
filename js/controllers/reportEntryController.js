@@ -36,6 +36,7 @@ class ReportEntryController {
     this.currentBills = [];
     this.selectedBill = null;
     this.selectedTestItem = null;
+    this.reportHeaderRequestId = 0;
     this.billListRequestId = 0;
     this.billSearchRequestId = 0;
     this.activeBillSuggestionIndex = -1;
@@ -4472,19 +4473,28 @@ class ReportEntryController {
 
   // Load report header (comments and special notes) and fill the fields
   async loadReportHeaderForItem(billItemId) {
+    const requestId = ++this.reportHeaderRequestId;
+
+    // Reset first so comments from the previously selected test are not shown.
+    if (this.commentsResultInput) this.commentsResultInput.value = "";
+    if (
+      this.specialNotesInput &&
+      this.specialNotesInput !== this.commentsResultInput
+    ) {
+      this.specialNotesInput.value = "";
+    }
+
+    if (!this.reportEntryService || !billItemId) return;
+
     try {
-      if (!this.reportEntryService || !billItemId) return;
-      // Always reset fields first so old report comments do not leak
-      // into newly selected reports that have no saved header yet.
-      if (this.commentsResultInput) this.commentsResultInput.value = "";
+      const header = await this.reportEntryService.getReportHeader(billItemId);
       if (
-        this.specialNotesInput &&
-        this.specialNotesInput !== this.commentsResultInput
+        requestId !== this.reportHeaderRequestId ||
+        String(this.selectedTestItem?.id ?? "") !== String(billItemId)
       ) {
-        this.specialNotesInput.value = "";
+        return;
       }
 
-      const header = await this.reportEntryService.getReportHeader(billItemId);
       if (header) {
         const comments = header.comments_result || "";
         const notes = header.special_notes || "";

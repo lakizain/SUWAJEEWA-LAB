@@ -276,99 +276,6 @@ class ReportsService {
     }
   }
 
-  async getTestCostSummary(fromDate = null, toDate = null, centerId = null) {
-    if (!this.isSupabaseAvailable()) {
-      return this.getSampleTestCostSummary();
-    }
-
-    try {
-      let query = this.supabase
-        .from("bills")
-        .select(
-          `
-          id,
-          bill_date,
-          center_id,
-          bill_items(
-            quantity,
-            is_package_component,
-            tests(id, test_name, test_cost)
-          )
-        `
-        )
-        .order("bill_date", { ascending: true });
-
-      if (fromDate) {
-        query = query.gte(
-          "bill_date",
-          new Date(fromDate + "T00:00:00").toISOString()
-        );
-      }
-
-      if (toDate) {
-        query = query.lte(
-          "bill_date",
-          new Date(toDate + "T23:59:59").toISOString()
-        );
-      }
-
-      if (centerId && centerId !== "all") {
-        query = query.eq("center_id", centerId);
-      }
-
-      const { data: bills, error } = await query;
-      if (error) throw error;
-
-      const testSummary = new Map();
-      (bills || []).forEach((bill) => {
-        (bill.bill_items || []).forEach((item) => {
-          const test = item.tests;
-          if (!test) return;
-
-          const key = test.id || test.test_name;
-          if (!testSummary.has(key)) {
-            const parsedCost =
-              test.test_cost === null || test.test_cost === undefined
-                ? null
-                : Number(test.test_cost);
-            const hasValidCost =
-              parsedCost !== null && Number.isFinite(parsedCost);
-            testSummary.set(key, {
-              test_name: test.test_name || "Unknown Test",
-              test_count: 0,
-              test_cost: hasValidCost ? parsedCost : null,
-              total_test_cost: 0,
-              missing_cost_quantity: 0,
-            });
-          }
-
-          const summary = testSummary.get(key);
-          const parsedQuantity = Number(item.quantity);
-          const quantity =
-            Number.isFinite(parsedQuantity) && parsedQuantity > 0
-              ? parsedQuantity
-              : 1;
-          summary.test_count += quantity;
-
-          if (summary.test_cost === null) {
-            summary.missing_cost_quantity += quantity;
-          } else {
-            summary.total_test_cost += summary.test_cost * quantity;
-          }
-        });
-      });
-
-      return Array.from(testSummary.values()).sort((a, b) =>
-        a.test_name.localeCompare(b.test_name, undefined, {
-          sensitivity: "base",
-        })
-      );
-    } catch (error) {
-      console.error("Error getting test cost summary:", error);
-      throw error;
-    }
-  }
-
   // Get commission report data
   async getCommissionReport(
     fromDate = null,
@@ -500,6 +407,316 @@ class ReportsService {
     }
   }
 
+  async getTestCostProfitReport(fromDate = null, toDate = null, centerId = null) {
+    try {
+      if (!this.isSupabaseAvailable()) {
+        console.log("Supabase not available, returning sample test cost report");
+        return this.buildTestCostProfitReport([
+          {
+            id: "sample-1",
+            bill_date: new Date().toISOString(),
+            final_amount: 1500,
+            status: "paid",
+            bill_items: [
+              {
+                quantity: 1,
+                unit_price: 800,
+                total_price: 800,
+                is_package_component: false,
+                tests: { id: "sample-fbc", test_name: "FBC", test_cost: 200 },
+              },
+              {
+                quantity: 1,
+                unit_price: 700,
+                total_price: 700,
+                is_package_component: false,
+                tests: { id: "sample-crp", test_name: "CRP", test_cost: 280 },
+              },
+            ],
+          },
+        ]);
+      }
+
+      const pageSize = 1000;
+      const bills = [];
+      let offset = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        let query = this.supabase
+          .from("bills")
+          .select(
+            `
+            id,
+            bill_date,
+            center_id,
+            final_amount,
+            status,
+            bill_items(
+              test_id,
+              package_id,
+              quantity,
+              unit_price,
+              total_price,
+              is_package_component,
+              tests(test_name, test_cost),
+              packages(package_name)
+            )
+          `
+          )
+          .neq("status", "cancelled")
+          .order("bill_date", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+
+        if (fromDate) {
+          query = query.gte(
+            "bill_date",
+            new Date(fromDate + "T00:00:00").toISOString()
+          );
+        }
+        if (toDate) {
+          query = query.lte(
+            "bill_date",
+            new Date(toDate + "T23:59:59").toISOString()
+          );
+        }
+        if (centerId && centerId !== "all") {
+          query = query.eq("center_id", centerId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        bills.push(...(data || []));
+        hasMore = (data || []).length === pageSize;
+        offset += pageSize;
+      }
+
+      return this.buildTestCostProfitReport(bills);
+    } catch (error) {
+      console.error("Error getting test cost and profit report:", error);
+      throw error;
+    }
+  }
+
+  buildTestCostProfitReport(bills) {
+    const itemTotals = new Map();
+    const billIds = new Set();
+    let totalRevenue = 0;
+    let totalCost = 0;
+    let missingCostItems = 0;
+
+    const getNumber = (value, fallback = 0) => {
+      const number = Number(value);
+      return Number.isFinite(number) ? number : fallback;
+    };
+    const getRelation = (relation) =>
+      Array.isArray(relation) ? relation[0] || null : relation || null;
+    const addItem = (key, item) => {
+      if (!itemTotals.has(key)) {
+        itemTotals.set(key, {
+          item_type: item.item_type,
+          item_name: item.item_name,
+          quantity: 0,
+          revenue: 0,
+          cost: 0,
+          missing_cost_quantity: 0,
+        });
+      }
+      return itemTotals.get(key);
+    };
+
+    (bills || []).forEach((bill, billIndex) => {
+      if (bill.status === "cancelled") return;
+      billIds.add(bill.id || `bill-${billIndex}`);
+
+      const billItems = Array.isArray(bill.bill_items) ? bill.bill_items : [];
+      const saleItems = billItems.filter((item) => !item.is_package_component);
+      const lineTotals = saleItems.map((item) => {
+        const quantity = Math.max(0, getNumber(item.quantity, 1));
+        const unitPrice = getNumber(item.unit_price);
+        const totalPrice =
+          item.total_price === null || item.total_price === undefined
+            ? quantity * unitPrice
+            : getNumber(item.total_price);
+        return { item, quantity, totalPrice };
+      });
+      const subtotal = lineTotals.reduce(
+        (sum, line) => sum + line.totalPrice,
+        0
+      );
+      const billedAmount = Math.max(0, getNumber(bill.final_amount));
+      const revenueScale = subtotal > 0 ? billedAmount / subtotal : 0;
+      const packageRows = new Map();
+
+      lineTotals.forEach(({ item, quantity, totalPrice }, lineIndex) => {
+        const revenue =
+          lineIndex === lineTotals.length - 1 && subtotal > 0
+            ? billedAmount -
+              lineTotals
+                .slice(0, lineIndex)
+                .reduce((sum, line) => sum + line.totalPrice * revenueScale, 0)
+            : totalPrice * revenueScale;
+        totalRevenue += revenue;
+
+        const test = getRelation(item.tests);
+        const packageData = getRelation(item.packages);
+        if (item.test_id || test) {
+          const itemName = test?.test_name || "Unknown test";
+          const key = `test:${item.test_id || itemName}`;
+          const row = addItem(key, {
+            item_type: "Test",
+            item_name: itemName,
+          });
+          row.quantity += quantity;
+          row.revenue += revenue;
+
+          const testCost =
+            test?.test_cost === null ||
+            test?.test_cost === undefined ||
+            test?.test_cost === ""
+              ? null
+              : getNumber(test.test_cost, null);
+          if (testCost === null) {
+            row.missing_cost_quantity += quantity;
+            missingCostItems += quantity;
+          } else {
+            const cost = testCost * quantity;
+            row.cost += cost;
+            totalCost += cost;
+          }
+        } else if (item.package_id || packageData) {
+          const itemName = packageData?.package_name || "Unknown package";
+          const key = `package:${item.package_id || itemName}`;
+          const row = addItem(key, {
+            item_type: "Package",
+            item_name: itemName,
+          });
+          row.quantity += quantity;
+          row.revenue += revenue;
+          packageRows.set(`${item.package_id || itemName}`, {
+            row,
+            componentCount: 0,
+            quantity,
+          });
+        } else {
+          const key = `unallocated:${bill.id || billIndex}`;
+          const row = addItem(key, {
+            item_type: "Unallocated",
+            item_name: "Unallocated bill item",
+          });
+          row.quantity += quantity;
+          row.revenue += revenue;
+          row.missing_cost_quantity += quantity;
+          missingCostItems += quantity;
+        }
+      });
+
+      billItems
+        .filter((item) => item.is_package_component)
+        .forEach((item) => {
+          const test = getRelation(item.tests);
+          const packageData = getRelation(item.packages);
+          const packageKey = item.package_id || packageData?.id;
+          const packageRow = packageRows.get(String(packageKey));
+          const quantity = Math.max(0, getNumber(item.quantity, 1));
+
+          if (!packageRow) {
+            const key = `unallocated-cost:${bill.id || billIndex}:${packageKey || "unknown"}`;
+            const row = addItem(key, {
+              item_type: "Unallocated",
+              item_name: "Package test cost without package sale",
+            });
+            row.quantity += quantity;
+            const testCost =
+              test?.test_cost === null ||
+              test?.test_cost === undefined ||
+              test?.test_cost === ""
+                ? null
+                : getNumber(test.test_cost, null);
+            if (testCost === null) {
+              row.missing_cost_quantity += quantity;
+              missingCostItems += quantity;
+            } else {
+              const cost = testCost * quantity;
+              row.cost += cost;
+              totalCost += cost;
+            }
+            return;
+          }
+
+          packageRow.componentCount += 1;
+          if (!test) {
+            packageRow.row.missing_cost_quantity += quantity;
+            missingCostItems += quantity;
+            return;
+          }
+
+          const testCost =
+            test.test_cost === null ||
+            test.test_cost === undefined ||
+            test.test_cost === ""
+              ? null
+              : getNumber(test.test_cost, null);
+          if (testCost === null) {
+            packageRow.row.missing_cost_quantity += quantity;
+            missingCostItems += quantity;
+          } else {
+            const cost = testCost * quantity;
+            packageRow.row.cost += cost;
+            totalCost += cost;
+          }
+        });
+
+      packageRows.forEach((packageRow) => {
+        if (packageRow.componentCount === 0) {
+          packageRow.row.missing_cost_quantity += packageRow.quantity;
+          missingCostItems += packageRow.quantity;
+        }
+      });
+
+      if (subtotal <= 0 && billedAmount > 0) {
+        const key = `unallocated:${bill.id || billIndex}`;
+        const row = addItem(key, {
+          item_type: "Unallocated",
+          item_name: "Bill amount without item details",
+        });
+        row.quantity += 1;
+        row.revenue += billedAmount;
+        row.missing_cost_quantity += 1;
+        missingCostItems += 1;
+        totalRevenue += billedAmount;
+      }
+    });
+
+    const rows = Array.from(itemTotals.values())
+      .map((row) => {
+        const profit = row.revenue - row.cost;
+        return {
+          ...row,
+          profit,
+          profit_margin: row.revenue > 0 ? (profit / row.revenue) * 100 : 0,
+        };
+      })
+      .sort((a, b) => b.revenue - a.revenue);
+    const estimatedProfit = totalRevenue - totalCost;
+
+    return {
+      total_bills: billIds.size,
+      total_revenue: totalRevenue,
+      total_cost: totalCost,
+      estimated_profit: missingCostItems > 0 ? null : estimatedProfit,
+      profit_margin:
+        missingCostItems > 0
+          ? null
+          : totalRevenue > 0
+            ? (estimatedProfit / totalRevenue) * 100
+            : 0,
+      missing_cost_items: missingCostItems,
+      rows,
+    };
+  }
+
   // Sample data methods for offline mode
   getSampleDailySalesData() {
     return [
@@ -560,32 +777,6 @@ class ReportsService {
         center_name: "Branch Lab",
         total_bills: 18,
         total_amount: 27000.0,
-      },
-    ];
-  }
-
-  getSampleTestCostSummary() {
-    return [
-      {
-        test_name: "FBC",
-        test_count: 1,
-        test_cost: 200,
-        total_test_cost: 200,
-        missing_cost_quantity: 0,
-      },
-      {
-        test_name: "CRP",
-        test_count: 1,
-        test_cost: 350,
-        total_test_cost: 350,
-        missing_cost_quantity: 0,
-      },
-      {
-        test_name: "LFT",
-        test_count: 1,
-        test_cost: 280,
-        total_test_cost: 280,
-        missing_cost_quantity: 0,
       },
     ];
   }

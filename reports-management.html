@@ -269,15 +269,15 @@
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary"
-                            type="button" role="tab">
-                            Test Cost Summary
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
                         <button class="nav-link" id="commission-tab" data-bs-toggle="tab" data-bs-target="#commission"
                             type="button" role="tab">
                             Commission
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="test-cost-tab" data-bs-toggle="tab" data-bs-target="#test-cost"
+                            type="button" role="tab">
+                            Test Cost &amp; Profit
                         </button>
                     </li>
                 </ul>
@@ -305,6 +305,7 @@
                                     </select>
                                 </div>
                             </div>
+
                         </div>
 
                         <!-- Report Content -->
@@ -482,70 +483,6 @@
                         </div>
                     </div>
 
-                    <!-- Test Cost Summary Tab -->
-                    <div class="tab-pane fade" id="summary" role="tabpanel">
-                        <div class="filter-section">
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <label class="form-label">From Date</label>
-                                    <input type="date" class="form-control" id="summary-from-date">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">To Date</label>
-                                    <input type="date" class="form-control" id="summary-to-date">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Center</label>
-                                    <select class="form-control" id="summary-center-filter">
-                                        <option value="all">All Centers</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <h3 class="report-title">Test Cost Summary</h3>
-                        <p class="text-muted">Counts tests billed directly and through packages. Cost totals use each test's currently configured test cost.</p>
-                        <div class="report-summary show" id="test-summary">
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="summary-item">
-                                        <span class="summary-label">Total Test Items</span>
-                                        <span class="summary-value" id="summary-total-quantity">0</span>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="summary-item">
-                                        <span class="summary-label">Total Test Cost</span>
-                                        <span class="summary-value" id="summary-total-cost">Rs. 0.00</span>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="summary-item">
-                                        <span class="summary-label">Units Missing Cost</span>
-                                        <span class="summary-value" id="summary-missing-cost">0</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-bordered">
-                                <thead>
-                                    <tr>
-                                        <th>TEST</th>
-                                        <th>TEST QUANTITY</th>
-                                        <th>COST PER TEST</th>
-                                        <th>TOTAL TEST COST</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td colspan="4" class="no-data">No data found</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
                     <!-- Commission Tab -->
                     <div class="tab-pane fade" id="commission" role="tabpanel">
 
@@ -573,6 +510,7 @@
                                     </select>
                                 </div>
                             </div>
+
                         </div>
 
                         <!-- Report Content -->
@@ -589,6 +527,96 @@
                                         <th>TOTAL AMOUNT</th>
                                         <th>COMMISSION RATE</th>
                                         <th>COMMISSION AMOUNT</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="8" class="no-data">No data found</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Test Cost and Profitability Tab -->
+                    <div class="tab-pane fade" id="test-cost" role="tabpanel">
+                        <div class="filter-section">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label class="form-label">From Date</label>
+                                    <input type="date" class="form-control" id="test-cost-from-date">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">To Date</label>
+                                    <input type="date" class="form-control" id="test-cost-to-date">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Center</label>
+                                    <select class="form-control" id="test-cost-center-filter">
+                                        <option value="all">All Centers</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h3 class="report-title">Test Cost &amp; Profitability Report</h3>
+                        <div class="report-summary show" id="test-cost-summary">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="summary-item">
+                                        <span class="summary-label">Bills:</span>
+                                        <span class="summary-value" id="test-cost-total-bills">0</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="summary-item">
+                                        <span class="summary-label">Billed Revenue:</span>
+                                        <span class="summary-value" id="test-cost-total-revenue">Rs. 0.00</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="summary-item">
+                                        <span class="summary-label">Known Test Cost:</span>
+                                        <span class="summary-value" id="test-cost-total-cost">Rs. 0.00</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="summary-item">
+                                        <span class="summary-label">Estimated Gross Profit:</span>
+                                        <span class="summary-value" id="test-cost-estimated-profit">Rs. 0.00</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-6">
+                                    <div class="summary-item">
+                                        <span class="summary-label">Estimated Profit Margin:</span>
+                                        <span class="summary-value" id="test-cost-profit-margin">0.0%</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="summary-item">
+                                        <span class="summary-label">Units Missing Cost Data:</span>
+                                        <span class="summary-value" id="test-cost-missing-count">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="alert alert-warning mt-3 mb-0" id="test-cost-data-note" role="status">
+                                Profit and margin are incomplete when test cost data is missing.
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>TYPE</th>
+                                        <th>TEST / PACKAGE</th>
+                                        <th class="text-end">QTY SOLD</th>
+                                        <th class="text-end">BILLED REVENUE</th>
+                                        <th class="text-end">TEST COST</th>
+                                        <th class="text-end">EST. GROSS PROFIT</th>
+                                        <th class="text-end">EST. MARGIN</th>
+                                        <th>COST DATA</th>
                                     </tr>
                                 </thead>
                                 <tbody>

@@ -272,7 +272,6 @@ window.UserCenterAccess = {
     "monthly-center-filter",
     "center-center-filter",
     "commission-center-filter",
-    "summary-center-filter",
     "bills-center-filter",
   ];
   const selector = centerSelectIds

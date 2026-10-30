@@ -85,7 +85,7 @@ class ReportsController {
             return;
         }
         document.querySelectorAll(
-            '#daily-center-filter, #monthly-center-filter, #center-center-filter, #commission-center-filter, #summary-center-filter'
+            '#daily-center-filter, #monthly-center-filter, #center-center-filter, #commission-center-filter, #test-cost-center-filter'
         ).forEach((filter) => {
             if (Array.from(filter.options).some((option) => option.value === centerId)) {
                 filter.value = centerId;
@@ -96,15 +96,16 @@ class ReportsController {
 
     setupEventListeners() {
         document.querySelectorAll(
-            '#daily-center-filter, #monthly-center-filter, #center-center-filter, #commission-center-filter, #summary-center-filter'
+            '#daily-center-filter, #monthly-center-filter, #center-center-filter, #commission-center-filter, #test-cost-center-filter'
         ).forEach((filter) => {
             filter.addEventListener('change', () => this.handleReportCenterChange(filter.value));
         });
 
         document.querySelectorAll(
             '#daily-from-date, #daily-to-date, #monthly-year-filter, #monthly-month-filter, ' +
-            '#center-from-date, #center-to-date, #summary-from-date, #summary-to-date, ' +
-            '#commission-from-date, #commission-to-date, #commission-reference-filter'
+            '#center-from-date, #center-to-date, ' +
+            '#commission-from-date, #commission-to-date, #commission-reference-filter, ' +
+            '#test-cost-from-date, #test-cost-to-date'
         ).forEach((filter) => {
             filter.addEventListener('change', () => this.loadReportData());
         });
@@ -155,6 +156,11 @@ class ReportsController {
         if (commissionFromDateInput) commissionFromDateInput.value = todayStr;
         if (commissionToDateInput) commissionToDateInput.value = todayStr;
 
+        const testCostFromDateInput = document.getElementById('test-cost-from-date');
+        const testCostToDateInput = document.getElementById('test-cost-to-date');
+        if (testCostFromDateInput) testCostFromDateInput.value = todayStr;
+        if (testCostToDateInput) testCostToDateInput.value = todayStr;
+
         // Set default year to 2025 for monthly filter
         const monthlyYearFilter = document.getElementById('monthly-year-filter');
         if (monthlyYearFilter) {
@@ -180,7 +186,7 @@ class ReportsController {
                 'monthly-center-filter',
                 'center-center-filter',
                 'commission-center-filter',
-                'summary-center-filter'
+                'test-cost-center-filter'
             ];
 
             centerFilters.forEach(filterId => {
@@ -285,12 +291,12 @@ class ReportsController {
         await this.loadCommissionData(fromDate, toDate, referenceName, centerId);
     }
 
-    async applySummaryFilter() {
-        const fromDate = document.getElementById('summary-from-date')?.value;
-        const toDate = document.getElementById('summary-to-date')?.value;
-        const centerId = this.resolveReportCenterId(document.getElementById('summary-center-filter')?.value);
+    async applyTestCostFilter() {
+        const fromDate = document.getElementById('test-cost-from-date')?.value;
+        const toDate = document.getElementById('test-cost-to-date')?.value;
+        const centerId = this.resolveReportCenterId(document.getElementById('test-cost-center-filter')?.value);
 
-        await this.loadTestCostSummary(fromDate, toDate, centerId);
+        await this.loadTestCostData(fromDate, toDate, centerId);
     }
 
     async loadReportData() {
@@ -304,11 +310,11 @@ class ReportsController {
             case 'center':
                 await this.applyCenterFilter();
                 break;
-            case 'summary':
-                await this.applySummaryFilter();
-                break;
             case 'commission':
                 await this.applyCommissionFilter();
+                break;
+            case 'test-cost':
+                await this.applyTestCostFilter();
                 break;
         }
     }
@@ -358,21 +364,6 @@ class ReportsController {
         }
     }
 
-    async loadTestCostSummary(fromDate = null, toDate = null, centerId = null) {
-        try {
-            if (!this.reportsService) {
-                this.showError('summary', 'Reports service not available');
-                return;
-            }
-            this.showLoading('summary');
-            const data = await this.reportsService.getTestCostSummary(fromDate, toDate, this.resolveReportCenterId(centerId));
-            this.displayTestCostSummary(data);
-        } catch (error) {
-            console.error('Error loading test cost summary:', error);
-            this.showError('summary', 'Failed to load test cost summary: ' + error.message);
-        }
-    }
-
     async loadCommissionData(fromDate = null, toDate = null, referenceName = null, centerId = null) {
         try {
             if (!this.reportsService) {
@@ -385,6 +376,25 @@ class ReportsController {
         } catch (error) {
             console.error('Error loading commission data:', error);
             this.showError('commission', 'Failed to load commission data: ' + error.message);
+        }
+    }
+
+    async loadTestCostData(fromDate = null, toDate = null, centerId = null) {
+        try {
+            if (!this.reportsService) {
+                this.showError('test-cost', 'Reports service not available');
+                return;
+            }
+            this.showLoading('test-cost');
+            const report = await this.reportsService.getTestCostProfitReport(
+                fromDate,
+                toDate,
+                this.resolveReportCenterId(centerId)
+            );
+            this.displayTestCostData(report);
+        } catch (error) {
+            console.error('Error loading test cost and profit data:', error);
+            this.showError('test-cost', 'Failed to load test cost and profit data: ' + error.message);
         }
     }
 
@@ -577,41 +587,6 @@ class ReportsController {
             '</tr>';
     }
 
-    displayTestCostSummary(data) {
-        const tbody = document.querySelector('#summary tbody');
-        if (!tbody) return;
-
-        const rows = Array.isArray(data) ? data : [];
-        const totalQuantity = rows.reduce((sum, test) => sum + test.test_count, 0);
-        const totalCost = rows.reduce((sum, test) => sum + test.total_test_cost, 0);
-        const missingCostQuantity = rows.reduce((sum, test) => sum + test.missing_cost_quantity, 0);
-
-        document.getElementById('summary-total-quantity').textContent = totalQuantity;
-        document.getElementById('summary-total-cost').textContent = 'Rs. ' + totalCost.toFixed(2);
-        document.getElementById('summary-missing-cost').textContent = missingCostQuantity;
-
-        if (rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="no-data"><i class="fas fa-info-circle"></i>No test data found for the selected criteria</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = rows.map(test =>
-            '<tr>' +
-            '<td>' + this.escapeHtml(test.test_name) + '</td>' +
-            '<td class="text-center">' + test.test_count + '</td>' +
-            '<td class="text-end">' + (test.test_cost === null ? 'Not Set' : 'Rs. ' + test.test_cost.toFixed(2)) + '</td>' +
-            '<td class="text-end">Rs. ' + test.total_test_cost.toFixed(2) + '</td>' +
-            '</tr>'
-        ).join('');
-
-        tbody.innerHTML += '<tr class="table-info">' +
-            '<td><strong>Total:</strong></td>' +
-            '<td class="text-center"><strong>' + totalQuantity + '</strong></td>' +
-            '<td class="text-end"><strong>-</strong></td>' +
-            '<td class="text-end"><strong>Rs. ' + totalCost.toFixed(2) + '</strong></td>' +
-            '</tr>';
-    }
-
     escapeHtml(value) {
         const element = document.createElement('span');
         element.textContent = value || 'N/A';
@@ -675,6 +650,62 @@ class ReportsController {
             '</tr>';
     }
 
+    displayTestCostData(report) {
+        const tbody = document.querySelector('#test-cost tbody');
+        if (!tbody) return;
+
+        const data = report || {};
+        const formatCurrency = (amount) => 'Rs. ' + Number(amount || 0).toFixed(2);
+        const rows = Array.isArray(data.rows) ? data.rows : [];
+
+        document.getElementById('test-cost-total-bills').textContent = data.total_bills || 0;
+        document.getElementById('test-cost-total-revenue').textContent = formatCurrency(data.total_revenue);
+        document.getElementById('test-cost-total-cost').textContent = formatCurrency(data.total_cost);
+        document.getElementById('test-cost-estimated-profit').textContent =
+            data.missing_cost_items > 0 ? 'Incomplete' : formatCurrency(data.estimated_profit);
+        document.getElementById('test-cost-profit-margin').textContent =
+            data.missing_cost_items > 0 ? 'Incomplete' : Number(data.profit_margin || 0).toFixed(1) + '%';
+        document.getElementById('test-cost-missing-count').textContent = data.missing_cost_items || 0;
+
+        const note = document.getElementById('test-cost-data-note');
+        if (note) {
+            note.classList.toggle('alert-warning', data.missing_cost_items > 0);
+            note.classList.toggle('alert-success', !data.missing_cost_items);
+            note.textContent = data.missing_cost_items > 0
+                ? 'Profit and margin are incomplete because ' + data.missing_cost_items +
+                    ' units have no test cost. Update test costs for a complete estimate.'
+                : 'All test costs are configured. Gross profit is billed revenue minus test cost, before commissions and overhead.';
+        }
+
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="no-data"><i class="fas fa-info-circle"></i>No cost data found for the selected criteria</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = rows.map((item) => {
+            const hasCompleteCost = item.missing_cost_quantity === 0;
+            return '<tr>' +
+                '<td>' + this.escapeHtml(item.item_type) + '</td>' +
+                '<td>' + this.escapeHtml(item.item_name) + '</td>' +
+                '<td class="text-end">' + Number(item.quantity || 0).toLocaleString('en-US') + '</td>' +
+                '<td class="text-end">' + formatCurrency(item.revenue) + '</td>' +
+                '<td class="text-end">' + formatCurrency(item.cost) + '</td>' +
+                '<td class="text-end">' + (hasCompleteCost ? formatCurrency(item.profit) : 'Incomplete') + '</td>' +
+                '<td class="text-end">' + (hasCompleteCost ? Number(item.profit_margin || 0).toFixed(1) + '%' : 'Incomplete') + '</td>' +
+                '<td>' + (hasCompleteCost ? 'Complete' : Number(item.missing_cost_quantity) + ' unit(s) missing') + '</td>' +
+                '</tr>';
+        }).join('') +
+        '<tr class="table-info">' +
+            '<td colspan="2"><strong>Total</strong></td>' +
+            '<td class="text-end"><strong>' + rows.reduce((sum, item) => sum + Number(item.quantity || 0), 0).toLocaleString('en-US') + '</strong></td>' +
+            '<td class="text-end"><strong>' + formatCurrency(data.total_revenue) + '</strong></td>' +
+            '<td class="text-end"><strong>' + formatCurrency(data.total_cost) + '</strong></td>' +
+            '<td class="text-end"><strong>' + (data.missing_cost_items > 0 ? 'Incomplete' : formatCurrency(data.estimated_profit)) + '</strong></td>' +
+            '<td class="text-end"><strong>' + (data.missing_cost_items > 0 ? 'Incomplete' : Number(data.profit_margin || 0).toFixed(1) + '%') + '</strong></td>' +
+            '<td></td>' +
+        '</tr>';
+    }
+
     showLoading(tabId) {
         const tbody = document.querySelector('#' + tabId + ' tbody');
         if (tbody) {
@@ -695,8 +726,8 @@ class ReportsController {
             'daily': 7,
             'monthly': 3,
             'center': 3,
-            'summary': 4,
-            'commission': 8
+            'commission': 8,
+            'test-cost': 8
         };
         return columnCounts[tabId] || 6;
     }
@@ -754,6 +785,7 @@ class ReportsController {
                 // Get report type from active tab
                 const reportType = this.getReportType(activeTab);
                 const dateRange = this.getDateRangeForPrint(activeTab);
+                const summary = activeTab.querySelector('.report-summary.show');
 
                 const htmlContent = '<html>' +
                     '<head>' +
@@ -766,6 +798,10 @@ class ReportsController {
                     '.date-range { font-size: 12px; color: #333; font-weight: 500; margin-bottom: 5px; }' +
                     '.report-date { font-size: 11px; color: #888; }' +
                     'table { width: 100%; border-collapse: collapse; margin-top: 15px; }' +
+                    '.report-summary { display: block; margin-bottom: 12px; padding: 8px; border: 1px solid #ddd; }' +
+                    '.summary-item { display: inline-block; min-width: 24%; padding: 4px; text-align: center; }' +
+                    '.summary-label { display: block; color: #555; }' +
+                    '.summary-value { display: block; font-weight: bold; }' +
                     'th, td { border: 1px solid #ddd; padding: 4px; text-align: left; line-height: 1.2; }' +
                     'th { background-color: #f2f2f2; font-weight: bold; font-size: 11px; }' +
                     'td { font-size: 10px; }' +
@@ -793,6 +829,7 @@ class ReportsController {
                     (dateRange ? '<div class="date-range">' + dateRange + '</div>' : '') +
                     '<div class="report-date">Generated on: ' + new Date().toLocaleString() + '</div>' +
                     '</div>' +
+                    (summary ? summary.outerHTML : '') +
                     table.outerHTML +
                     '</body>' +
                     '</html>';
@@ -812,10 +849,10 @@ class ReportsController {
                 return 'Monthly Sales Report';
             case 'center':
                 return 'Center Wise Report';
-            case 'summary':
-                return 'Test Cost Summary';
             case 'commission':
                 return 'Commission Report';
+            case 'test-cost':
+                return 'Test Cost and Profitability Report';
             default:
                 return 'Report';
         }
@@ -834,13 +871,13 @@ class ReportsController {
                 fromDate = document.getElementById('center-from-date')?.value;
                 toDate = document.getElementById('center-to-date')?.value;
                 break;
-            case 'summary':
-                fromDate = document.getElementById('summary-from-date')?.value;
-                toDate = document.getElementById('summary-to-date')?.value;
-                break;
             case 'commission':
                 fromDate = document.getElementById('commission-from-date')?.value;
                 toDate = document.getElementById('commission-to-date')?.value;
+                break;
+            case 'test-cost':
+                fromDate = document.getElementById('test-cost-from-date')?.value;
+                toDate = document.getElementById('test-cost-to-date')?.value;
                 break;
             case 'monthly':
                 year = document.getElementById('monthly-year-filter')?.value;
@@ -898,7 +935,25 @@ class ReportsController {
         if (activeTab) {
             const table = activeTab.querySelector('table');
             if (table) {
-                const csv = this.tableToCSV(table);
+                const summaryRows = Array.from(
+                    activeTab.querySelectorAll('.report-summary.show .summary-item')
+                ).map((item) => {
+                    const label = item.querySelector('.summary-label')?.textContent.trim() || '';
+                    const value = item.querySelector('.summary-value')?.textContent.trim() || '';
+                    return [label, value]
+                        .map((text) => '"' + text.replace(/"/g, '""') + '"')
+                        .join(',');
+                });
+                const summaryNote = activeTab.querySelector('.report-summary.show .alert');
+                if (summaryNote) {
+                    summaryRows.push(
+                        '"Note","' + summaryNote.textContent.trim().replace(/"/g, '""') + '"'
+                    );
+                }
+                const summaryCsv = summaryRows.length
+                    ? summaryRows.join('\n') + '\n\n'
+                    : '';
+                const csv = summaryCsv + this.tableToCSV(table);
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
