@@ -1,6 +1,8 @@
 class PricingManagementController {
   constructor() {
     this.currentCenterId = "";
+    this.pricingLoadedCenterId = "";
+    this.pricingLoadRequestId = 0;
     this.testsWithPrices = [];
     this.packagesWithPrices = [];
     this.testSearchTerm = "";
@@ -77,6 +79,18 @@ class PricingManagementController {
     });
   }
 
+  setPricingActionButtonsDisabled(disabled) {
+    [
+      "saveTestPricesBtn",
+      "resetTestPricesBtn",
+      "savePackagePricesBtn",
+      "resetPackagePricesBtn",
+    ].forEach((id) => {
+      const button = document.getElementById(id);
+      if (button) button.disabled = disabled;
+    });
+  }
+
   ensureServicesReady() {
     if (!this.centerService || !this.pricingService) {
       throw new Error("Required services are not available");
@@ -99,9 +113,26 @@ class PricingManagementController {
     }
   }
 
+  getSelectedCenterId() {
+    return this.centerSelect?.value || "";
+  }
+
   setupEventListeners() {
     this.centerSelect?.addEventListener("change", (event) => {
-      this.currentCenterId = event.target.value || "";
+      const centerId = event.target.value || "";
+      if (!window.UserCenterAccess?.setActiveCenterId(centerId)) {
+        this.centerSelect.value = this.currentCenterId;
+        this.showError("You are not assigned to this center");
+        return;
+      }
+
+      this.currentCenterId = centerId;
+      this.clearPricingData();
+      if (centerId) {
+        this.loadPricing(centerId);
+      } else {
+        this.setActionButtonsDisabled(true);
+      }
     });
 
     document.getElementById("loadPricingBtn")?.addEventListener("click", () => {
@@ -156,14 +187,27 @@ class PricingManagementController {
       });
 
       const user = this.getLoggedInUser();
-      const userCenterId = user?.center_id || "";
+      const assignedCenterIds =
+        window.UserCenterAccess?.getAssignedCenterIds(user) || [];
+      const defaultCenterId =
+        window.UserCenterAccess?.getDefaultCenterId(
+          user,
+          centers.map((center) => center.id)
+        );
+      const activeCenterId =
+        window.UserCenterAccess?.getActiveCenterId(user);
+      const userCenterId =
+        activeCenterId && centers.some((center) => center.id === activeCenterId)
+          ? activeCenterId
+          : defaultCenterId && (
+              user?.role === "admin" || assignedCenterIds.includes(defaultCenterId)
+            )
+            ? defaultCenterId
+            : "";
       if (userCenterId) {
         this.centerSelect.value = userCenterId;
         this.currentCenterId = userCenterId;
-      }
-
-      if (user?.role !== "admin" && userCenterId) {
-        this.centerSelect.setAttribute("disabled", "disabled");
+        window.UserCenterAccess?.setActiveCenterId(userCenterId);
       }
 
       if (!centers.length) {
@@ -176,10 +220,12 @@ class PricingManagementController {
       }
 
       this.clearPageAlert();
-      this.setActionButtonsDisabled(false);
 
       if (this.currentCenterId) {
-        await this.loadPricing();
+        await this.loadPricing(this.currentCenterId);
+      } else {
+        this.clearPricingData();
+        this.setActionButtonsDisabled(true);
       }
     } catch (error) {
       console.error("Error loading centers for pricing management:", error);
@@ -194,43 +240,73 @@ class PricingManagementController {
     }
   }
 
-  async loadPricing() {
-    if (!this.currentCenterId) {
+  async loadPricing(centerId = this.currentCenterId) {
+    if (!centerId) {
       this.showWarning("Please select a center first");
       return;
     }
 
-    try {
-      this.clearPageAlert();
-      await Promise.all([this.loadTestPricing(), this.loadPackagePricing()]);
-    } catch (error) {
-      console.error("Error loading pricing:", error);
-      this.setPageAlert(error?.message || "Failed to load pricing data from backend");
-      this.showError(error?.message || "Failed to load pricing data");
-    }
-  }
-
-  async loadTestPricing() {
+    const requestId = ++this.pricingLoadRequestId;
+    this.pricingLoadedCenterId = "";
+    this.setActionButtonsDisabled(true);
     this.setLoadingState("test", true);
-    try {
-      this.testsWithPrices = await this.pricingService.getTestsWithCenterPrices(
-        this.currentCenterId
-      );
-      this.renderTestPricingTable();
-    } finally {
-      this.setLoadingState("test", false);
-    }
-  }
-
-  async loadPackagePricing() {
     this.setLoadingState("package", true);
     try {
-      this.packagesWithPrices = await this.pricingService.getPackagesWithCenterPrices(
-        this.currentCenterId
-      );
+      this.clearPageAlert();
+      const [tests, packages] = await Promise.all([
+        this.pricingService.getTestsWithCenterPrices(centerId),
+        this.pricingService.getPackagesWithCenterPrices(centerId),
+      ]);
+      if (
+        requestId !== this.pricingLoadRequestId ||
+        centerId !== this.centerSelect?.value
+      ) {
+        return;
+      }
+
+      this.testsWithPrices = tests;
+      this.packagesWithPrices = packages;
+      this.pricingLoadedCenterId = centerId;
+      this.renderTestPricingTable();
       this.renderPackagePricingTable();
+    } catch (error) {
+      if (requestId === this.pricingLoadRequestId) {
+        console.error("Error loading pricing:", error);
+        this.setPageAlert(
+          error?.message || "Failed to load pricing data from backend"
+        );
+        this.showError(error?.message || "Failed to load pricing data");
+      }
     } finally {
-      this.setLoadingState("package", false);
+      if (requestId === this.pricingLoadRequestId) {
+        this.setLoadingState("test", false);
+        this.setLoadingState("package", false);
+        const centerIsSelected = this.centerSelect?.value === centerId;
+        const loadButton = document.getElementById("loadPricingBtn");
+        if (loadButton) loadButton.disabled = !centerIsSelected;
+        this.setPricingActionButtonsDisabled(
+          !centerIsSelected || this.pricingLoadedCenterId !== centerId
+        );
+      }
+    }
+  }
+
+  clearPricingData() {
+    this.pricingLoadRequestId++;
+    this.pricingLoadedCenterId = "";
+    this.testsWithPrices = [];
+    this.packagesWithPrices = [];
+    this.setLoadingState("test", false);
+    this.setLoadingState("package", false);
+    if (this.testSummary) this.testSummary.innerHTML = "";
+    if (this.packageSummary) this.packageSummary.innerHTML = "";
+    if (this.testTableBody) {
+      this.testTableBody.innerHTML =
+        '<tr><td colspan="6" class="text-center">Loading selected center pricing...</td></tr>';
+    }
+    if (this.packageTableBody) {
+      this.packageTableBody.innerHTML =
+        '<tr><td colspan="6" class="text-center">Loading selected center pricing...</td></tr>';
     }
   }
 
@@ -415,22 +491,27 @@ class PricingManagementController {
   }
 
   ensureCenterSelected() {
-    if (this.currentCenterId) return true;
-    this.showWarning("Please select a center first");
+    if (
+      this.currentCenterId &&
+      this.currentCenterId === this.centerSelect?.value &&
+      this.pricingLoadedCenterId === this.currentCenterId
+    ) return true;
+    this.showWarning("Load pricing for the selected center before saving");
     return false;
   }
 
   async saveTestPrices() {
     if (!this.ensureCenterSelected()) return;
+    const centerId = this.currentCenterId;
 
     try {
       const entries = this.collectPriceEntries(
         "#testPricingTableBody .price-input",
         "test_id"
       );
-      await this.pricingService.setBulkTestPrices(this.currentCenterId, entries);
+      await this.pricingService.setBulkTestPrices(centerId, entries);
       this.showSuccess("Test prices saved successfully");
-      await this.loadTestPricing();
+      if (centerId === this.getSelectedCenterId()) await this.loadPricing(centerId);
     } catch (error) {
       console.error("Error saving test prices:", error);
       this.showError(error?.message || "Failed to save test prices");
@@ -439,15 +520,16 @@ class PricingManagementController {
 
   async savePackagePrices() {
     if (!this.ensureCenterSelected()) return;
+    const centerId = this.currentCenterId;
 
     try {
       const entries = this.collectPriceEntries(
         "#packagePricingTableBody .price-input",
         "package_id"
       );
-      await this.pricingService.setBulkPackagePrices(this.currentCenterId, entries);
+      await this.pricingService.setBulkPackagePrices(centerId, entries);
       this.showSuccess("Package prices saved successfully");
-      await this.loadPackagePricing();
+      if (centerId === this.getSelectedCenterId()) await this.loadPricing(centerId);
     } catch (error) {
       console.error("Error saving package prices:", error);
       this.showError(error?.message || "Failed to save package prices");
@@ -456,14 +538,15 @@ class PricingManagementController {
 
   async resetTestPrices() {
     if (!this.ensureCenterSelected()) return;
+    const centerId = this.currentCenterId;
     if (!window.confirm("Reset all test prices for this center back to global prices?")) {
       return;
     }
 
     try {
-      await this.pricingService.resetAllTestPrices(this.currentCenterId);
+      await this.pricingService.resetAllTestPrices(centerId);
       this.showSuccess("All test prices reset to global prices");
-      await this.loadTestPricing();
+      if (centerId === this.getSelectedCenterId()) await this.loadPricing(centerId);
     } catch (error) {
       console.error("Error resetting test prices:", error);
       this.showError(error?.message || "Failed to reset test prices");
@@ -472,6 +555,7 @@ class PricingManagementController {
 
   async resetPackagePrices() {
     if (!this.ensureCenterSelected()) return;
+    const centerId = this.currentCenterId;
     if (
       !window.confirm("Reset all package prices for this center back to global prices?")
     ) {
@@ -479,9 +563,9 @@ class PricingManagementController {
     }
 
     try {
-      await this.pricingService.resetAllPackagePrices(this.currentCenterId);
+      await this.pricingService.resetAllPackagePrices(centerId);
       this.showSuccess("All package prices reset to global prices");
-      await this.loadPackagePricing();
+      if (centerId === this.getSelectedCenterId()) await this.loadPricing(centerId);
     } catch (error) {
       console.error("Error resetting package prices:", error);
       this.showError(error?.message || "Failed to reset package prices");
@@ -489,12 +573,13 @@ class PricingManagementController {
   }
 
   async resetSingleTestPrice(testId) {
-    if (!this.currentCenterId || !testId) return;
+    if (!this.ensureCenterSelected() || !testId) return;
+    const centerId = this.currentCenterId;
 
     try {
-      await this.pricingService.deleteTestPrice(this.currentCenterId, testId);
+      await this.pricingService.deleteTestPrice(centerId, testId);
       this.showSuccess("Test price reset to global price");
-      await this.loadTestPricing();
+      if (centerId === this.getSelectedCenterId()) await this.loadPricing(centerId);
     } catch (error) {
       console.error("Error resetting single test price:", error);
       this.showError(error?.message || "Failed to reset test price");
@@ -502,12 +587,13 @@ class PricingManagementController {
   }
 
   async resetSinglePackagePrice(packageId) {
-    if (!this.currentCenterId || !packageId) return;
+    if (!this.ensureCenterSelected() || !packageId) return;
+    const centerId = this.currentCenterId;
 
     try {
-      await this.pricingService.deletePackagePrice(this.currentCenterId, packageId);
+      await this.pricingService.deletePackagePrice(centerId, packageId);
       this.showSuccess("Package price reset to global price");
-      await this.loadPackagePricing();
+      if (centerId === this.getSelectedCenterId()) await this.loadPricing(centerId);
     } catch (error) {
       console.error("Error resetting single package price:", error);
       this.showError(error?.message || "Failed to reset package price");

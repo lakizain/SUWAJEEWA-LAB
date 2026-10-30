@@ -1,8 +1,9 @@
 # Multi-center staff access
 
 This change lets one staff login be assigned to multiple laboratory centers and
-choose the center whose reports they are entering. Existing users' `center_id`
-assignments are copied into the new `admin_user_centers` mapping table.
+choose the active center used across center-aware pages. Existing users'
+`center_id` assignments are copied into the new `admin_user_centers` mapping
+table.
 
 ## Setup
 
@@ -12,15 +13,22 @@ assignments are copied into the new `admin_user_centers` mapping table.
 4. In **Admin User Management**, edit each staff account and select all centers
    where that person is authorized to enter reports. Select one of those
    centers as the **Main center**; it is saved in `admin_users.center_id`.
-5. At **Report Entry**, the staff member selects the active center. The bill
-   list is then limited to that center. The main center is selected by default,
-   and a different authorized center can be selected when needed. The current
-   selection is remembered for the browser session.
+5. On a center-aware page, the staff member selects an authorized center. The
+   active center is shared by Billing, Report Entry, Pricing, Reports, Patient
+   History, and the bills filter in Admin User Management. Center-specific
+   information refreshes for the selected center. The selection is remembered
+   for that user and synchronized across browser tabs. The staff member's Main
+   center is the default. Admins use the first active center (sorted by name)
+   as their default. The default center is shown in bold green; another
+   selected center is shown in bold red. Center options are bold, with the
+   default option shown in green. Signing in resets the active center to that
+   user's default.
 6. Have users sign out and sign back in so their browser session reloads the
    current center assignments.
 
 Existing single-center users continue to have their current center assigned
-after the migration. Admin users retain the existing all-centers behavior.
+after the migration. Admin users can select any center; report filters may
+still explicitly use **All Centers** when that option is selected.
 
 ## Security note
 

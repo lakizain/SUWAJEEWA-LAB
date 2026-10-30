@@ -139,10 +139,29 @@ class ReportEntryService {
     return this.supabase !== null;
   }
 
-  // Helper to apply center filter to a query (applies to ALL users with a center_id)
-  applyCenterFilter(query) {
-    if (this.getUserCenterId()) {
-      query = query.eq("center_id", this.getUserCenterId());
+  // Apply the selected center while restricting non-admins to assigned centers.
+  applyCenterFilter(query, centerId) {
+    const user = this.getCurrentUser();
+    if (centerId === "all") {
+      if (user?.role !== "admin") {
+        throw new Error("You are not authorized to view all centers");
+      }
+      return query;
+    }
+
+    const selectedCenterId =
+      centerId === undefined ? this.getUserCenterId() : centerId;
+    if (
+      user?.role !== "admin" &&
+      selectedCenterId &&
+      !(window.UserCenterAccess?.getAssignedCenterIds(user) || []).includes(
+        selectedCenterId
+      )
+    ) {
+      throw new Error("You are not assigned to this center");
+    }
+    if (selectedCenterId) {
+      query = query.eq("center_id", selectedCenterId);
     }
     return query;
   }
@@ -178,7 +197,7 @@ class ReportEntryService {
   }
 
   // Get today's bills with all test details
-  async getTodaysBills() {
+  async getTodaysBills(centerId) {
     try {
       if (!this.isSupabaseAvailable()) {
         console.log("Supabase not available, returning sample data");
@@ -218,7 +237,7 @@ class ReportEntryService {
         .lte("created_at", endOfDay)
         .order("created_at", { ascending: false });
 
-      query = this.applyCenterFilter(query);
+      query = this.applyCenterFilter(query, centerId);
 
       const { data: bills, error } = await query;
 
@@ -231,7 +250,7 @@ class ReportEntryService {
   }
 
   // Get bills by date range
-  async getBillsByDateRange(fromDate, toDate) {
+  async getBillsByDateRange(fromDate, toDate, centerId) {
     try {
       if (!this.isSupabaseAvailable()) {
         console.log("Supabase not available, returning sample data");
@@ -256,7 +275,7 @@ class ReportEntryService {
         .lte("bill_date", toDate)
         .order("created_at", { ascending: false });
 
-      query = this.applyCenterFilter(query);
+      query = this.applyCenterFilter(query, centerId);
 
       const { data: bills, error } = await query;
 
@@ -269,7 +288,7 @@ class ReportEntryService {
   }
 
   // Get bills by test filter
-  async getBillsByTest(testId) {
+  async getBillsByTest(testId, centerId) {
     try {
       if (!this.isSupabaseAvailable()) {
         console.log("Supabase not available, returning sample data");
@@ -293,7 +312,7 @@ class ReportEntryService {
         .eq("bill_items.test_id", testId)
         .order("created_at", { ascending: false });
 
-      query = this.applyCenterFilter(query);
+      query = this.applyCenterFilter(query, centerId);
 
       const { data: bills, error } = await query;
 
@@ -307,14 +326,6 @@ class ReportEntryService {
 
   // Get bills by center filter
   async getBillsByCenter(centerId) {
-    const user = this.getCurrentUser();
-    if (
-      user?.role !== "admin" &&
-      !window.UserCenterAccess?.getAssignedCenterIds(user).includes(centerId)
-    ) {
-      throw new Error("You are not assigned to this center");
-    }
-
     try {
       if (!this.isSupabaseAvailable()) {
         console.log("Supabase not available, returning sample data");
@@ -335,11 +346,9 @@ class ReportEntryService {
           centers (center_name, is_out_medical)
         `
         )
-        .eq("center_id", centerId)
         .order("created_at", { ascending: false });
 
-      // If user is not admin, we still apply the user's center filter
-      query = this.applyCenterFilter(query);
+      query = this.applyCenterFilter(query, centerId);
 
       const { data: bills, error } = await query;
 
@@ -352,7 +361,7 @@ class ReportEntryService {
   }
 
   // Search bills by bill number or patient name
-  async searchBills(searchTerm) {
+  async searchBills(searchTerm, centerId) {
     try {
       if (!this.isSupabaseAvailable()) {
         console.log("Supabase not available, returning sample data");
@@ -376,7 +385,7 @@ class ReportEntryService {
         .or(`bill_no.ilike.%${searchTerm}%,patient_name.ilike.%${searchTerm}%`)
         .order("created_at", { ascending: false });
 
-      query = this.applyCenterFilter(query);
+      query = this.applyCenterFilter(query, centerId);
 
       const { data: bills, error } = await query;
 
@@ -389,7 +398,7 @@ class ReportEntryService {
   }
 
   // Get bill by number
-  async getBillByNumber(billNo) {
+  async getBillByNumber(billNo, centerId) {
     try {
       if (!this.isSupabaseAvailable()) {
         console.log("Supabase not available, returning sample data");
@@ -412,7 +421,7 @@ class ReportEntryService {
         )
         .eq("bill_no", billNo);
 
-      query = this.applyCenterFilter(query);
+      query = this.applyCenterFilter(query, centerId);
 
       const { data: bill, error } = await query.single();
 

@@ -36,6 +36,8 @@ class ReportEntryController {
     this.currentBills = [];
     this.selectedBill = null;
     this.selectedTestItem = null;
+    this.billListRequestId = 0;
+    this.billSearchRequestId = 0;
     this.copiedTestResults = null;
     this.isLoading = false;
     this.testsIndexByName = new Map();
@@ -554,9 +556,21 @@ class ReportEntryController {
     this.highlightSelectedSubcategoryRow();
   }
 
-  async loadTodaysBills() {
+  getSelectedCenterId() {
+    return this.centerFilter?.value || "all";
+  }
+
+  async loadTodaysBills(centerId = this.getSelectedCenterId()) {
+    const requestId = ++this.billListRequestId;
     try {
-      this.currentBills = await this.reportEntryService.getTodaysBills();
+      const bills = await this.reportEntryService.getTodaysBills(centerId);
+      if (
+        requestId !== this.billListRequestId ||
+        centerId !== this.getSelectedCenterId()
+      ) {
+        return;
+      }
+      this.currentBills = bills;
       this.renderBillsTable();
     } catch (error) {
       console.error("Error loading today's bills:", error);
@@ -617,16 +631,23 @@ class ReportEntryController {
           option.textContent = center.center_name;
           this.centerFilter.appendChild(option);
         });
-        if (user?.role !== "admin") {
-          const selectedCenterId =
-            window.UserCenterAccess?.getActiveCenterId(user) || centers[0]?.id;
-          if (selectedCenterId) {
-            this.centerFilter.value = selectedCenterId;
-            window.UserCenterAccess?.setActiveCenterId(selectedCenterId);
-          } else {
-            this.centerFilter.disabled = true;
-            this.showError("Your account has no assigned center. Contact an administrator.");
-          }
+        const activeCenterId =
+          window.UserCenterAccess?.getActiveCenterId(user);
+        const defaultCenterId =
+          window.UserCenterAccess?.getDefaultCenterId(
+            user,
+            centers.map((center) => center.id)
+          );
+        const selectedCenterId =
+          activeCenterId && centers.some((center) => center.id === activeCenterId)
+            ? activeCenterId
+            : defaultCenterId;
+        if (selectedCenterId) {
+          this.centerFilter.value = selectedCenterId;
+          window.UserCenterAccess?.setActiveCenterId(selectedCenterId);
+        } else if (user?.role !== "admin") {
+          this.centerFilter.disabled = true;
+          this.showError("Your account has no assigned center. Contact an administrator.");
         }
       }
     } catch (error) {
@@ -955,6 +976,7 @@ class ReportEntryController {
     const items = Array.from(this.readySelectionKeys)
       .map((key) => this.readySelectionItems.get(key))
       .filter(Boolean);
+    const centerId = this.getSelectedCenterId();
 
     if (items.length === 0) {
       this.showError("Please select at least one test from Ready Reports");
@@ -1024,7 +1046,13 @@ class ReportEntryController {
           this.downloadReadyReportsBtn.textContent =
             `Preparing ${downloadedCount + 1} of ${items.length}…`;
         }
-        const bill = await this.reportEntryService.getBillByNumber(item.billNo);
+        const bill = await this.reportEntryService.getBillByNumber(
+          item.billNo,
+          centerId
+        );
+        if (centerId !== this.getSelectedCenterId()) {
+          throw new Error("The selected center changed. Please try again.");
+        }
         if (!bill) {
           throw new Error(`Could not load bill ${item.billNo || ""}`.trim());
         }
@@ -1044,6 +1072,9 @@ class ReportEntryController {
         this.populateSummaryForm(bill, billItem);
         await this.renderTestResults(bill, billItem);
         await this.loadReportHeaderForItem(billItem.id);
+        if (centerId !== this.getSelectedCenterId()) {
+          throw new Error("The selected center changed. Please try again.");
+        }
 
         const reportHTML = this.generatePrintHTML(options);
         const reportData = await this.loadReportPdfData(
@@ -1054,6 +1085,9 @@ class ReportEntryController {
           assets.reportFooter = await this.loadPdfImageData(reportData.footerImage);
         } else {
           delete assets.reportFooter;
+        }
+        if (centerId !== this.getSelectedCenterId()) {
+          throw new Error("The selected center changed. Please try again.");
         }
         this.drawReadyReport(
           pdf,
@@ -1075,45 +1109,47 @@ class ReportEntryController {
       console.error("Failed to download ready reports", e);
       this.showError(e?.message || "Failed to download reports");
     } finally {
-      this.selectedBill = originalState.bill;
-      this.selectedTestItem = originalState.testItem;
+      if (centerId === this.getSelectedCenterId()) {
+        this.selectedBill = originalState.bill;
+        this.selectedTestItem = originalState.testItem;
 
-      if (originalState.bill) {
-        this.populateSummaryForm(originalState.bill, originalState.testItem);
-        await this.renderTestResults(originalState.bill, originalState.testItem);
-        originalState.resultValues.forEach(({ id, value, remark }) => {
-          const row = this.resultsItemsBody?.querySelector(
-            `tr[data-subcategory-id="${id}"]`
-          );
-          const valueInput = row?.querySelector("td:nth-child(2) input");
-          const remarkInput = row?.querySelector("td:nth-child(5) input");
-          if (valueInput) valueInput.value = value;
-          if (remarkInput) remarkInput.value = remark;
+        if (originalState.bill) {
+          this.populateSummaryForm(originalState.bill, originalState.testItem);
+          await this.renderTestResults(originalState.bill, originalState.testItem);
+          originalState.resultValues.forEach(({ id, value, remark }) => {
+            const row = this.resultsItemsBody?.querySelector(
+              `tr[data-subcategory-id="${id}"]`
+            );
+            const valueInput = row?.querySelector("td:nth-child(2) input");
+            const remarkInput = row?.querySelector("td:nth-child(5) input");
+            if (valueInput) valueInput.value = value;
+            if (remarkInput) remarkInput.value = remark;
+          });
+        } else if (this.resultsItemsBody) {
+          this.resultsItemsBody.innerHTML = originalState.resultsHTML;
+        }
+
+        [
+          this.reportIdInput,
+          this.billNoInput,
+          this.patientNameInput,
+          this.titleInput,
+          this.ageInput,
+          this.genderInput,
+          this.testTypeInput,
+          this.specimenInput,
+          this.refByInput,
+        ].forEach((input, index) => {
+          if (input) input.value = originalState.summaryValues[index];
         });
-      } else if (this.resultsItemsBody) {
-        this.resultsItemsBody.innerHTML = originalState.resultsHTML;
+        this.currentSubcategories = originalState.currentSubcategories;
+        this.currentSubcategoryIndex = originalState.currentSubcategoryIndex;
+        this.currentReportHeader = originalState.currentReportHeader;
+        if (this.commentsResultInput) this.commentsResultInput.value = originalState.comments;
+        if (this.specialNotesInput) this.specialNotesInput.value = originalState.specialNotes;
+        if (this.topCategoryInput) this.topCategoryInput.value = originalState.topCategory;
+        if (this.topValueInput) this.topValueInput.value = originalState.topValue;
       }
-
-      [
-        this.reportIdInput,
-        this.billNoInput,
-        this.patientNameInput,
-        this.titleInput,
-        this.ageInput,
-        this.genderInput,
-        this.testTypeInput,
-        this.specimenInput,
-        this.refByInput,
-      ].forEach((input, index) => {
-        if (input) input.value = originalState.summaryValues[index];
-      });
-      this.currentSubcategories = originalState.currentSubcategories;
-      this.currentSubcategoryIndex = originalState.currentSubcategoryIndex;
-      this.currentReportHeader = originalState.currentReportHeader;
-      if (this.commentsResultInput) this.commentsResultInput.value = originalState.comments;
-      if (this.specialNotesInput) this.specialNotesInput.value = originalState.specialNotes;
-      if (this.topCategoryInput) this.topCategoryInput.value = originalState.topCategory;
-      if (this.topValueInput) this.topValueInput.value = originalState.topValue;
       if (this.downloadReadyReportsBtn) {
         this.downloadReadyReportsBtn.innerHTML = originalState.downloadButtonHTML;
       }
@@ -1765,7 +1801,10 @@ class ReportEntryController {
     try {
       const phone = (bill && bill.patient_phone) ? String(bill.patient_phone) : "";
       if (window.PatientHistoryLoader && typeof window.PatientHistoryLoader.loadByPhone === "function") {
-        window.PatientHistoryLoader.loadByPhone(phone);
+        window.PatientHistoryLoader.loadByPhone(
+          phone,
+          this.getSelectedCenterId()
+        );
       } else {
         // Fallback: set the input directly so user can press Load
         const phoneInput = document.getElementById("historyPhoneInput");
@@ -1776,6 +1815,7 @@ class ReportEntryController {
 
   // Public: load by bill number and test name from external UI (history table)
   async selectBillByNumberAndTest(billNo, testNameRaw) {
+    const requestId = ++this.billListRequestId;
     try {
       const billNumber = (billNo || "").toString().trim();
       const testName = (testNameRaw || "").toString().trim();
@@ -1784,7 +1824,15 @@ class ReportEntryController {
       this.setLoading(true);
 
       // Fetch specific bill
-      const bill = await this.reportEntryService.getBillByNumber(billNumber);
+      const centerId = this.getSelectedCenterId();
+      const bill = await this.reportEntryService.getBillByNumber(
+        billNumber,
+        centerId
+      );
+      if (
+        requestId !== this.billListRequestId ||
+        centerId !== this.getSelectedCenterId()
+      ) return;
       if (!bill) {
         this.showError("Bill not found");
         return;
@@ -2259,13 +2307,15 @@ class ReportEntryController {
   }
 
   async handleDateRangeSearch() {
+    const requestId = ++this.billListRequestId;
+    const centerId = this.getSelectedCenterId();
     try {
       this.setLoading(true);
 
       // Check if there's a bill number search first
       const billNo = this.billSearchInput?.value.trim();
       if (billNo) {
-        await this.selectBillFromSearch(billNo);
+        await this.selectBillFromSearch(billNo, centerId);
         return;
       }
 
@@ -2277,10 +2327,18 @@ class ReportEntryController {
         return;
       }
 
-      this.currentBills = await this.reportEntryService.getBillsByDateRange(
+      const bills = await this.reportEntryService.getBillsByDateRange(
         fromDate,
-        toDate
+        toDate,
+        centerId
       );
+      if (
+        requestId !== this.billListRequestId ||
+        centerId !== this.getSelectedCenterId()
+      ) {
+        return;
+      }
+      this.currentBills = bills;
       this.renderBillsTable();
     } catch (error) {
       console.error("Error searching by date range:", error);
@@ -2291,17 +2349,27 @@ class ReportEntryController {
   }
 
   async handleTestFilter() {
+    const requestId = ++this.billListRequestId;
+    const centerId = this.getSelectedCenterId();
     try {
       this.setLoading(true);
 
       const testId = this.testFilter?.value;
 
       if (testId === "all") {
-        await this.loadTodaysBills();
+        await this.loadTodaysBills(centerId);
       } else {
-        this.currentBills = await this.reportEntryService.getBillsByTest(
-          testId
+        const bills = await this.reportEntryService.getBillsByTest(
+          testId,
+          centerId
         );
+        if (
+          requestId !== this.billListRequestId ||
+          centerId !== this.getSelectedCenterId()
+        ) {
+          return;
+        }
+        this.currentBills = bills;
         this.renderBillsTable();
       }
     } catch (error) {
@@ -2341,24 +2409,57 @@ class ReportEntryController {
   }
 
   async handleCenterFilter() {
+    const requestId = ++this.billListRequestId;
+    this.billSearchRequestId++;
+    const centerId = this.getSelectedCenterId();
     try {
       this.setLoading(true);
 
-      const centerId = this.centerFilter?.value;
-
       const user = window.UserCenterAccess?.getCurrentUser();
-      if (user?.role !== "admin" && !window.UserCenterAccess?.setActiveCenterId(centerId)) {
+      if (
+        centerId !== "all" &&
+        !window.UserCenterAccess?.setActiveCenterId(centerId)
+      ) {
         throw new Error("You are not assigned to this center");
       }
 
-      if (centerId === "all") {
-        await this.loadTodaysBills();
-      } else {
-        this.currentBills = await this.reportEntryService.getBillsByCenter(
-          centerId
-        );
-        this.renderBillsTable();
+      this.hideSuggestions();
+      this.selectedBill = null;
+      this.selectedTestItem = null;
+      this.currentBills = [];
+      this.clearSummaryForm();
+      this.clearTestResults();
+      this.currentSubcategories = [];
+      this.currentSubcategoryIndex = 0;
+      this.copiedTestResults = null;
+      this.currentReportHeader = null;
+      if (this.commentsResultInput) this.commentsResultInput.value = "";
+      if (this.specialNotesInput) this.specialNotesInput.value = "";
+      this.readySelectionKeys.clear();
+      this.readySelectionItems.clear();
+      this.syncReadySelectAllCheckboxState();
+      this.updateReadySendControls();
+
+      const phone = document.getElementById("historyPhoneInput")?.value.trim();
+      const historyRefresh = window.PatientHistoryLoader?.loadByPhone
+        ? window.PatientHistoryLoader.loadByPhone(
+            phone && phone.length >= 3 ? phone : "",
+            centerId
+          )
+        : Promise.resolve();
+      const billsRequest =
+        centerId === "all"
+          ? this.reportEntryService.getTodaysBills(centerId)
+          : this.reportEntryService.getBillsByCenter(centerId);
+      const [bills] = await Promise.all([billsRequest, historyRefresh]);
+      if (
+        requestId !== this.billListRequestId ||
+        centerId !== this.getSelectedCenterId()
+      ) {
+        return;
       }
+      this.currentBills = bills;
+      this.renderBillsTable();
     } catch (error) {
       console.error("Error filtering by center:", error);
       this.showError("Failed to filter bills");
@@ -2368,6 +2469,8 @@ class ReportEntryController {
   }
 
   async handleBillSearch() {
+    const requestId = ++this.billSearchRequestId;
+    const centerId = this.getSelectedCenterId();
     try {
       const searchTerm = this.billSearchInput?.value.trim();
 
@@ -2376,7 +2479,16 @@ class ReportEntryController {
         return;
       }
 
-      const bills = await this.reportEntryService.searchBills(searchTerm);
+      const bills = await this.reportEntryService.searchBills(
+        searchTerm,
+        centerId
+      );
+      if (
+        requestId !== this.billSearchRequestId ||
+        centerId !== this.getSelectedCenterId()
+      ) {
+        return;
+      }
       this.showBillSuggestions(bills);
     } catch (error) {
       console.error("Error searching bills:", error);
@@ -2385,12 +2497,20 @@ class ReportEntryController {
   }
 
   // Handle bill selection from search
-  async selectBillFromSearch(billNo) {
+  async selectBillFromSearch(billNo, centerId = this.getSelectedCenterId()) {
+    const requestId = ++this.billListRequestId;
     try {
       this.setLoading(true);
 
       // Get the specific bill by number
-      const bill = await this.reportEntryService.getBillByNumber(billNo);
+      const bill = await this.reportEntryService.getBillByNumber(
+        billNo,
+        centerId
+      );
+      if (
+        requestId !== this.billListRequestId ||
+        centerId !== this.getSelectedCenterId()
+      ) return;
 
       if (!bill) {
         this.showError("Bill not found");

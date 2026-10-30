@@ -295,7 +295,7 @@
                 return;
               }
               // Store user session data
-              sessionStorage.setItem('loggedInUser', JSON.stringify({
+              const loggedInUser = {
                 id: userData.id,
                 username: userData.username,
                 email: userData.email,
@@ -305,7 +305,22 @@
                 assigned_centers: userData.assigned_centers || [],
                 active_center_id: userData.role === 'admin' ? null : (userData.center_id || centerIds[0]),
                 centers: userData.centers
-              }));
+              };
+              sessionStorage.setItem('loggedInUser', JSON.stringify(loggedInUser));
+              try {
+                const activeCenterKey =
+                  window.UserCenterAccess?.getActiveCenterStorageKey(loggedInUser);
+                const defaultCenterId = loggedInUser.role === 'admin'
+                  ? null
+                  : (loggedInUser.center_id || centerIds[0] || null);
+                if (activeCenterKey && defaultCenterId) {
+                  localStorage.setItem(activeCenterKey, defaultCenterId);
+                } else if (activeCenterKey) {
+                  localStorage.removeItem(activeCenterKey);
+                }
+              } catch (storageError) {
+                console.warn('Could not reset active center to the login default:', storageError);
+              }
               setMessage('Login successful. Redirecting…', 'success');
               window.location.replace('dashboard.html');
             } else {

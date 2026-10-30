@@ -177,6 +177,11 @@ window.SUPABASE_CONFIG = {
 };
 
 window.UserCenterAccess = {
+  getActiveCenterStorageKey(user = this.getCurrentUser()) {
+    const userKey = user?.id || user?.username;
+    return userKey ? `activeCenterId:${userKey}` : null;
+  },
+
   getCurrentUser() {
     try {
       const user = sessionStorage.getItem("loggedInUser");
@@ -194,22 +199,204 @@ window.UserCenterAccess = {
     return [...new Set([...ids, ...(legacyId ? [legacyId] : [])].filter(Boolean))];
   },
 
-  getActiveCenterId(user = this.getCurrentUser()) {
-    if (!user || user.role === "admin") return null;
-    const assignedIds = this.getAssignedCenterIds(user);
-    if (user.active_center_id && assignedIds.includes(user.active_center_id)) {
-      return user.active_center_id;
+  getDefaultCenterId(user = this.getCurrentUser(), availableCenterIds = []) {
+    if (!user) return null;
+    const availableIds = availableCenterIds.filter(
+      (centerId) => centerId && centerId !== "all"
+    );
+
+    if (user.role === "admin") {
+      return availableIds[0] || null;
     }
-    return assignedIds.length === 1 ? assignedIds[0] : null;
+
+    const assignedIds = this.getAssignedCenterIds(user);
+    const defaultCenterId =
+      user.center_id && assignedIds.includes(user.center_id)
+        ? user.center_id
+        : assignedIds[0] || null;
+    if (!availableIds.length || availableIds.includes(defaultCenterId)) {
+      return defaultCenterId;
+    }
+    return availableIds.find((centerId) => assignedIds.includes(centerId)) || null;
+  },
+
+  getActiveCenterId(user = this.getCurrentUser()) {
+    if (!user) return null;
+    const assignedIds = this.getAssignedCenterIds(user);
+    let activeCenterId = user.active_center_id || null;
+    const storageKey = this.getActiveCenterStorageKey(user);
+    if (storageKey) {
+      try {
+        activeCenterId = localStorage.getItem(storageKey) || activeCenterId;
+      } catch (error) {
+        console.warn("Failed to read shared active center", error);
+      }
+    }
+    if (user.role === "admin") return activeCenterId;
+    if (activeCenterId && assignedIds.includes(activeCenterId)) return activeCenterId;
+    return this.getDefaultCenterId(user, assignedIds);
   },
 
   setActiveCenterId(centerId) {
     const user = this.getCurrentUser();
-    if (!user || user.role === "admin") return false;
+    if (!user || !centerId || centerId === "all") return false;
     const assignedIds = this.getAssignedCenterIds(user);
-    if (!assignedIds.includes(centerId)) return false;
+    if (user.role !== "admin" && !assignedIds.includes(centerId)) return false;
     user.active_center_id = centerId;
     sessionStorage.setItem("loggedInUser", JSON.stringify(user));
+    const storageKey = this.getActiveCenterStorageKey(user);
+    if (storageKey) {
+      try {
+        localStorage.setItem(storageKey, centerId);
+      } catch (error) {
+        console.warn("Failed to persist shared active center", error);
+      }
+    }
+    document.dispatchEvent(
+      new CustomEvent("active-center-changed", {
+        detail: { centerId, userKey: user.id || user.username },
+      })
+    );
     return true;
   },
 };
+
+(() => {
+  const centerSelectIds = [
+    "center-dropdown",
+    "filterCenter",
+    "centerSelect",
+    "daily-center-filter",
+    "monthly-center-filter",
+    "center-center-filter",
+    "commission-center-filter",
+    "summary-center-filter",
+    "bills-center-filter",
+  ];
+  const selector = centerSelectIds
+    .map((id) => `#${id}`)
+    .join(", ");
+
+  const centerSelectStyle = document.createElement("style");
+  centerSelectStyle.textContent = `
+    .center-context-select { font-weight: 700 !important; }
+    .center-context-select--default { color: #198754 !important; }
+    .center-context-select--changed { color: #dc3545 !important; }
+    .center-context-option { font-weight: 700; }
+    .center-context-option--default { color: #198754; }
+    .center-context-option--changed { color: #dc3545; }
+    .center-context-label { font-weight: 700 !important; }
+    .center-context-label--default { color: #198754 !important; }
+    .center-context-label--changed { color: #dc3545 !important; }
+  `;
+  document.head.appendChild(centerSelectStyle);
+
+  function updateCenterSelectStyles() {
+    const user = window.UserCenterAccess.getCurrentUser();
+    document.querySelectorAll(selector).forEach((select) => {
+      const options = Array.from(select.options);
+      const centerIds = options
+        .filter((option) => option.dataset?.isActive !== "false")
+        .map((option) => option.value)
+        .filter((centerId) => centerId && centerId !== "all");
+      const defaultCenterId =
+        window.UserCenterAccess.getDefaultCenterId(user, centerIds);
+      const selectedCenterId = select.value;
+      const isDefault = selectedCenterId === defaultCenterId;
+      const isChanged =
+        selectedCenterId &&
+        selectedCenterId !== "all" &&
+        defaultCenterId &&
+        !isDefault;
+
+      select.classList.add("center-context-select");
+      select.classList.toggle("center-context-select--default", isDefault);
+      select.classList.toggle("center-context-select--changed", Boolean(isChanged));
+
+      options.forEach((option) => {
+        option.classList.add("center-context-option");
+        option.classList.toggle(
+          "center-context-option--default",
+          option.value === defaultCenterId
+        );
+        option.classList.toggle(
+          "center-context-option--changed",
+          option.value === selectedCenterId && Boolean(isChanged)
+        );
+      });
+
+      const label = document.querySelector(`label[for="${select.id}"]`);
+      if (label) {
+        label.classList.add("center-context-label");
+        label.classList.toggle("center-context-label--default", isDefault);
+        label.classList.toggle(
+          "center-context-label--changed",
+          Boolean(isChanged)
+        );
+      }
+    });
+  }
+
+  document.addEventListener(
+    "change",
+    (event) => {
+      if (!event.target.matches?.(selector)) return;
+      const centerId = event.target.value;
+      if (centerId && centerId !== "all") {
+        const saved = window.UserCenterAccess.setActiveCenterId(centerId);
+        if (!saved) {
+          const activeCenterId = window.UserCenterAccess.getActiveCenterId();
+          if (
+            activeCenterId &&
+            Array.from(event.target.options).some(
+              (option) => option.value === activeCenterId
+            )
+          ) {
+            event.target.value = activeCenterId;
+          }
+        }
+      }
+      updateCenterSelectStyles();
+    },
+    true
+  );
+
+  document.addEventListener("active-center-changed", (event) => {
+    const { centerId } = event.detail || {};
+    if (!centerId) return;
+    document.querySelectorAll(selector).forEach((select) => {
+      if (Array.from(select.options).some((option) => option.value === centerId)) {
+        select.value = centerId;
+      }
+    });
+    updateCenterSelectStyles();
+  });
+
+  window.addEventListener("storage", (event) => {
+    const user = window.UserCenterAccess.getCurrentUser();
+    const storageKey = window.UserCenterAccess.getActiveCenterStorageKey(user);
+    if (!storageKey || event.key !== storageKey || !event.newValue) return;
+    if (
+      user?.role !== "admin" &&
+      !window.UserCenterAccess.getAssignedCenterIds(user).includes(event.newValue)
+    ) {
+      return;
+    }
+
+    user.active_center_id = event.newValue;
+    sessionStorage.setItem("loggedInUser", JSON.stringify(user));
+    document.dispatchEvent(
+      new CustomEvent("active-center-changed", {
+        detail: { centerId: event.newValue, userKey: user.id || user.username },
+      })
+    );
+
+    updateCenterSelectStyles();
+  });
+
+  new MutationObserver(updateCenterSelectStyles).observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+  updateCenterSelectStyles();
+})();

@@ -651,6 +651,11 @@
             const phoneInput = document.getElementById('historyPhoneInput');
             const loadBtn = document.getElementById('loadHistoryBtn');
             const tableBody = document.getElementById('patientHistoryBody');
+            let historyRequestId = 0;
+
+            function getSelectedCenterId() {
+                return document.getElementById('filterCenter')?.value || 'all';
+            }
 
             function getCurrentTests() {
                 // Use controller state; do not read subcategory table rows
@@ -720,18 +725,25 @@
                 });
             }
 
-            async function loadHistory() {
+            async function loadHistory(centerId = getSelectedCenterId()) {
+                const requestId = ++historyRequestId;
                 const phone = (phoneInput?.value || '').trim();
                 if (!phone) {
                     renderRows([]);
                     return;
                 }
                 try {
-                    const bills = await billing.getPatientHistory(phone);
+                    const bills = await billing.getPatientHistory(phone, centerId);
+                    if (
+                        requestId !== historyRequestId ||
+                        centerId !== getSelectedCenterId()
+                    ) return;
                     renderRows(bills || []);
                 } catch (e) {
                     console.error('Failed to load history', e);
-                    tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Failed to load</td></tr>';
+                    if (requestId === historyRequestId) {
+                        tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Failed to load</td></tr>';
+                    }
                 }
             }
 
@@ -741,6 +753,7 @@
                 phoneInput.addEventListener('input', () => {
                     const v = (phoneInput.value || '').trim();
                     clearTimeout(debounceId);
+                    if (v.length < 3) historyRequestId++;
                     debounceId = setTimeout(() => {
                         if (v.length >= 3) loadHistory();
                         else tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Enter mobile number</td></tr>';
@@ -761,7 +774,8 @@
 
             // Expose a simple API to load history by phone programmatically
             window.PatientHistoryLoader = {
-                async loadByPhone(phone) {
+                async loadByPhone(phone, centerId = getSelectedCenterId()) {
+                    const requestId = ++historyRequestId;
                     try {
                         const value = (phone || '').toString().trim();
                         if (phoneInput) phoneInput.value = value;
@@ -769,11 +783,17 @@
                             renderRows([]);
                             return;
                         }
-                        const bills = await billing.getPatientHistory(value);
+                        const bills = await billing.getPatientHistory(value, centerId);
+                        if (
+                            requestId !== historyRequestId ||
+                            centerId !== getSelectedCenterId()
+                        ) return;
                         renderRows(bills || []);
                     } catch (e) {
-                        console.error('Failed to load history', e);
-                        tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Failed to load</td></tr>';
+                        if (requestId === historyRequestId) {
+                            console.error('Failed to load history', e);
+                            tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Failed to load</td></tr>';
+                        }
                     }
                 },
                 setPhoneAndLoad(phone) {

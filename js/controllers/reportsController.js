@@ -80,20 +80,17 @@ class ReportsController {
 
     handleReportCenterChange(centerId) {
         const user = this.getCurrentUser();
-        if (user && user.role !== 'admin') {
-            if (!window.UserCenterAccess?.setActiveCenterId(centerId)) {
-                this.showGlobalError('You are not assigned to this center.');
-                return;
-            }
-
-            document.querySelectorAll(
-                '#daily-center-filter, #monthly-center-filter, #center-center-filter, #commission-center-filter, #summary-center-filter'
-            ).forEach((filter) => {
-                if (Array.from(filter.options).some((option) => option.value === centerId)) {
-                    filter.value = centerId;
-                }
-            });
+        if (centerId !== 'all' && !window.UserCenterAccess?.setActiveCenterId(centerId)) {
+            this.showGlobalError('You are not assigned to this center.');
+            return;
         }
+        document.querySelectorAll(
+            '#daily-center-filter, #monthly-center-filter, #center-center-filter, #commission-center-filter, #summary-center-filter'
+        ).forEach((filter) => {
+            if (Array.from(filter.options).some((option) => option.value === centerId)) {
+                filter.value = centerId;
+            }
+        });
         this.loadReportData();
     }
 
@@ -196,18 +193,31 @@ class ReportsController {
                         const option = document.createElement('option');
                         option.value = center.id;
                         option.textContent = center.center_name;
+                        if (center.is_active === false) {
+                            option.dataset.isActive = 'false';
+                        }
                         centerFilter.appendChild(option);
                     });
-                    if (user?.role !== 'admin') {
-                        const activeCenterId = window.UserCenterAccess?.getActiveCenterId(user);
-                        const defaultCenterId = centerIds.includes(activeCenterId)
+                    const activeCenterId =
+                        window.UserCenterAccess?.getActiveCenterId(user);
+                    const defaultCenterId =
+                        window.UserCenterAccess?.getDefaultCenterId(
+                            user,
+                            centers
+                                .filter((center) => center.is_active !== false)
+                                .map((center) => center.id)
+                        );
+                    const selectedCenterId =
+                        activeCenterId &&
+                        centers.some((center) => center.id === activeCenterId)
                             ? activeCenterId
-                            : centerIds.includes(user.center_id)
-                                ? user.center_id
-                                : centerIds[0];
-                        if (defaultCenterId && centers.some((center) => center.id === defaultCenterId)) {
-                            centerFilter.value = defaultCenterId;
-                        } else {
+                            : defaultCenterId;
+                    if (selectedCenterId) {
+                        centerFilter.value = selectedCenterId;
+                        window.UserCenterAccess?.setActiveCenterId(selectedCenterId);
+                    }
+                    if (user?.role !== 'admin') {
+                        if (!selectedCenterId) {
                             centerFilter.disabled = true;
                         }
                     }

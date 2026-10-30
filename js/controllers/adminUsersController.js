@@ -81,6 +81,22 @@
           option.textContent = center.center_name;
           billsCenterFilter.appendChild(option);
         });
+        const user = window.UserCenterAccess?.getCurrentUser();
+        const activeCenterId =
+          window.UserCenterAccess?.getActiveCenterId(user);
+        const defaultCenterId =
+          window.UserCenterAccess?.getDefaultCenterId(
+            user,
+            centers.map((center) => center.id)
+          );
+        const selectedCenterId =
+          activeCenterId && centers.some((center) => center.id === activeCenterId)
+            ? activeCenterId
+            : defaultCenterId;
+        if (selectedCenterId && centers.some((center) => center.id === selectedCenterId)) {
+          billsCenterFilter.value = selectedCenterId;
+          window.UserCenterAccess?.setActiveCenterId(selectedCenterId);
+        }
       }
     } catch (error) {
       console.error('Error populating center dropdown:', error);

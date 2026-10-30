@@ -37,14 +37,20 @@ class PricingService {
     const requestedCenterId = centerId || null;
     const userCenterId = this.getUserCenterId();
 
-    if (!this.isUserAdmin() && userCenterId) {
-      if (requestedCenterId && requestedCenterId !== userCenterId) {
+    if (!this.isUserAdmin()) {
+      const user = this.getCurrentUser();
+      const assignedCenterIds =
+        window.UserCenterAccess?.getAssignedCenterIds(user) || [];
+      if (
+        requestedCenterId &&
+        !assignedCenterIds.includes(requestedCenterId)
+      ) {
         throw new Error("You are not authorized to access another center");
       }
-      return userCenterId;
+      return requestedCenterId || userCenterId || null;
     }
 
-    return requestedCenterId;
+    return requestedCenterId || userCenterId || null;
   }
 
   resolveBillingCenterId(centerId) {

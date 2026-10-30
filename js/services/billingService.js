@@ -34,13 +34,22 @@ class BillingService {
 
   getBillingHistoryCenterId(selectedCenterId = null) {
     const user = this.getCurrentUser();
-    if (user?.role === "admin") return selectedCenterId || null;
+    if (user?.role === "admin") {
+      if (selectedCenterId === "all") return null;
+      return selectedCenterId || this.getUserCenterId() || null;
+    }
 
     const assignedIds = window.UserCenterAccess?.getAssignedCenterIds(user) || [];
-    if (selectedCenterId && !assignedIds.includes(selectedCenterId)) {
+    if (
+      selectedCenterId &&
+      selectedCenterId !== "all" &&
+      !assignedIds.includes(selectedCenterId)
+    ) {
       throw new Error("You are not assigned to this center");
     }
-    return selectedCenterId || this.getUserCenterId();
+    return selectedCenterId && selectedCenterId !== "all"
+      ? selectedCenterId
+      : this.getUserCenterId();
   }
 
   // Check if Supabase is available
@@ -830,7 +839,10 @@ class BillingService {
 
       if (centerId && centerId !== "all") {
         q = q.eq("center_id", centerId);
-      } else if (this.getUserCenterId()) {
+      } else if (
+        centerId !== "all" &&
+        this.getUserCenterId()
+      ) {
         // If no centerId provided, use user's center (for all users regardless of role)
         q = q.eq("center_id", this.getUserCenterId());
       }

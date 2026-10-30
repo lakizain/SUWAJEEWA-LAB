@@ -12,6 +12,7 @@ class BillingController {
     this.isInitialized = false;
     this.paidAmountManuallyEdited = false; // Track if user manually edited Paid Amount
     this.testSearchRequestId = 0;
+    this.referenceSearchRequestId = 0;
     this.currentDateTimeInterval = null;
   }
 
@@ -163,18 +164,14 @@ class BillingController {
 
     const centerSelect = document.getElementById("center-dropdown");
     if (centerSelect) {
-      centerSelect.addEventListener("change", (event) => {
-        const user = window.UserCenterAccess?.getCurrentUser();
-        if (
-          user?.role !== "admin" &&
-          !window.UserCenterAccess?.setActiveCenterId(event.target.value)
-        ) {
-          window.app.showError("You are not assigned to this center");
-          return;
-        }
+    centerSelect.addEventListener("change", (event) => {
+      if (!window.UserCenterAccess?.setActiveCenterId(event.target.value)) {
+        window.app.showError("You are not assigned to this center");
+        return;
+      }
         this.handleCenterChange(event).catch((error) => {
           console.error("Error handling center change:", error);
-          window.app.showError("Failed to refresh center prices");
+          window.app.showError("Failed to refresh billing data for this center");
         });
       });
     }
@@ -528,9 +525,10 @@ class BillingController {
   }
 
   // Generate bill number
-  async generateBillNumber() {
+  async generateBillNumber(centerId = this.getSelectedCenterId()) {
     try {
-      const billNumber = await this.billingService.generateBillNumber();
+      const billNumber = await this.billingService.generateBillNumber(centerId);
+      if (centerId !== this.getSelectedCenterId()) return;
       const billNoInput = document.getElementById("bill-no");
       if (billNoInput) {
         billNoInput.value = billNumber;
@@ -541,7 +539,7 @@ class BillingController {
   }
 
   // Handle patient phone search
-  async handlePatientPhoneSearch(event) {
+  async handlePatientPhoneSearch(event, centerId = this.getSelectedCenterId()) {
     const phone = event.target.value.trim();
 
     if (phone.length < 3) {
@@ -551,11 +549,11 @@ class BillingController {
     }
 
     try {
-      const selectedCenterId = this.getSelectedCenterId();
       const [history, patients] = await Promise.all([
-        this.billingService.getPatientHistory(phone, selectedCenterId),
-        this.billingService.getPatientsByPhone(phone, selectedCenterId),
+        this.billingService.getPatientHistory(phone, centerId),
+        this.billingService.getPatientsByPhone(phone, centerId),
       ]);
+      if (centerId !== this.getSelectedCenterId()) return;
       this.displayPatientHistory(history);
 
       // Keep patient suggestions and history scoped to the selected center.
@@ -595,7 +593,7 @@ class BillingController {
     if (history.length === 0) {
       historyTable.innerHTML = `
                 <tr>
-                    <td colspan="6" class="empty-state">
+                    <td colspan="7" class="empty-state">
                         <i class="fas fa-info-circle"></i>
                         <div>No history found for this phone number</div>
                     </td>
@@ -874,24 +872,29 @@ class BillingController {
 
   // Clear patient history
   clearPatientHistory() {
-    const historyTable = document.querySelectorAll(
-      ".table-responsive .table tbody"
-    )[1];
+    const historyTable = document.querySelector("#patient-history-table tbody");
     if (historyTable) {
       historyTable.innerHTML = `
                 <tr>
-                    <td colspan="6" class="empty-state">
+                    <td colspan="7" class="empty-state">
                         <i class="fas fa-info-circle"></i>
                         <div>No recent bills found</div>
                     </td>
                 </tr>
             `;
     }
+    const resultsPanel = document.getElementById("patient-history-results");
+    const resultsBody = document.querySelector(
+      "#patient-history-results-table tbody"
+    );
+    if (resultsPanel) resultsPanel.hidden = true;
+    if (resultsBody) resultsBody.innerHTML = "";
   }
 
   // Handle package selection
   async handlePackageSelection(event) {
     const packageId = event.target.value;
+    const centerId = this.getSelectedCenterId();
 
     if (!packageId || packageId === "Select Package") {
       return;
@@ -901,8 +904,9 @@ class BillingController {
       const pricingService = this.pricingService || window.app.getService("pricing");
       const packageData = await pricingService.getResolvedPackageById(
         packageId,
-        this.getSelectedCenterId()
+        centerId
       );
+      if (centerId !== this.getSelectedCenterId()) return;
       this.addPackageToBill(packageData);
     } catch (error) {
       console.error("Error loading package:", error);
@@ -1356,18 +1360,23 @@ class BillingController {
           dropdown.appendChild(option);
         });
         const user = window.UserCenterAccess?.getCurrentUser();
-        if (user?.role !== "admin") {
-          const assignedIds = window.UserCenterAccess?.getAssignedCenterIds(user) || [];
-          const activeCenterId =
-            window.UserCenterAccess?.getActiveCenterId(user) ||
-            (assignedIds.includes(user?.center_id) ? user.center_id : assignedIds[0]);
-          if (activeCenterId && assignedIds.includes(activeCenterId)) {
-            dropdown.value = activeCenterId;
-            window.UserCenterAccess?.setActiveCenterId(activeCenterId);
-          } else {
+        const assignedIds = window.UserCenterAccess?.getAssignedCenterIds(user) || [];
+        const defaultCenterId =
+          window.UserCenterAccess?.getDefaultCenterId(
+            user,
+            centers.map((center) => center.id)
+          );
+        const activeCenterId = window.UserCenterAccess?.getActiveCenterId(user);
+        const selectedCenterId =
+          activeCenterId && centers.some((center) => center.id === activeCenterId)
+            ? activeCenterId
+            : defaultCenterId;
+        if (selectedCenterId && (user?.role === "admin" || assignedIds.includes(selectedCenterId))) {
+          dropdown.value = selectedCenterId;
+          window.UserCenterAccess?.setActiveCenterId(selectedCenterId);
+        } else {
             dropdown.disabled = true;
             dropdown.innerHTML = "<option value=''>No assigned centers</option>";
-          }
         }
         this.updateCompanyNameVisibility();
       } else {
@@ -1381,14 +1390,17 @@ class BillingController {
 
   // Populate references dropdown
   // NOTE: scoped to (user's center refs) + (global refs where center_id IS NULL)
-  async populateReferencesDropdown() {
+  async populateReferencesDropdown(centerId = this.getSelectedCenterId()) {
     const dropdown = document.getElementById("ref-by-dropdown");
     if (!dropdown) return;
     dropdown.innerHTML = "<option value=''>Loading references...</option>";
     try {
       const referenceService = window.app.getService("reference");
-      const billingCenterId = this.getSelectedCenterId() || null;
-      const references = await referenceService.getReferencesForBillingCenter(billingCenterId);
+      const billingCenterId = centerId || null;
+      const references = await referenceService.getReferencesForBillingCenter(
+        billingCenterId
+      );
+      if (centerId !== this.getSelectedCenterId()) return;
 
       dropdown.innerHTML = "<option value=''>Select Reference</option>";
       if (references && references.length > 0) {
@@ -1404,20 +1416,23 @@ class BillingController {
       }
     } catch (e) {
       console.warn("populateReferencesDropdown error:", e);
-      dropdown.innerHTML = "<option value=''>Error loading references</option>";
+      if (centerId === this.getSelectedCenterId()) {
+        dropdown.innerHTML = "<option value=''>Error loading references</option>";
+      }
     }
   }
 
   // Populate packages dropdown
-  async populatePackagesDropdown() {
+  async populatePackagesDropdown(centerId = this.getSelectedCenterId()) {
     const dropdown = document.getElementById("package-dropdown");
     if (!dropdown) return;
     dropdown.innerHTML = "<option>Loading packages...</option>";
     try {
       const pricingService = this.pricingService || window.app.getService("pricing");
       const packages = pricingService
-        ? await pricingService.getPackagesForBilling(this.getSelectedCenterId())
+        ? await pricingService.getPackagesForBilling(centerId)
         : [];
+      if (centerId !== this.getSelectedCenterId()) return;
       dropdown.innerHTML = "<option>Select Package</option>";
       if (packages && packages.length > 0) {
         packages.forEach((pkg) => {
@@ -1433,7 +1448,9 @@ class BillingController {
         dropdown.innerHTML = "<option>No packages found</option>";
       }
     } catch (e) {
-      dropdown.innerHTML = "<option>Error loading packages</option>";
+      if (centerId === this.getSelectedCenterId()) {
+        dropdown.innerHTML = "<option>Error loading packages</option>";
+      }
     }
   }
 
@@ -1465,44 +1482,65 @@ class BillingController {
   async handleCenterChange() {
     const centerId = this.getSelectedCenterId();
     this.updateCompanyNameVisibility();
-    const user = window.UserCenterAccess?.getCurrentUser();
-    if (user?.role !== "admin" && !window.UserCenterAccess?.setActiveCenterId(centerId)) {
+    if (!window.UserCenterAccess?.setActiveCenterId(centerId)) {
       throw new Error("You are not assigned to this center");
     }
-    await this.populatePackagesDropdown();
-    await this.repriceSelectedItems();
-    await this.refreshCenterScopedHistory();
+
+    this.testSearchRequestId++;
+    this.referenceSearchRequestId++;
+    this._lastTestSuggestions = [];
+    document.getElementById("test-dropdown")?.remove();
+    document.getElementById("reference-dropdown")?.remove();
+
+    const testInput = document.getElementById("test-details-input");
+    const refreshTestSearch =
+      testInput && testInput.value.trim().length >= 2
+        ? this.handleTestSearch({ target: testInput })
+        : Promise.resolve();
+
+    await Promise.all([
+      this.populateReferencesDropdown(centerId),
+      this.populatePackagesDropdown(centerId),
+      this.generateBillNumber(centerId),
+      this.repriceSelectedItems(centerId),
+      this.refreshCenterScopedHistory(centerId),
+      refreshTestSearch,
+    ]);
   }
 
-  async refreshCenterScopedHistory() {
+  async refreshCenterScopedHistory(centerId = this.getSelectedCenterId()) {
     const recentBillsSearch = document.querySelector(
       'input[placeholder*="Search by Bill No or Patient Name"]'
     );
     const searchTerm = recentBillsSearch?.value.trim() || "";
     if (searchTerm.length >= 2) {
-      await this.handleRecentBillsSearch({ target: recentBillsSearch });
+      await this.handleRecentBillsSearch({ target: recentBillsSearch }, centerId);
     } else {
-      await this.loadRecentBills();
+      await this.loadRecentBills(centerId);
     }
+    if (centerId !== this.getSelectedCenterId()) return;
 
     const phoneInput = document.querySelector('input[placeholder*="phone"]');
     const phone = phoneInput?.value.trim() || "";
     if (phone.length >= 3) {
-      await this.handlePatientPhoneSearch({ target: phoneInput });
+      await this.handlePatientPhoneSearch({ target: phoneInput }, centerId);
     } else {
       this.clearPatientHistory();
       this.removePatientDropdown();
     }
   }
 
-  async repriceSelectedItems() {
-    if (!this.pricingService || !Array.isArray(this.selectedTests) || this.selectedTests.length === 0) {
+  async repriceSelectedItems(centerId = this.getSelectedCenterId()) {
+    if (
+      !this.pricingService ||
+      !Array.isArray(this.selectedTests) ||
+      this.selectedTests.length === 0
+    ) {
       this.updateBillTotals();
       this.updateTestTable();
       return;
     }
 
-    const centerId = this.getSelectedCenterId();
     const testIds = this.selectedTests
       .filter((item) => item.itemType !== "package")
       .map((item) => item.id)
@@ -1520,6 +1558,7 @@ class BillingController {
         ? this.pricingService.getResolvedPackagesByIds(packageIds, centerId)
         : Promise.resolve([]),
     ]);
+    if (centerId !== this.getSelectedCenterId()) return;
 
     const resolvedTestMap = new Map(
       resolvedTests.map((item) => [item.id, item])
@@ -2409,9 +2448,11 @@ class BillingController {
     }
 
     // Reset selects to first option
-    document.querySelectorAll("select").forEach((select) => {
-      select.selectedIndex = 0;
-    });
+    document
+      .querySelectorAll("select:not(#center-dropdown)")
+      .forEach((select) => {
+        select.selectedIndex = 0;
+      });
     this.updateCompanyNameVisibility();
 
     // Clear bill items table
@@ -2479,9 +2520,10 @@ class BillingController {
   }
 
   // Load recent bills
-  async loadRecentBills() {
+  async loadRecentBills(centerId = this.getSelectedCenterId()) {
     try {
-      const bills = await this.billingService.getRecentBills(10, this.getSelectedCenterId());
+      const bills = await this.billingService.getRecentBills(10, centerId);
+      if (centerId !== this.getSelectedCenterId()) return;
       this.displayRecentBills(bills);
 
       // Clear search results counter
@@ -2565,7 +2607,7 @@ class BillingController {
   }
 
   // Handle recent bills search
-  async handleRecentBillsSearch(event) {
+  async handleRecentBillsSearch(event, centerId = this.getSelectedCenterId()) {
     const searchTerm = event.target.value.trim();
 
     // Show loading state - use the same selector as displayRecentBills
@@ -2595,8 +2637,9 @@ class BillingController {
     try {
       const bills = await this.billingService.searchBills(
         searchTerm,
-        this.getSelectedCenterId()
+        centerId
       );
+      if (centerId !== this.getSelectedCenterId()) return;
       this.displayRecentBills(bills);
 
       // Update search results counter
@@ -3052,16 +3095,24 @@ class BillingController {
   // NOTE: scoped to user's center + global refs only
   async handleReferenceSearch(event) {
     const searchTerm = event.target.value.trim();
+    const requestId = ++this.referenceSearchRequestId;
+    const centerId = this.getSelectedCenterId();
 
     if (searchTerm.length < 2) return;
 
     try {
       const referenceService = window.app.getService("reference");
-      const billingCenterId = this.getSelectedCenterId() || null;
+      const billingCenterId = centerId || null;
       const references = await referenceService.searchBillingReferences(
         searchTerm,
         billingCenterId
       );
+      if (
+        requestId !== this.referenceSearchRequestId ||
+        centerId !== this.getSelectedCenterId()
+      ) {
+        return;
+      }
       this.displayReferenceSuggestions(references);
     } catch (error) {
       console.error("Error searching references:", error);
@@ -3124,6 +3175,7 @@ class BillingController {
   async handleTestSearch(event) {
     const searchTerm = event.target.value.trim();
     const requestId = ++this.testSearchRequestId;
+    const centerId = this.getSelectedCenterId();
     console.log("Searching for tests with term:", searchTerm);
 
     if (searchTerm.length < 2) {
@@ -3136,7 +3188,7 @@ class BillingController {
       let tests = pricingService
         ? await pricingService.searchTestsForBilling(
             searchTerm,
-            this.getSelectedCenterId()
+            centerId
           )
         : [];
       console.log("Tests from service:", tests);
@@ -3152,7 +3204,10 @@ class BillingController {
         );
         console.log("Filtered sample tests:", tests);
       }
-      if (requestId !== this.testSearchRequestId) return;
+      if (
+        requestId !== this.testSearchRequestId ||
+        centerId !== this.getSelectedCenterId()
+      ) return;
 
       const normalizedTerm = searchTerm.toLowerCase().replace(/\s+/g, " ");
       const searchWords = normalizedTerm.split(" ").filter(Boolean);

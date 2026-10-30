@@ -70,13 +70,36 @@
     const billing = window.app.getService("billing");
 
     // Populate dropdowns when initial data is ready
-    const centers = (window.APP_CACHE && window.APP_CACHE.centers) || [];
-    populateCenters(centerSelect, centers);
+    const user = window.UserCenterAccess?.getCurrentUser();
+    const assignedCenterIds =
+      window.UserCenterAccess?.getAssignedCenterIds(user) || [];
+    const availableCenters = (window.APP_CACHE?.centers || []).filter(
+      (center) => user?.role === "admin" || assignedCenterIds.includes(center.id)
+    );
+    populateCenters(centerSelect, availableCenters);
+    const activeCenterId =
+      window.UserCenterAccess?.getActiveCenterId(user);
+    const defaultCenterId =
+      window.UserCenterAccess?.getDefaultCenterId(
+        user,
+        availableCenters.map((center) => center.id)
+      );
+    const selectedCenterId =
+      activeCenterId &&
+      availableCenters.some((center) => center.id === activeCenterId)
+        ? activeCenterId
+        : defaultCenterId || "all";
+    centerSelect.value = selectedCenterId;
+    if (selectedCenterId !== "all") {
+      window.UserCenterAccess?.setActiveCenterId(selectedCenterId);
+    }
 
     // Keep last fetched result set for member filtering
     let lastBills = [];
+    let searchRequestId = 0;
 
     async function performSearch() {
+      const requestId = ++searchRequestId;
       const query = searchInput.value.trim();
       const centerId = centerSelect.value;
       const memberName = memberSelect.value;
@@ -100,6 +123,10 @@
         centerId,
         // Do not pass memberName here; populate dropdown from full result first
       });
+      if (
+        requestId !== searchRequestId ||
+        centerId !== centerSelect.value
+      ) return;
       lastBills = bills || [];
       populateMembersFromBills(memberSelect, lastBills);
 
