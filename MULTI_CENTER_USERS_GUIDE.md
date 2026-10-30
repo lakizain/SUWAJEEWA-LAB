@@ -17,9 +17,10 @@ table.
    active center is shared by Billing, Report Entry, Pricing, Reports, Patient
    History, and the bills filter in Admin User Management. Center-specific
    information refreshes for the selected center. The selection is remembered
-   for that user and synchronized across browser tabs. The staff member's Main
-   center is the default. Admins use the first active center (sorted by name)
-   as their default. The default center is shown in bold green; another
+   for that user and synchronized across browser tabs. The user's Main center
+   is the default when available. Older admin accounts without a Main center
+   continue to use the first active center (sorted by name). The default center
+   is shown in bold green; another
    selected center is shown in bold red. Center options are bold, with the
    default option shown in green. Signing in resets the active center to that
    user's default.
@@ -27,8 +28,9 @@ table.
    current center assignments.
 
 Existing single-center users continue to have their current center assigned
-after the migration. Admin users can select any center; report filters may
-still explicitly use **All Centers** when that option is selected.
+after the migration. Admin users can select any center as their Main center;
+report filters may still explicitly use **All Centers** when that option is
+selected.
 
 ## Security note
 

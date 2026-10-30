@@ -108,7 +108,7 @@ class AdminUsersService {
       }
 
       const assignedCenterIds = [...new Set(center_ids.filter(Boolean))];
-      if (role === 'staff' && (!center_id || !assignedCenterIds.includes(center_id))) {
+      if (!center_id || !assignedCenterIds.includes(center_id)) {
         throw new Error('Main center must be one of the authorized centers');
       }
 
@@ -119,7 +119,7 @@ class AdminUsersService {
           email,
           password, // Store as plain text as requested
           role,
-          center_id: role === 'admin' ? null : center_id,
+          center_id,
           is_active: true
         }])
         .select()
@@ -166,10 +166,10 @@ class AdminUsersService {
       delete nextData.center_ids;
       if (shouldUpdateCenters) {
         const mainCenterId = nextData.center_id || null;
-        if (nextData.role === 'staff' && (!mainCenterId || !centerIds.includes(mainCenterId))) {
+        if (!mainCenterId || !centerIds.includes(mainCenterId)) {
           throw new Error('Main center must be one of the authorized centers');
         }
-        nextData.center_id = nextData.role === 'admin' ? null : mainCenterId;
+        nextData.center_id = mainCenterId;
       }
 
       // If username is being updated, check if it already exists (excluding current user)
@@ -244,14 +244,19 @@ class AdminUsersService {
         }
       } else {
         // Deactivate user
-        const { error } = await this.supabase
+        const { data, error } = await this.supabase
           .from('admin_users')
           .update({ is_active: false })
-          .eq('id', userId);
+          .eq('id', userId)
+          .select('id')
+          .maybeSingle();
 
         if (error) {
           console.error('Error deactivating admin user:', error);
           throw error;
+        }
+        if (!data) {
+          throw new Error('User was not found or could not be deactivated.');
         }
       }
 

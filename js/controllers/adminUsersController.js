@@ -18,18 +18,25 @@
     const authorizedSelect = $('center');
     const mainSelect = $('mainCenter');
     if (!authorizedSelect || !mainSelect) return;
-    const isStaff = $('role').value === 'staff';
-    mainSelect.required = isStaff;
-    mainSelect.disabled = !isStaff;
+    mainSelect.required = true;
+    mainSelect.disabled = false;
 
-    const authorizedIds = Array.from(authorizedSelect.selectedOptions)
+    let authorizedIds = Array.from(authorizedSelect.selectedOptions)
       .map((option) => option.value)
       .filter(Boolean);
     const currentMainId = preferredCenterId || mainSelect.value;
+    if (currentMainId && !authorizedIds.includes(currentMainId)) {
+      const mainCenterOption = Array.from(authorizedSelect.options)
+        .find((option) => option.value === currentMainId);
+      if (mainCenterOption) {
+        mainCenterOption.selected = true;
+        authorizedIds = [...authorizedIds, currentMainId];
+      }
+    }
     mainSelect.innerHTML = '<option value="">-- Select main center --</option>';
 
     Array.from(authorizedSelect.options)
-      .filter((option) => authorizedIds.includes(option.value))
+      .filter((option) => option.value)
       .forEach((authorizedOption) => {
         const option = document.createElement('option');
         option.value = authorizedOption.value;
@@ -42,6 +49,13 @@
     } else if (authorizedIds.length === 1) {
       mainSelect.value = authorizedIds[0];
     }
+  }
+
+  function onMainCenterChange() {
+    const mainCenterId = $('mainCenter').value;
+    const authorizedOption = Array.from($('center').options)
+      .find((option) => option.value === mainCenterId);
+    if (authorizedOption) authorizedOption.selected = true;
   }
 
   async function ensureSupabase() {
@@ -123,6 +137,10 @@
           return u.center_id === center.id ? `${name} <strong>(Main)</strong>` : name;
         }).join(', ')
         : '<span class="muted">--</span>';
+      const active = u.is_active !== false;
+      const deactivateButton = active
+        ? '<button class="btn danger" data-action="deactivate" data-id="' + u.id + '">Deactivate</button>'
+        : '<button class="btn danger" disabled>Deactivated</button>';
       return (
         '<tr>' +
           '<td>' + (u.username || '') + '</td>' +
@@ -132,7 +150,7 @@
           '<td>' + centerName + '</td>' +
           '<td class="actions">' +
             '<button class="btn secondary" data-action="edit" data-id="' + u.id + '">Edit</button>' +
-            '<button class="btn danger" data-action="deactivate" data-id="' + u.id + '">Delete</button>' +
+            deactivateButton +
           '</td>' +
         '</tr>'
       );
@@ -254,7 +272,7 @@
       setFormMsg('Select at least one center for a staff user.');
       return;
     }
-    if (role === 'staff' && (!center_id || !center_ids.includes(center_id))) {
+    if (!center_id || !center_ids.includes(center_id)) {
       setFormMsg('Select a main center from the authorized centers.');
       return;
     }
@@ -343,12 +361,12 @@
       
       // Disable button during operation
       target.disabled = true;
-      target.textContent = 'Deleting...';
+      target.textContent = 'Deactivating...';
       
       try {
         await state.adminUsersService.deleteUser(id, false); // Deactivate, don't delete
         await fetchUsers();
-        setStatus(`User "${username}" has been deactivated successfully`);
+        setStatus(`User "${username}" has been deactivated and removed from the active user list`);
         
         // Clear status after 3 seconds
         setTimeout(() => setStatus(''), 3000);
@@ -359,7 +377,7 @@
       } finally {
         // Re-enable button
         target.disabled = false;
-        target.textContent = 'Delete';
+        target.textContent = 'Deactivate';
       }
     }
   }
@@ -741,6 +759,10 @@
         syncMainCenterOptions();
       });
       syncMainCenterOptions();
+    }
+    const mainCenterSelect = $('mainCenter');
+    if (mainCenterSelect) {
+      mainCenterSelect.addEventListener('change', onMainCenterChange);
     }
     const body = $('usersBody'); if (body) body.addEventListener('click', onTableClick);
     

@@ -206,7 +206,9 @@ window.UserCenterAccess = {
     );
 
     if (user.role === "admin") {
-      return availableIds[0] || null;
+      return availableIds.includes(user.center_id)
+        ? user.center_id
+        : availableIds[0] || null;
     }
 
     const assignedIds = this.getAssignedCenterIds(user);
