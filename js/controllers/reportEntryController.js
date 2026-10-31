@@ -3092,7 +3092,7 @@ class ReportEntryController {
             display: grid; 
             grid-template-columns: 1fr 1fr; 
             gap: 8px 8px; 
-            font-size: 14px; 
+            font-size: 10px; 
             margin-bottom: 4px; 
           }
           
@@ -3128,7 +3128,7 @@ class ReportEntryController {
             grid-template-columns: 140px 8px 1fr; 
             align-items: baseline; 
             margin-top: 16px; 
-            font-size: 14px; 
+            font-size: 10px; 
           }
           
           .investigation-line .label, 
@@ -3147,7 +3147,7 @@ class ReportEntryController {
           table { 
             width: 100%; 
             border-collapse: collapse; 
-            font-size: 14px; 
+            font-size: 10px; 
             margin-top: 8px; 
           }
           
@@ -3197,7 +3197,7 @@ class ReportEntryController {
           }
           
           .results-table tbody td:first-child { 
-            font-size: 12px;
+            font-size: 10px;
             font-weight: 400; 
             text-align: left;
             white-space: nowrap;
@@ -3209,7 +3209,7 @@ class ReportEntryController {
           
           .remarks { 
             margin-top: 18mm; 
-            font-size: 14px; 
+            font-size: 10px; 
           }
           
           .remarks .label { 
@@ -3522,7 +3522,7 @@ class ReportEntryController {
           .report-container { width: 100%; margin-left: ${includeLetterhead ? "0" : "-10px"}; padding-bottom: ${containerPaddingBottomMm}mm; box-sizing: border-box; }
           .content-area { flex: 1 0 auto; }
           .top-space { height: ${includeLetterhead ? "50mm" : "calc(40mm - 16mm)"}; }
-          .info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 8px; font-size: 14px; margin-top: ${includeLetterhead ? "0" : "10mm"}; margin-bottom: 4px; line-height: 1.4; }
+          .info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 8px; font-size: 10px; margin-top: ${includeLetterhead ? "0" : "10mm"}; margin-bottom: 4px; line-height: 1.4; }
           .letterhead-header, .letterhead-footer { position: fixed; left: 0; width: 100vw; z-index: 10; }
           .letterhead-header { top: 0; }
           .letterhead-footer { bottom: 0; }
@@ -3533,11 +3533,11 @@ class ReportEntryController {
           .info-col:first-child .row { grid-template-columns: 140px 8px 1fr; }
           .label { font-weight: 700; text-transform: uppercase; letter-spacing: 0.2px; white-space: nowrap; }
           .colon { text-align: center; }
-          .investigation-line { display: grid; grid-template-columns: 140px 8px 1fr; align-items: baseline; margin-top: 16px; font-size: 14px; line-height: 1.4; }
+          .investigation-line { display: grid; grid-template-columns: 140px 8px 1fr; align-items: baseline; margin-top: 16px; font-size: 10px; line-height: 1.4; }
           .investigation-line .label, .investigation-line .colon { white-space: nowrap; }
           .investigation-value { font-weight: 700; }
           .hr { margin-top: 8px; border-top: 1px solid #999; }
-          table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; line-height: 1.4; }
+          table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 8px; line-height: 1.4; }
           .results-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 1.5px; }
           .results-table th, .results-table td { border: none; padding: 3px 6px; vertical-align: top; }
           .results-table thead th { background: #fff; font-weight: 700; text-align: left; }
@@ -3547,7 +3547,7 @@ class ReportEntryController {
           .results-table tbody tr.hide-value-colon td:nth-child(2)::before { content: ""; }
           .results-table tbody td:nth-child(2) { padding-left: 0; transform: translateX(0); }
           .results-table tbody td:first-child { 
-            font-size: 12px;
+            font-size: 10px;
             font-weight: 400; 
             text-align: left;
             white-space: nowrap;
@@ -3573,7 +3573,7 @@ class ReportEntryController {
             margin: 0;
             object-fit: contain;
           }
-          .remarks { margin-top: 18mm; font-size: 14px; line-height: 1.4; }
+          .remarks { margin-top: 18mm; font-size: 10px; line-height: 1.4; }
           .remarks .label { font-weight: 700; }
 
           /* ---- Signature block: fixed position on the A4 sheet ---- */
@@ -3613,7 +3613,7 @@ class ReportEntryController {
             margin-bottom: 2px; 
           }
           .signature-label { 
-            font-size: 14px; 
+            font-size: 10px; 
             font-weight: 500;
             text-align: center; 
             width: 100%; 
