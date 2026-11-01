@@ -81,7 +81,7 @@ class ReferenceService {
   async getReferencesForBillingCenter(p_centerId) {
     try {
       if (!this.isSupabaseAvailable()) {
-        return this.getActiveReferences();
+        return [];
       }
 
       // Build query
@@ -102,8 +102,7 @@ class ReferenceService {
       return references || [];
     } catch (error) {
       console.error("Error getting billing references for center:", error);
-      // Safe fallback: return generic dropdown list
-      return this.getReferencesForDropdown();
+      throw error;
     }
   }
 

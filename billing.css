@@ -157,6 +157,17 @@ body {
   outline: none;
   background-color: #fff;
 }
+.ref-by-suggestions {
+  z-index: 1000;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 2px;
+}
+.ref-by-suggestions .dropdown-item {
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+}
 .form-control-sm { padding: .35rem .6rem; font-size: .85rem; height: 34px; }
 select.form-control, select.form-select {
   appearance: none;

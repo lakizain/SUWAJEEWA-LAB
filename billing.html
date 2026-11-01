@@ -131,16 +131,12 @@
                                 </div>
 
                                 <div class="row mb-0">
-                                    <div class="col-6">
+                                    <div class="col-12">
                                         <label class="form-label">Ref By</label>
-                                        <select class="form-control" id="ref-by-dropdown">
-                                            <option value="">Loading references...</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-6">
-                                        <label class="form-label">New Reference (if unlisted)</label>
-                                        <input type="text" class="form-control" id="new-referral-input"
-                                            placeholder="Enter new doctor / clinic">
+                                        <input type="text" class="form-control" id="ref-by-input"
+                                            placeholder="Type a reference name" autocomplete="off"
+                                            role="combobox" aria-autocomplete="list"
+                                            aria-expanded="false" aria-controls="ref-by-suggestions">
                                     </div>
                                 </div>
                             </div>

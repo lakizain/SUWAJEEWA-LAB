@@ -12,7 +12,8 @@ class BillingController {
     this.isInitialized = false;
     this.paidAmountManuallyEdited = false; // Track if user manually edited Paid Amount
     this.testSearchRequestId = 0;
-    this.referenceSearchRequestId = 0;
+    this.billingReferences = [];
+    this.referenceSuggestionIndex = -1;
     this.collectionSiteSearchRequestId = 0;
     this.currentDateTimeInterval = null;
   }
@@ -34,7 +35,7 @@ class BillingController {
       this.setupKeyboardNavigation();
       await this.populateCentersDropdown();
       await Promise.all([
-        this.populateReferencesDropdown(),
+        this.populateBillingReferences(),
         this.populatePackagesDropdown(),
       ]);
       await this.loadInitialData();
@@ -126,16 +127,22 @@ class BillingController {
       );
     }
 
-    // Reference dropdown change handler
-    this.setupReferenceChangeHandler();
-
-    // New reference input change handler
-    const newReferralInput = document.getElementById("new-referral-input");
-    if (newReferralInput) {
-      newReferralInput.addEventListener(
+    const refByInput = document.getElementById("ref-by-input");
+    if (refByInput) {
+      refByInput.addEventListener(
         "input",
-        this.handleNewReferenceChange.bind(this)
+        this.handleReferenceAutocomplete.bind(this)
       );
+      refByInput.addEventListener(
+        "keydown",
+        this.handleReferenceSuggestionKeydown.bind(this)
+      );
+      refByInput.addEventListener("input", () => {
+        if (this.editingBillId) this.referenceChanged = true;
+      });
+      refByInput.addEventListener("blur", () => {
+        setTimeout(() => this.hideReferenceSuggestions(), 150);
+      });
     }
 
     // Package selection (change and Enter key)
@@ -332,7 +339,7 @@ class BillingController {
     const genderSelect = document.querySelector(
       'select[name="patient_gender"]'
     );
-    const refBySelect = document.getElementById("ref-by-dropdown");
+    const refByInput = document.getElementById("ref-by-input");
     const testDetailsInput = document.getElementById("test-details-input");
 
     const focusAndOpenSelect = (selectEl) => {
@@ -448,18 +455,11 @@ class BillingController {
     }
 
     // Gender: Enter to open, after selection or second Enter -> Ref By
-    setupSelectEnterBehavior(genderSelect, refBySelect);
+    setupSelectEnterBehavior(genderSelect, refByInput);
 
-    // Ref By: Enter to open, after selection or second Enter -> New Reference
-    setupSelectEnterBehavior(
-      refBySelect,
-      document.getElementById("new-referral-input")
-    );
-
-    // New Reference -> Test Details (Enter)
-    const newReferralInput = document.getElementById("new-referral-input");
-    if (newReferralInput && testDetailsInput) {
-      newReferralInput.addEventListener("keydown", (e) => {
+    // Ref By -> Test Details (Enter)
+    if (refByInput && testDetailsInput) {
+      refByInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
           e.preventDefault();
           testDetailsInput.focus();
@@ -1245,34 +1245,13 @@ class BillingController {
   collectBillData() {
     const now = new Date();
     const referenceDetails = this.getSelectedReferenceDetails();
-    const newReferenceValue = document
-      .getElementById("new-referral-input")
-      ?.value.trim();
+    const referenceInputValue =
+      document.getElementById("ref-by-input")?.value.trim() || "";
 
     console.log("Collecting bill data - Reference details:", referenceDetails);
-    console.log(
-      "Collecting bill data - New reference value:",
-      newReferenceValue
-    );
+    console.log("Collecting bill data - Reference input:", referenceInputValue);
 
-    // Validate reference data before proceeding - prioritize new reference field
-    let ref_by = null;
-
-    // First check if new reference field has a value
-    if (newReferenceValue && newReferenceValue !== "") {
-      ref_by = newReferenceValue;
-      console.log("Using new reference for bill:", ref_by);
-    } else if (referenceDetails) {
-      // Only use reference data if it's valid and no new reference is provided
-      if (referenceDetails.name && referenceDetails.name.trim() !== "") {
-        ref_by = referenceDetails.name;
-        console.log("Reference selected for bill:", ref_by);
-      } else {
-        console.warn("Invalid reference details, skipping reference data");
-      }
-    } else {
-      console.log("No reference selected for bill");
-    }
+    const ref_by = referenceDetails?.name || referenceInputValue || null;
 
     return {
       bill_type:
@@ -1301,8 +1280,7 @@ class BillingController {
       ref_by: ref_by, // Use validated reference name
       // Note: reference_id and reference_rid are not stored in the database
       // They are only used for frontend reference matching
-      new_referral:
-        document.getElementById("new-referral-input")?.value.trim() || "",
+      new_referral: referenceDetails ? "" : referenceInputValue,
       items: this.getBillItems(),
       total_amount: this.calculateTotalAmount(),
       discount: this.getDiscountValue(),
@@ -1380,12 +1358,8 @@ class BillingController {
     }
   }
 
-  // Populate references dropdown
-  // NOTE: scoped to (user's center refs) + (global refs where center_id IS NULL)
-  async populateReferencesDropdown(centerId = this.getSelectedCenterId()) {
-    const dropdown = document.getElementById("ref-by-dropdown");
-    if (!dropdown) return;
-    dropdown.innerHTML = "<option value=''>Loading references...</option>";
+  // Load active references scoped to the user's center and global references.
+  async populateBillingReferences(centerId = this.getSelectedCenterId()) {
     try {
       const referenceService = window.app.getService("reference");
       const billingCenterId = centerId || null;
@@ -1393,24 +1367,11 @@ class BillingController {
         billingCenterId
       );
       if (centerId !== this.getSelectedCenterId()) return;
-
-      dropdown.innerHTML = "<option value=''>Select Reference</option>";
-      if (references && references.length > 0) {
-        references.forEach((ref) => {
-          const option = document.createElement("option");
-          option.value = ref.id;
-          const scopeBadge = ref.center_id ? "[C]" : "[G]";
-          option.textContent = `${ref.name} (${ref.rid})  ${scopeBadge}`;
-          dropdown.appendChild(option);
-        });
-      } else {
-        dropdown.innerHTML = "<option value=''>No references found</option>";
-      }
+      this.billingReferences = references || [];
     } catch (e) {
-      console.warn("populateReferencesDropdown error:", e);
-      if (centerId === this.getSelectedCenterId()) {
-        dropdown.innerHTML = "<option value=''>Error loading references</option>";
-      }
+      this.billingReferences = [];
+      console.error("Failed to load billing references:", e);
+      window.app.showError("Failed to load references");
     }
   }
 
@@ -1479,10 +1440,8 @@ class BillingController {
     }
 
     this.testSearchRequestId++;
-    this.referenceSearchRequestId++;
     this._lastTestSuggestions = [];
     document.getElementById("test-dropdown")?.remove();
-    document.getElementById("reference-dropdown")?.remove();
 
     const testInput = document.getElementById("test-details-input");
     const refreshTestSearch =
@@ -1491,7 +1450,7 @@ class BillingController {
         : Promise.resolve();
 
     await Promise.all([
-      this.populateReferencesDropdown(centerId),
+      this.populateBillingReferences(centerId),
       this.populatePackagesDropdown(centerId),
       this.generateBillNumber(centerId),
       this.repriceSelectedItems(centerId),
@@ -1593,122 +1552,25 @@ class BillingController {
 
   // Get selected reference ID
   getSelectedReferenceId() {
-    const dropdown = document.getElementById("ref-by-dropdown");
-    if (dropdown) {
-      return dropdown.value;
-    }
-    return null;
+    return this.getSelectedReferenceDetails()?.id || null;
   }
 
   // Get selected reference name
   getSelectedReferenceName() {
-    const dropdown = document.getElementById("ref-by-dropdown");
-    if (dropdown && dropdown.value && dropdown.value !== "") {
-      const selectedOption = dropdown.options[dropdown.selectedIndex];
-      // Extract the name part (before the parentheses)
-      const text = selectedOption.textContent;
-      const nameMatch = text.match(/^([^(]+)/);
-      return nameMatch ? nameMatch[1].trim() : null;
-    }
-    return null;
+    return this.getSelectedReferenceDetails()?.name || null;
   }
 
   // Get selected reference details (both ID and name)
   getSelectedReferenceDetails() {
-    const dropdown = document.getElementById("ref-by-dropdown");
-    if (dropdown && dropdown.value && dropdown.value !== "") {
-      const selectedOption = dropdown.options[dropdown.selectedIndex];
-      const text = selectedOption.textContent;
+    const inputValue = document.getElementById("ref-by-input")?.value.trim();
+    if (!inputValue) return null;
 
-      // Validate that we have a valid option
-      if (!selectedOption || !text || text.trim() === "") {
-        console.warn("Invalid reference option selected");
-        return null;
-      }
-
-      // Parse the reference text - handle various formats
-      const nameMatch = text.match(/^([^(]+)/);
-      const ridMatch = text.match(/\(([^)]+)\)/);
-
-      const name = nameMatch ? nameMatch[1].trim() : text.trim();
-      const rid = ridMatch ? ridMatch[1].trim() : null;
-
-      // Validate that we have at least a name
-      if (
-        !name ||
-        name === "" ||
-        name === "Select Reference" ||
-        name === "Loading references..."
-      ) {
-        console.warn("Invalid reference name:", name);
-        return null;
-      }
-
-      // Validate UUID format for reference ID
-      if (selectedOption.value && !this.isValidUUID(selectedOption.value)) {
-        console.warn("Invalid reference ID format:", selectedOption.value);
-        // For temporary options, we might not have a valid UUID, so we'll allow it
-        if (!text.includes("(N/A)") && !text.includes("(Temporary)")) {
-          return null;
-        }
-      }
-
-      return {
-        id: selectedOption.value || null,
-        name: name,
-        rid: rid,
-      };
-    }
-    return null;
-  }
-
-  // Setup reference change handler
-  setupReferenceChangeHandler() {
-    const refByDropdown = document.getElementById("ref-by-dropdown");
-    if (refByDropdown) {
-      refByDropdown.addEventListener("change", (event) => {
-        console.log("Reference dropdown changed:", event.target.value);
-        this.handleReferenceChange(event.target.value);
-      });
-    }
-  }
-
-  // Handle reference change
-  handleReferenceChange(selectedValue) {
-    console.log("Handling reference change:", selectedValue);
-
-    // Clear new referral input when a reference is selected
-    if (selectedValue && selectedValue !== "") {
-      const newReferralInput = document.getElementById("new-referral-input");
-      if (newReferralInput) {
-        newReferralInput.value = "";
-      }
-    }
-
-    // If editing a bill, mark that reference has been changed
-    if (this.editingBillId) {
-      this.referenceChanged = true;
-      console.log("Reference changed for bill being edited");
-    }
-  }
-
-  // Handle new reference input change
-  handleNewReferenceChange(event) {
-    const newReferenceValue = event.target.value.trim();
-
-    // Clear reference dropdown when new reference is entered
-    if (newReferenceValue && newReferenceValue !== "") {
-      const refByDropdown = document.getElementById("ref-by-dropdown");
-      if (refByDropdown) {
-        refByDropdown.selectedIndex = 0; // Select first option (empty)
-      }
-    }
-
-    // If editing a bill, mark that reference has been changed
-    if (this.editingBillId) {
-      this.referenceChanged = true;
-      console.log("New reference entered for bill being edited");
-    }
+    return (
+      this.billingReferences.find(
+        (reference) =>
+          reference.name?.toLowerCase() === inputValue.toLowerCase()
+      ) || null
+    );
   }
 
   // Get selected package ID (if needed)
@@ -2433,12 +2295,6 @@ class BillingController {
       .forEach((input) => {
         input.value = "";
       });
-    // Specifically clear the new reference field
-    const newReferralInput = document.getElementById("new-referral-input");
-    if (newReferralInput) {
-      newReferralInput.value = "";
-    }
-
     // Reset selects to first option
     document
       .querySelectorAll("select:not(#center-dropdown)")
@@ -2798,67 +2654,9 @@ class BillingController {
         this.updateCompanyNameVisibility();
       }
     }
-    if (bill.ref_by) {
-      // Set the reference dropdown to the correct value
-      const refByDropdown = document.getElementById("ref-by-dropdown");
-      if (refByDropdown) {
-        console.log("Setting reference dropdown for:", bill.ref_by);
-        console.log("Reference ID from bill:", bill.reference_id);
-
-        let referenceFound = false;
-
-        // First try to match by reference_id if available (more reliable)
-        if (bill.reference_id) {
-          for (let i = 0; i < refByDropdown.options.length; i++) {
-            if (refByDropdown.options[i].value === bill.reference_id) {
-              refByDropdown.selectedIndex = i;
-              console.log("Reference dropdown set by ID to index:", i);
-              referenceFound = true;
-              break;
-            }
-          }
-        }
-
-        // If not found by ID, try to match by name
-        if (!referenceFound) {
-          const options = refByDropdown.options;
-          for (let i = 0; i < options.length; i++) {
-            const optionText = options[i].textContent;
-            const referenceName = optionText.split(" (")[0]; // Extract name part before (RID)
-            console.log(
-              "Checking option:",
-              referenceName,
-              "against:",
-              bill.ref_by
-            );
-            if (referenceName === bill.ref_by) {
-              refByDropdown.selectedIndex = i;
-              console.log("Reference dropdown set by name to index:", i);
-              referenceFound = true;
-              break;
-            }
-          }
-        }
-
-        // If reference not found in dropdown, add it as a temporary option
-        if (!referenceFound) {
-          console.log(
-            "Reference not found in dropdown, adding as temporary option"
-          );
-          const tempOption = document.createElement("option");
-          tempOption.value = bill.reference_id || "";
-          tempOption.textContent = `${bill.ref_by} (${
-            bill.reference_rid || "N/A"
-          })`;
-          tempOption.style.color = "#666";
-          refByDropdown.appendChild(tempOption);
-          refByDropdown.selectedIndex = refByDropdown.options.length - 1;
-          console.log("Added temporary reference option");
-        }
-      }
-    }
-    if (bill.new_referral) {
-      document.getElementById("new-referral-input").value = bill.new_referral;
+    const refByInput = document.getElementById("ref-by-input");
+    if (refByInput) {
+      refByInput.value = bill.new_referral || bill.ref_by || "";
     }
     // Payment fields must populate even when values are 0
     if (bill.discount !== undefined && bill.discount !== null) {
@@ -3046,15 +2844,6 @@ class BillingController {
       });
     }
 
-    // Setup reference auto complete (existing)
-    const refByInput = document.querySelector('input[value="DR M AMUNUGAMA"]');
-    if (refByInput) {
-      refByInput.addEventListener(
-        "input",
-        this.debounce(this.handleReferenceSearch.bind(this), 300)
-      );
-    }
-
     // Setup test auto complete for Test Details field
     const testInput = document.getElementById("test-details-input");
     console.log("Test input found:", testInput);
@@ -3129,84 +2918,112 @@ class BillingController {
     }
   }
 
-  // Handle reference search
-  // NOTE: scoped to user's center + global refs only
-  async handleReferenceSearch(event) {
-    const searchTerm = event.target.value.trim();
-    const requestId = ++this.referenceSearchRequestId;
-    const centerId = this.getSelectedCenterId();
-
-    if (searchTerm.length < 2) return;
-
-    try {
-      const referenceService = window.app.getService("reference");
-      const billingCenterId = centerId || null;
-      const references = await referenceService.searchBillingReferences(
-        searchTerm,
-        billingCenterId
-      );
-      if (
-        requestId !== this.referenceSearchRequestId ||
-        centerId !== this.getSelectedCenterId()
-      ) {
-        return;
-      }
-      this.displayReferenceSuggestions(references);
-    } catch (error) {
-      console.error("Error searching references:", error);
-    }
-  }
-
-  // Display reference suggestions
-  displayReferenceSuggestions(references) {
-    // Create dropdown for reference suggestions
-    let dropdown = document.getElementById("reference-dropdown");
-    if (!dropdown) {
-      dropdown = document.createElement("div");
-      dropdown.id = "reference-dropdown";
-      dropdown.className = "dropdown-menu show position-absolute w-100";
-      dropdown.style.cssText =
-        "z-index: 1000; max-height: 200px; overflow-y: auto;";
-
-      const refByInput = document.querySelector(
-        'input[value="DR M AMUNUGAMA"]'
-      );
-      if (refByInput) {
-        refByInput.parentElement.style.position = "relative";
-        refByInput.parentElement.appendChild(dropdown);
-      }
-    }
-
-    if (references.length === 0) {
-      dropdown.innerHTML =
-        '<div class="dropdown-item">No references found</div>';
+  // Show active billing references that match anywhere in the typed name.
+  handleReferenceAutocomplete(event) {
+    const input = event.target;
+    const query = input.value.trim();
+    if (!query) {
+      this.hideReferenceSuggestions();
       return;
     }
 
-    const items = references
-      .map(
-        (ref) => `
-            <div class="dropdown-item" onclick="window.billingController.selectReference('${ref.name}')">
-                <strong>${ref.name}</strong> (${ref.rid})
-            </div>
-        `
-      )
-      .join("");
-
-    dropdown.innerHTML = items;
+    const matches = this.billingReferences.filter(
+      (reference) =>
+        typeof reference.name === "string" &&
+        reference.name.toLowerCase().includes(query.toLowerCase())
+    );
+    this.displayReferenceSuggestions(matches, input);
   }
 
-  // Select reference
-  selectReference(referenceName) {
-    const refByInput = document.querySelector('input[value="DR M AMUNUGAMA"]');
-    if (refByInput) {
-      refByInput.value = referenceName;
+  displayReferenceSuggestions(references, input) {
+    this.hideReferenceSuggestions();
+    if (!references.length || !input?.parentElement) return;
+
+    const dropdown = document.createElement("div");
+    dropdown.id = "ref-by-suggestions";
+    dropdown.className = "dropdown-menu show position-absolute w-100 ref-by-suggestions";
+    dropdown.setAttribute("role", "listbox");
+
+    references.slice(0, 20).forEach((reference, index) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "dropdown-item";
+      option.id = `ref-by-option-${index}`;
+      option.setAttribute("role", "option");
+      option.textContent = reference.rid
+        ? `${reference.name} (${reference.rid})`
+        : reference.name;
+      option.dataset.index = String(index);
+      dropdown.appendChild(option);
+    });
+
+    dropdown.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+    });
+    dropdown.addEventListener("click", (event) => {
+      const option = event.target.closest("button[data-index]");
+      if (!option) return;
+      const reference = references[Number(option.dataset.index)];
+      if (reference) this.selectReferenceSuggestion(reference);
+    });
+
+    const parent = input.parentElement;
+    if (getComputedStyle(parent).position === "static") {
+      parent.style.position = "relative";
+    }
+    parent.appendChild(dropdown);
+    input.setAttribute("aria-expanded", "true");
+    this.referenceSuggestionIndex = -1;
+    this.referenceSuggestionItems = references.slice(0, 20);
+  }
+
+  hideReferenceSuggestions() {
+    document.getElementById("ref-by-suggestions")?.remove();
+    document.getElementById("ref-by-input")?.setAttribute("aria-expanded", "false");
+    document.getElementById("ref-by-input")?.removeAttribute("aria-activedescendant");
+    this.referenceSuggestionIndex = -1;
+    this.referenceSuggestionItems = [];
+  }
+
+  handleReferenceSuggestionKeydown(event) {
+    const dropdown = document.getElementById("ref-by-suggestions");
+    if (event.key === "Escape") {
+      this.hideReferenceSuggestions();
+      return;
+    }
+    if (!dropdown) return;
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const items = dropdown.querySelectorAll("button[data-index]");
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      this.referenceSuggestionIndex =
+        (this.referenceSuggestionIndex + direction + items.length) % items.length;
+      items.forEach((item, index) => {
+        item.classList.toggle("active", index === this.referenceSuggestionIndex);
+      });
+      event.target.setAttribute(
+        "aria-activedescendant",
+        `ref-by-option-${this.referenceSuggestionIndex}`
+      );
+      return;
     }
 
-    const dropdown = document.getElementById("reference-dropdown");
-    if (dropdown) {
-      dropdown.remove();
+    if (event.key === "Enter") {
+      const selectedIndex = Math.max(this.referenceSuggestionIndex, 0);
+      const reference = this.referenceSuggestionItems[selectedIndex];
+      if (!reference) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.selectReferenceSuggestion(reference);
     }
+  }
+
+  selectReferenceSuggestion(reference) {
+    const input = document.getElementById("ref-by-input");
+    if (input) input.value = reference.name;
+    if (this.editingBillId) this.referenceChanged = true;
+    this.hideReferenceSuggestions();
   }
 
   // Handle test search for autocomplete
@@ -4075,30 +3892,6 @@ class BillingController {
     if (months) parts.push(`${String(months).padStart(2, "0")} Mths`);
     if (days) parts.push(`${String(days).padStart(2, "0")} Days`);
     return parts.length > 0 ? parts.join(" ") : "";
-  }
-
-  // Test reference selection (for debugging)
-  testReferenceSelection() {
-    const dropdown = document.getElementById("ref-by-dropdown");
-    console.log("Dropdown element:", dropdown);
-    console.log("Dropdown value:", dropdown?.value);
-    console.log("Dropdown selectedIndex:", dropdown?.selectedIndex);
-    console.log("Dropdown options:", dropdown?.options);
-
-    if (dropdown && dropdown.options) {
-      for (let i = 0; i < dropdown.options.length; i++) {
-        console.log(
-          `Option ${i}:`,
-          dropdown.options[i].value,
-          dropdown.options[i].textContent
-        );
-      }
-    }
-
-    const referenceDetails = this.getSelectedReferenceDetails();
-    console.log("Selected reference details:", referenceDetails);
-
-    return referenceDetails;
   }
 
   // Debounce function
