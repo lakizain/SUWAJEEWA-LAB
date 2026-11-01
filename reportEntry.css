@@ -1091,7 +1091,7 @@ td,
 
   .print-table th:nth-child(2),
   .print-table td:nth-child(2) {
-    padding-left: 20px; /* Indent second column for better readability */
+    text-align: center;
   }
 
   .print-footer {
