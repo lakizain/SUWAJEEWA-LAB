@@ -2739,11 +2739,12 @@ class ReportEntryController {
       this.currentBills = [bill];
       this.renderBillsTable();
 
-      // Clear any previously selected test item
-      this.selectedTestItem = null;
-
-      // Select the bill and populate forms (show all tests for this patient)
-      this.selectBill(bill);
+      // Select the first test so the result grid starts with its subcategories.
+      // The bill table remains available for switching to another test.
+      const firstTestItem = (bill.bill_items || []).find(
+        (item) => item?.tests?.id || item?.test_id
+      ) || null;
+      this.selectBill(bill, firstTestItem);
       this.setSearchStatus("Bill loaded.", "success");
     } catch (error) {
       console.error("Error selecting bill from search:", error);
