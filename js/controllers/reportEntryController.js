@@ -739,15 +739,34 @@ class ReportEntryController {
     if (this.resultsTableBodyReady) this.resultsTableBodyReady.innerHTML = "";
     this.readySelectionItems.clear();
 
-    if (this.currentBills.length === 0) {
-      const row = document.createElement("tr");
-      row.innerHTML =
-        '<td colspan="4" class="text-center text-muted py-4">No reports found for the selected filters</td>';
-      this.resultsTableBody.appendChild(row);
-      this.pruneReadySelectionToVisible();
-      this.updateReadySendControls();
-      return;
-    }
+    const testId = this.testFilter?.value || "all";
+    const billSearchTerm = (this.billSearchInput?.value || "")
+      .trim()
+      .toLocaleLowerCase();
+    const fromDate = this.dateFromInput?.value || "";
+    const toDate = this.dateToInput?.value || "";
+    const hasDateRange = Boolean(fromDate && toDate && fromDate <= toDate);
+    const visibleBills = this.currentBills.filter((bill) => {
+      if (billSearchTerm) {
+        const billNo = String(bill.bill_no || "").toLocaleLowerCase();
+        const patientName = String(bill.patient_name || "").toLocaleLowerCase();
+        if (!billNo.includes(billSearchTerm) && !patientName.includes(billSearchTerm)) {
+          return false;
+        }
+      }
+
+      if (hasDateRange) {
+        const billDate = bill.bill_date || bill.created_at;
+        const billDateValue = billDate
+          ? this.getLocalDateValue(new Date(billDate))
+          : "";
+        if (!billDateValue || billDateValue < fromDate || billDateValue > toDate) {
+          return false;
+        }
+      }
+
+      return true;
+    });
 
     const appendRow = (targetBody, bill, item, status) => {
       const testName = item
@@ -854,10 +873,17 @@ class ReportEntryController {
       }
     };
 
-    this.currentBills.forEach((bill) => {
-      const items = bill.bill_items || [];
+    visibleBills.forEach((bill) => {
+      const billItems = bill.bill_items || [];
+      const items = testId === "all"
+        ? billItems
+        : billItems.filter(
+            (item) =>
+              String(item.test_id || item.tests?.id || "") === String(testId)
+          );
 
       if (items.length === 0) {
+        if (testId !== "all") return;
         const status = bill.report_status || "pending";
         // Show bills without items only in Pending when not ready
         if (status !== "ready") {
@@ -879,6 +905,22 @@ class ReportEntryController {
         }
       });
     });
+
+    if (!this.resultsTableBody.children.length) {
+      const row = document.createElement("tr");
+      row.innerHTML =
+        '<td colspan="4" class="text-center text-muted py-4">No reports found for the selected filters</td>';
+      this.resultsTableBody.appendChild(row);
+    }
+    if (
+      this.resultsTableBodyReady &&
+      !this.resultsTableBodyReady.children.length
+    ) {
+      const row = document.createElement("tr");
+      row.innerHTML =
+        '<td colspan="6" class="text-center text-muted py-4">No reports found for the selected filters</td>';
+      this.resultsTableBodyReady.appendChild(row);
+    }
 
     this.pruneReadySelectionToVisible();
     this.syncReadySelectAllCheckboxState();
