@@ -57,6 +57,34 @@ class BillingService {
     return this.supabase !== null;
   }
 
+  async getCollectionSiteSuggestions(searchTerm) {
+    const term = String(searchTerm || "").trim();
+    if (term.length < 2 || !this.isSupabaseAvailable()) return [];
+
+    try {
+      const pattern = term.replace(/[\\%_]/g, "\\$&");
+      const { data, error } = await this.supabase
+        .from("bills")
+        .select("company_name")
+        .not("company_name", "is", null)
+        .ilike("company_name", `${pattern}%`)
+        .order("company_name", { ascending: true })
+        .limit(100);
+
+      if (error) throw error;
+
+      const uniqueNames = new Map();
+      (data || []).forEach((bill) => {
+        const name = String(bill.company_name || "").trim();
+        if (name) uniqueNames.set(name.toLowerCase(), name);
+      });
+      return Array.from(uniqueNames.values()).slice(0, 20);
+    } catch (error) {
+      console.error("Error getting collection site suggestions:", error);
+      throw error;
+    }
+  }
+
   filterBillItemsForDisplay(items) {
     return (items || []).filter((item) => !item?.is_package_component);
   }

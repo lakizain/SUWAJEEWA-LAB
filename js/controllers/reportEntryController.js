@@ -3195,7 +3195,7 @@ class ReportEntryController {
           
           .results-table { 
             width: 100%; 
-            table-layout: fixed; 
+            table-layout: auto;
             border-collapse: separate; 
             border-spacing: 0 2px; 
           }
@@ -3215,6 +3215,11 @@ class ReportEntryController {
           
           .results-table thead th:nth-child(2) { 
             transform: translateX(0); 
+            white-space: nowrap;
+          }
+
+          .results-table tbody td:nth-child(2) {
+            white-space: nowrap;
           }
           
           .results-table tbody td:nth-child(2)::before { 
@@ -3580,10 +3585,11 @@ class ReportEntryController {
           .investigation-value { font-weight: 700; }
           .hr { margin-top: 8px; border-top: 1px solid #999; }
           table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 8px; line-height: 1.4; }
-          .results-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 1.5px; }
+          .results-table { width: 100%; table-layout: auto; border-collapse: separate; border-spacing: 0 1.5px; }
           .results-table th, .results-table td { border: none; padding: 3px 6px; vertical-align: top; }
           .results-table thead th { background: #fff; font-weight: 700; text-align: left; }
-          .results-table thead th:nth-child(2) { transform: translateX(0); }
+          .results-table thead th:nth-child(2) { transform: translateX(0); white-space: nowrap; }
+          .results-table tbody td:nth-child(2) { white-space: nowrap; }
           .results-table tbody td:nth-child(2)::before { content: ":"; display: inline-block; width: 10px; text-align: center; margin-right: 6px; }
           .results-table tbody tr.empty-category-row td:nth-child(2)::before { content: ""; }
           .results-table tbody tr.hide-value-colon td:nth-child(2)::before { content: ""; }
@@ -3726,11 +3732,11 @@ class ReportEntryController {
             <table class="results-table">
               <thead>
                 <tr>
-                  <th style="width: 35%">INVESTIGATION</th>
-                  <th style="width: 18%">RESULT</th>
-                  <th style="width: 12%">UNIT</th>
+                  <th style="width: 30%">INVESTIGATION</th>
+                  <th style="width: 30%">RESULT</th>
+                  <th style="width: 10%">UNIT</th>
                   ${showRefRange ? `<th style="width: 20%">REFERENCE RANGE</th>` : ""}
-                  ${showRemark ? `<th style="width: 15%">REMARK</th>` : ""}
+                  ${showRemark ? `<th style="width: 10%">REMARK</th>` : ""}
                 </tr>
               </thead>
               <tbody>

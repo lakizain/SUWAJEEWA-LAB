@@ -13,6 +13,7 @@ class BillingController {
     this.paidAmountManuallyEdited = false; // Track if user manually edited Paid Amount
     this.testSearchRequestId = 0;
     this.referenceSearchRequestId = 0;
+    this.collectionSiteSearchRequestId = 0;
     this.currentDateTimeInterval = null;
   }
 
@@ -2998,6 +2999,52 @@ class BillingController {
   // Setup auto complete
   setupAutoComplete() {
     console.log("Setting up autocomplete...");
+
+    const collectionSiteInput = document.getElementById("company-name");
+    if (collectionSiteInput) {
+      collectionSiteInput.addEventListener(
+        "input",
+        this.debounce(async (event) => {
+          const input = event.target;
+          const query = input.value.trim();
+          const requestId = ++this.collectionSiteSearchRequestId;
+          if (query.length < 2) return;
+
+          try {
+            const names =
+              await this.billingService.getCollectionSiteSuggestions(query);
+            if (
+              requestId !== this.collectionSiteSearchRequestId ||
+              input.value.trim() !== query ||
+              input.selectionStart !== input.selectionEnd
+            ) {
+              return;
+            }
+
+            const match = names.find(
+              (name) => name.toLowerCase().startsWith(query.toLowerCase())
+            );
+            if (!match || match.length <= query.length) return;
+
+            input.value = match;
+            input.setSelectionRange(query.length, match.length);
+          } catch (error) {
+            console.error("Failed to load collection site suggestions:", error);
+            window.app.showError("Failed to load collection site suggestions");
+          }
+        }, 300)
+      );
+      collectionSiteInput.addEventListener("keydown", (event) => {
+        if (
+          event.key === "Enter" &&
+          collectionSiteInput.selectionStart < collectionSiteInput.selectionEnd
+        ) {
+          event.preventDefault();
+          const end = collectionSiteInput.value.length;
+          collectionSiteInput.setSelectionRange(end, end);
+        }
+      });
+    }
 
     // Setup reference auto complete (existing)
     const refByInput = document.querySelector('input[value="DR M AMUNUGAMA"]');
