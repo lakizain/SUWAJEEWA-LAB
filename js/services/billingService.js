@@ -506,6 +506,9 @@ class BillingService {
           total_price: item.total_price ?? quantity * unitPrice,
           is_package_component: Boolean(item.is_package_component),
         };
+        if (item.is_package_component) {
+          update.report_status = "pending";
+        }
 
         if (!existing) {
           rowsToInsert.push({ bill_id: billId, ...update });

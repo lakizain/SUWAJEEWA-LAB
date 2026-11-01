@@ -1143,7 +1143,10 @@ class BillingController {
         const { items, ...billUpdateData } = billData;
         bill = await this.billingService.updateBill(
           this.editingBillId,
-          billUpdateData
+          {
+            ...billUpdateData,
+            bill_date: new Date().toISOString(),
+          }
         );
 
         // Update bill items separately
