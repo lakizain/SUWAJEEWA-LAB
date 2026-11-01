@@ -3527,7 +3527,7 @@ class BillingController {
         ${
           billData.company_name
             ? `<div class="info-row">
-          <span class="info-label">Company Name :</span>
+          <span class="info-label">Location / Venue :</span>
           <span class="info-value">${this.escapeHistoryText(
             billData.company_name
           )}</span>

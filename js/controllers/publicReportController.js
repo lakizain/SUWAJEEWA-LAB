@@ -112,7 +112,7 @@ class PublicReportController {
       ["GENDER", (bill.gender || "").toUpperCase()],
       ["REQUESTED BY", (bill.requestedBy || "").toUpperCase()],
       [
-        bill.isOutMedical ? "COMPANY NAME" : "CENTER",
+        bill.isOutMedical ? "LOCATION / VENUE" : "CENTER",
         String((bill.isOutMedical ? bill.companyName : bill.centerName) || "").toUpperCase(),
       ],
     ];
