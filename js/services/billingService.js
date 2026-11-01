@@ -469,18 +469,76 @@ class BillingService {
     }
   }
 
-  // Update bill items (delete existing and add new ones)
+  // Reconcile bill items so unchanged rows keep the IDs used by report entries.
   async updateBillItems(billId, items) {
     try {
-      // First delete existing bill items
-      await this.supabase.from("bill_items").delete().eq("bill_id", billId);
+      const { data: existingItems, error: fetchError } = await this.supabase
+        .from("bill_items")
+        .select("id, test_id, package_id, is_package_component")
+        .eq("bill_id", billId);
+      if (fetchError) throw fetchError;
 
-      // Then add new bill items
-      if (items && items.length > 0) {
-        return await this.addBillItems(billId, items);
+      const getItemKey = (item) =>
+        [
+          item.test_id || "",
+          item.package_id || "",
+          Boolean(item.is_package_component),
+        ].join(":");
+      const existingByKey = new Map();
+      (existingItems || []).forEach((item) => {
+        const key = getItemKey(item);
+        const matches = existingByKey.get(key) || [];
+        matches.push(item);
+        existingByKey.set(key, matches);
+      });
+
+      const rowsToInsert = [];
+      const retainedItemIds = new Set();
+      for (const item of items || []) {
+        const existing = existingByKey.get(getItemKey(item))?.shift();
+        const quantity = parseFloat(item.quantity || item.qty) || 1;
+        const unitPrice = parseFloat(item.unit_price || item.price) || 0;
+        const update = {
+          test_id: item.test_id || null,
+          package_id: item.package_id || null,
+          quantity,
+          unit_price: unitPrice,
+          total_price: item.total_price ?? quantity * unitPrice,
+          is_package_component: Boolean(item.is_package_component),
+        };
+
+        if (!existing) {
+          rowsToInsert.push({ bill_id: billId, ...update });
+          continue;
+        }
+
+        retainedItemIds.add(existing.id);
+        const { error: updateError } = await this.supabase
+          .from("bill_items")
+          .update(update)
+          .eq("id", existing.id);
+        if (updateError) throw updateError;
       }
 
-      return [];
+      if (rowsToInsert.length > 0) {
+        const { error: insertError } = await this.supabase
+          .from("bill_items")
+          .insert(rowsToInsert);
+        if (insertError) throw insertError;
+      }
+
+      const removedItemIds = (existingItems || [])
+        .filter((item) => !retainedItemIds.has(item.id))
+        .map((item) => item.id);
+      if (removedItemIds.length > 0) {
+        const { error: deleteError } = await this.supabase
+          .from("bill_items")
+          .delete()
+          .in("id", removedItemIds);
+        if (deleteError) throw deleteError;
+      }
+
+      return items || [];
     } catch (error) {
       console.error("Error updating bill items:", error);
       throw error;

@@ -1147,7 +1147,7 @@ class BillingController {
         );
 
         // Update bill items separately
-        if (items && items.length > 0) {
+        if (Array.isArray(items)) {
           await this.billingService.updateBillItems(this.editingBillId, items);
         }
 
@@ -2710,14 +2710,30 @@ class BillingController {
   async loadBillItemsForEditing(billId) {
     try {
       const billingService = window.app.getService("billing");
-      const billItems = await billingService.getBillItems(billId);
+      const billItems = await billingService.getBillItems(billId, {
+        includeComponents: true,
+      });
 
       if (billItems && billItems.length > 0) {
         // Clear existing items
         this.selectedTests = [];
+        const componentsByPackage = new Map();
+        billItems
+          .filter((item) => item.is_package_component && item.package_id)
+          .forEach((item) => {
+            const packageId = String(item.package_id);
+            const components = componentsByPackage.get(packageId) || [];
+            components.push({
+              test_id: item.test_id || item.tests?.id,
+              tests: item.tests,
+            });
+            componentsByPackage.set(packageId, components);
+          });
 
         // Add each item to selectedTests
         for (const item of billItems) {
+          if (item.is_package_component) continue;
+
           if (item.tests) {
             this.selectedTests.push({
               id: item.tests.id,
@@ -2730,9 +2746,10 @@ class BillingController {
               pricing_source: "saved_bill",
             });
           } else if (item.packages) {
-            let packageTests = [];
-            try {
-              if (this.pricingService) {
+            let packageTests =
+              componentsByPackage.get(String(item.packages.id)) || [];
+            if (packageTests.length === 0 && this.pricingService) {
+              try {
                 const packageData = await this.pricingService.getResolvedPackageById(
                   item.packages.id,
                   this.getSelectedCenterId()
@@ -2740,9 +2757,12 @@ class BillingController {
                 packageTests = Array.isArray(packageData?.package_tests)
                   ? packageData.package_tests
                   : [];
+              } catch (packageError) {
+                console.warn(
+                  "Failed to load package component tests for editing:",
+                  packageError
+                );
               }
-            } catch (packageError) {
-              console.warn("Failed to load package component tests for editing:", packageError);
             }
 
             this.selectedTests.push({
