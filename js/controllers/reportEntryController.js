@@ -3495,7 +3495,7 @@ class ReportEntryController {
     
     const gender = this.safeText(this.genderInput?.value || "").toUpperCase();
     const isOutMedicalCenter = bill.centers?.is_out_medical === true;
-    const centerLabel = isOutMedicalCenter ? "LOCATION / VENUE" : "CENTER";
+    const centerLabel = isOutMedicalCenter ? "COLLECTION SITE" : "CENTER";
     const centerDisplayName = this.safeText(
       isOutMedicalCenter
         ? bill.company_name || ""
