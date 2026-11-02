@@ -14,8 +14,41 @@ const THREE_DECIMAL_VALUE_TEST_ID = "3ea45cbd-4b12-4ae1-9983-52e759219e98";
 const SIGNATURE_BOTTOM_FROM_SHEET_MM = 31;
 const SIGNATURE_BLOCK_HEIGHT_MM = 18;
 const SIGNATURE_IMAGE_AREA_MM = 11;
-// Bottom @page margin used when printing WITHOUT letterhead (see @page rules)
-const PRINT_PAGE_MARGIN_BOTTOM_NO_LETTERHEAD_MM = 16;
+// @page margin is now 0 for BOTH letterhead / no-letterhead printing, so the
+// content sits at exactly the same place on the sheet in both modes
+// (pre-printed letterhead paper and printed letterhead look identical).
+const PRINT_PAGE_MARGIN_BOTTOM_NO_LETTERHEAD_MM = 0;
+
+/**
+ * ---------------------------------------------------------------------------
+ * STANDARD REPORT LAYOUT (measured from the reference laboratory report)
+ * ---------------------------------------------------------------------------
+ *  - Font            : monospace (Courier family), 10 pt, black
+ *  - Left margin     : 12 mm   |  Right margin : 6 mm  (table width = 192 mm)
+ *  - Info block      : label / ":" / value, line pitch ~4.4 mm
+ *  - Test/Profile    : bold + underlined
+ *  - Table header    : regular weight, single solid rule under the header
+ *  - Result rows     : pitch up to 6.35 mm (18 pt), shrinks automatically when
+ *                      a test has many rows
+ *  - Reference range : dash-aligned ("10.0  - 200.0")
+ *  - Flag column     : H / L only (normal results have an empty flag)
+ *  - Comment         : bold "Comment :-" + dotted rule + comment text
+ *  - Signature       : fixed block at bottom-right
+ */
+const REPORT_FONT_FAMILY =
+  '"Courier New", Courier, "Liberation Mono", "Nimbus Mono PS", monospace';
+const REPORT_LEFT_MM = 12;
+const REPORT_RIGHT_MM = 6;
+const REPORT_TOP_SPACE_MM = 50;
+const REPORT_LINE_HEIGHT_MM = 4.4;
+const REPORT_ROW_PITCH_MAX_MM = 6.35;
+const REPORT_ROW_PITCH_MIN_MM = 4.4;
+// Width of one character of a 10 pt monospace font (0.6 em) in millimetres
+const REPORT_CHAR_WIDTH_MM = (10 * 0.6 * 25.4) / 72;
+// Y (mm from top, incl. letterhead top space) where result rows start
+const REPORT_TABLE_BODY_TOP_MM = 103;
+const REPORT_SIGNATURE_WIDTH_MM = 70;
+const REPORT_SIGNATURE_RIGHT_MM = 14;
 
 /**
  * 0-based subcategory row indices where manual value entry is skipped (by test UUID).
@@ -1308,6 +1341,8 @@ class ReportEntryController {
     };
   }
 
+  // Render the report HTML in a hidden iframe and read the printable data
+  // back out of it, so the PDF always matches the printed report.
   async loadReportPdfData(reportHTML, includeLetterhead) {
     const frame = document.createElement("iframe");
     frame.setAttribute("aria-hidden", "true");
@@ -1345,25 +1380,34 @@ class ReportEntryController {
       const headers = Array.from(table?.querySelectorAll("thead th") || [])
         .map((cell) => cell.textContent.trim().toUpperCase());
       const results = Array.from(table?.querySelectorAll("tbody tr") || [])
-        .map((row) => Array.from(row.cells).map((cell) => cell.textContent.trim()))
-        .filter((cells) => cells.length >= 2 && !cells[0].includes("No results entered"))
-        .map((cells) => ({
-          name: cells[0] || "",
-          value: cells[1] || "",
-          unit: cells[2] || "",
-          referenceRange: headers.includes("REFERENCE RANGE")
-            ? cells[headers.indexOf("REFERENCE RANGE")] || ""
-            : "",
-          remark: headers.includes("REMARK")
-            ? cells[headers.indexOf("REMARK")] || ""
-            : "",
-        }));
+        .filter(
+          (row) =>
+            row.cells.length >= 2 &&
+            !row.cells[0].textContent.includes("No results entered")
+        )
+        .map((row) => {
+          const cells = Array.from(row.cells).map((cell) =>
+            cell.textContent.trim()
+          );
+          const column = (name) =>
+            headers.includes(name) ? cells[headers.indexOf(name)] || "" : "";
+          return {
+            name: cells[0] || "",
+            value: cells[1] || "",
+            unit: column("UNIT"),
+            flag: column("FLAG"),
+            referenceRange: column("REFERENCE VALUE"),
+            abnormal: row.classList.contains("flag-abnormal"),
+            group: row.classList.contains("group-row"),
+          };
+        });
       const footerImage = includeLetterhead
         ? reportDocument.querySelector(".footer-link-section img")?.src || ""
         : "";
-      const comments = reportDocument.querySelector(".remarks")?.textContent
-        .replace(/^\s*COMMENT:\s*/i, "")
-        .trim() || "";
+      const comments =
+        reportDocument.querySelector(".remarks-body")?.textContent.trim() || "";
+      const department =
+        reportDocument.querySelector(".department")?.textContent.trim() || "";
 
       return {
         leftFields: readFields(1),
@@ -1371,6 +1415,7 @@ class ReportEntryController {
         testName:
           reportDocument.querySelector(".investigation-value")?.textContent.trim() ||
           "REPORT",
+        department,
         headers,
         results,
         footerImage,
@@ -1381,52 +1426,85 @@ class ReportEntryController {
     }
   }
 
+  // Draws one report into the jsPDF document using the same standard layout
+  // as the printed report (Courier 10 pt, aligned columns, fixed signature).
   drawReadyReport(pdf, report, assets, options, startOnNewPage) {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const x = 10.5;
+    const FONT = "courier";
+    const ch = REPORT_CHAR_WIDTH_MM;
+    const lineH = REPORT_LINE_HEIGHT_MM;
+    const baseline = 3.3; // text baseline offset inside a 4.4 mm line
+    const x = REPORT_LEFT_MM;
+    const rightEdge = pageWidth - REPORT_RIGHT_MM;
+    const tableWidth = rightEdge - x;
+
     const headerHeight = options.includeLetterhead
-      ? pageWidth * assets.header.height / assets.header.width
+      ? (pageWidth * assets.header.height) / assets.header.width
       : 0;
     const footerHeight = options.includeLetterhead
-      ? pageWidth * assets.footer.height / assets.footer.width
+      ? (pageWidth * assets.footer.height) / assets.footer.width
       : 0;
-    const footerTop = pageHeight - footerHeight;
-    const hasRemark = report.headers.includes("REMARK");
-    const hasReferenceRange = report.headers.includes("REFERENCE RANGE");
-    const tableWidth = pageWidth - 2 * x;
-    const columnRatios = hasReferenceRange && hasRemark
-      ? [0.32, 0.18, 0.12, 0.21, 0.17]
-      : hasReferenceRange
-        ? [0.42, 0.22, 0.14, 0.22]
-        : hasRemark
-          ? [0.44, 0.24, 0.16, 0.16]
-          : [0.52, 0.28, 0.2];
-    const columnWidths = columnRatios.map((width) => tableWidth * width);
-    const infoY = options.includeLetterhead ? Math.max(57, headerHeight + 10) : 22;
-    const rowGap = 6.3;
-    const investigationY = infoY + 35;
-    const tableY = investigationY + 7;
-    const headerY = tableY + 6;
-    const firstResultY = headerY + 7;
-    const maxRowsPerPage = report.footerImage ? 22 : 28;
-    const pageCount = Math.max(1, Math.ceil(report.results.length / maxRowsPerPage));
+
+    // Vertical layout
+    const topSpace = Math.max(REPORT_TOP_SPACE_MM, headerHeight + 2);
+    const titleTop = topSpace;
+    const infoTop = titleTop + 5 + 3;
+    const infoRows = Math.max(
+      report.leftFields.length,
+      report.rightFields.length
+    );
+    const investigationTop = infoTop + infoRows * lineH + 5.7;
+    const tableHeaderTop = investigationTop + lineH + 6;
+    const bodyTop = tableHeaderTop + 7;
+    const signatureTop =
+      pageHeight - SIGNATURE_BOTTOM_FROM_SHEET_MM - SIGNATURE_BLOCK_HEIGHT_MM;
+    const bottomLimit = signatureTop - 2;
+
+    // Columns (same ratios as the printed HTML table)
+    const hasFlag = report.headers.includes("FLAG");
+    const hasReferenceRange = report.headers.includes("REFERENCE VALUE");
+    let widthsPct = this.getReportColumnWidthsPct(hasFlag, hasReferenceRange);
+    if (widthsPct.length !== report.headers.length) {
+      widthsPct = report.headers.map(() => 100 / report.headers.length);
+    }
+    const columnWidths = widthsPct.map((p) => (tableWidth * p) / 100);
+    const columnX = [];
+    columnWidths.reduce((acc, w, i) => {
+      columnX[i] = acc;
+      return acc + w;
+    }, x);
+
+    // Row pitch / pagination
+    const rowCount = report.results.length;
+    const reserve =
+      this.estimateCommentsHeightMm(report.comments) +
+      (report.footerImage ? 30 : 0);
+    const availableMm = bottomLimit - bodyTop - reserve;
+    const rowsPerPage = Math.max(
+      1,
+      Math.floor(availableMm / REPORT_ROW_PITCH_MIN_MM)
+    );
+    const pageCount = Math.max(1, Math.ceil(rowCount / rowsPerPage));
+    const pitch =
+      pageCount > 1
+        ? REPORT_ROW_PITCH_MIN_MM
+        : Math.max(
+            REPORT_ROW_PITCH_MIN_MM,
+            Math.min(
+              REPORT_ROW_PITCH_MAX_MM,
+              availableMm / Math.max(rowCount, 1)
+            )
+          );
 
     for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
       if (pageIndex > 0 || startOnNewPage) pdf.addPage("a4", "portrait");
-      const start = pageIndex * maxRowsPerPage;
-      const pageResults = report.results.slice(start, start + maxRowsPerPage);
+      const start = pageIndex * rowsPerPage;
+      const pageResults = report.results.slice(start, start + rowsPerPage);
       const isLastPage = pageIndex === pageCount - 1;
-      const reservedFooterSpace =
-        isLastPage && report.footerImage ? 28 : 0;
-      const resultsBottom = Math.min(
-        footerTop - 8 - reservedFooterSpace,
-        235 - reservedFooterSpace
-      );
-      const resultGap = pageResults.length
-        ? Math.min(6.2, (resultsBottom - firstResultY) / pageResults.length)
-        : 6.2;
-      const fontSize = resultGap < 4.5 ? 7 : resultGap < 5.3 ? 8 : 9.5;
+
+      pdf.setTextColor(0, 0, 0);
+      pdf.setDrawColor(0, 0, 0);
 
       if (options.includeLetterhead) {
         pdf.addImage(assets.header.data, "PNG", 0, 0, pageWidth, headerHeight);
@@ -1434,22 +1512,37 @@ class ReportEntryController {
           assets.footer.data,
           "PNG",
           0,
-          footerTop,
+          pageHeight - footerHeight,
           pageWidth,
           footerHeight
         );
       }
 
-      pdf.setFontSize(9.5);
+      // Title row: department (centre) + page number (right)
+      pdf.setFont(FONT, "normal");
+      pdf.setFontSize(10);
+      if (report.department) {
+        pdf.text(report.department, pageWidth / 2, titleTop + 3.8, {
+          align: "center",
+        });
+      }
+      pdf.text(`Page ${pageIndex + 1} of ${pageCount}`, rightEdge, titleTop + 3.8, {
+        align: "right",
+      });
+
+      // Patient / sample information block
+      const leftColWidth = tableWidth * 0.52;
+      const rightColX = x + leftColWidth;
+      const rightColWidth = tableWidth - leftColWidth;
       report.leftFields.forEach(({ label, value }, index) => {
         this.drawReadyReportField(
           pdf,
           label,
           value,
           x,
-          infoY + index * rowGap,
-          38,
-          58
+          infoTop + index * lineH + baseline,
+          17,
+          leftColWidth - 19 * ch
         );
       });
       report.rightFields.forEach(({ label, value }, index) => {
@@ -1457,132 +1550,178 @@ class ReportEntryController {
           pdf,
           label,
           value,
-          121.5,
-          infoY + index * rowGap,
-          49,
-          28
+          rightColX,
+          infoTop + index * lineH + baseline,
+          19,
+          rightColWidth - 21 * ch
         );
       });
 
+      // TEST/PROFILE line (bold + underlined)
+      const invY = investigationTop + baseline;
+      pdf.setFont(FONT, "bold");
       pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("INVESTIGATION", x, investigationY);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(":", 49, investigationY);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(report.testName.toUpperCase(), 52, investigationY, {
-        maxWidth: pageWidth - 2 * x - 42,
-      });
+      pdf.text("TEST/PROFILE", x, invY);
+      pdf.setLineWidth(0.2);
+      pdf.line(x, invY + 0.8, x + pdf.getTextWidth("TEST/PROFILE"), invY + 0.8);
+      pdf.text(":", x + 17 * ch, invY);
+      const invText = report.testName.toUpperCase();
+      const invX = x + 19 * ch;
+      pdf.text(invText, invX, invY, { maxWidth: rightEdge - invX });
+      pdf.line(
+        invX,
+        invY + 0.8,
+        invX + Math.min(pdf.getTextWidth(invText), rightEdge - invX),
+        invY + 0.8
+      );
 
-      pdf.setDrawColor(120, 120, 120);
-      pdf.setLineWidth(0.25);
-      pdf.line(x, tableY, pageWidth - x, tableY);
-      pdf.setFontSize(8.5);
-      pdf.setFont("helvetica", "bold");
-      let columnX = x;
+      // Table header: regular weight + a single rule underneath
+      pdf.setFont(FONT, "normal");
+      pdf.setFontSize(10);
       report.headers.forEach((header, index) => {
-        pdf.text(header, columnX + 1.5, headerY, {
-          maxWidth: columnWidths[index] - 3,
-        });
-        columnX += columnWidths[index];
+        pdf.text(header, columnX[index], tableHeaderTop + baseline);
       });
+      pdf.setLineWidth(0.35);
+      pdf.line(x, tableHeaderTop + 7, rightEdge, tableHeaderTop + 7);
 
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(fontSize);
+      // Result rows
       pageResults.forEach((result, index) => {
-        const y = firstResultY + index * resultGap;
-        pdf.text(result.name.toUpperCase(), x + 1.5, y, {
-          maxWidth: columnWidths[0] - 3,
+        const y = bodyTop + (index + 0.5) * pitch + 1.2;
+        const cellFor = (header) => {
+          switch (header) {
+            case "TEST":
+              return { text: result.name.toUpperCase(), bold: result.group, wrap: true };
+            case "RESULT":
+              return { text: result.value, bold: result.abnormal };
+            case "UNIT":
+              return { text: result.unit };
+            case "FLAG":
+              return { text: result.flag, bold: result.abnormal, wrap: true };
+            case "REFERENCE VALUE":
+              return { text: result.referenceRange };
+            default:
+              return { text: "" };
+          }
+        };
+        report.headers.forEach((header, colIndex) => {
+          const cell = cellFor(header);
+          if (!cell.text) return;
+          pdf.setFont(FONT, cell.bold ? "bold" : "normal");
+          pdf.setFontSize(10);
+          if (cell.wrap) {
+            pdf.text(cell.text, columnX[colIndex], y, {
+              maxWidth: columnWidths[colIndex] - 2,
+            });
+          } else {
+            // no maxWidth so the aligned spaces in reference ranges are kept
+            pdf.text(cell.text, columnX[colIndex], y);
+          }
         });
-        if (result.value) {
-          pdf.text(":", x + columnWidths[0] - 3, y);
-          pdf.text(result.value, x + columnWidths[0], y, {
-            maxWidth: columnWidths[1] - 5,
-          });
-        }
-        pdf.text(result.unit, x + columnWidths[0] + columnWidths[1] + 1.5, y, {
-          maxWidth: columnWidths[2] - 3,
-        });
-        let nextColumnX = x + columnWidths[0] + columnWidths[1] + columnWidths[2];
-        if (hasReferenceRange) {
-          pdf.text(result.referenceRange, nextColumnX + 1.5, y, {
-            maxWidth: columnWidths[3] - 3,
-          });
-          nextColumnX += columnWidths[3];
-        }
-        if (hasRemark) {
-          pdf.text(result.remark, nextColumnX + 1.5, y, {
-            maxWidth: columnWidths[columnWidths.length - 1] - 3,
-          });
-        }
       });
 
-      let extraContentY = firstResultY + pageResults.length * resultGap + 5;
-      if (isLastPage && assets.reportFooter && extraContentY < footerTop - 10) {
-        const maxHeight = Math.min(22, footerTop - 10 - extraContentY);
+      // Footer image + comment (last page only)
+      const bodyEnd = bodyTop + pageResults.length * pitch;
+      let cursor = bodyEnd + 6;
+      if (isLastPage && assets.reportFooter && cursor < bottomLimit - 10) {
+        const maxHeight = Math.min(22, bottomLimit - 10 - cursor);
         const imageWidth = Math.min(
-          pageWidth - 2 * x,
-          maxHeight * assets.reportFooter.width / assets.reportFooter.height
+          tableWidth,
+          (maxHeight * assets.reportFooter.width) / assets.reportFooter.height
         );
         const imageHeight =
-          imageWidth * assets.reportFooter.height / assets.reportFooter.width;
+          (imageWidth * assets.reportFooter.height) / assets.reportFooter.width;
         pdf.addImage(
           assets.reportFooter.data,
           "PNG",
           x,
-          extraContentY,
+          cursor,
           imageWidth,
           imageHeight
         );
-        extraContentY += imageHeight + 4;
+        cursor += imageHeight + 2;
+      } else {
+        cursor += 2;
       }
 
-      if (isLastPage && report.comments && extraContentY < pageHeight - 55) {
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "bold");
-        pdf.text("COMMENT:", x, extraContentY);
-        pdf.setFont("helvetica", "normal");
-        pdf.text(report.comments.toUpperCase(), x + 24, extraContentY, {
-          maxWidth: pageWidth - 2 * x - 24,
+      if (isLastPage && report.comments) {
+        pdf.setFont(FONT, "bold");
+        pdf.setFontSize(10);
+        pdf.text("Comment :-", x, cursor + baseline);
+        // dotted rule under the title
+        pdf.setLineWidth(0.3);
+        pdf.setLineDashPattern([0.3, 0.7], 0);
+        pdf.line(x, cursor + lineH + 0.2, x + 25, cursor + lineH + 0.2);
+        pdf.setLineDashPattern([], 0);
+
+        // comment text: shrink the font a little only if it would not fit
+        const textTop = cursor + lineH + 1.8;
+        pdf.setFont(FONT, "normal");
+        let size = 10;
+        let lines = [];
+        let lh = lineH;
+        for (; size >= 7; size -= 0.5) {
+          pdf.setFontSize(size);
+          lines = pdf.splitTextToSize(report.comments, tableWidth);
+          lh = size * 0.44;
+          if (textTop + lines.length * lh <= bottomLimit) break;
+        }
+        pdf.setFontSize(size);
+        lines.forEach((line, index) => {
+          pdf.text(line, x, textTop + index * lh + baseline * (lh / lineH));
         });
       }
 
+      // Signature block (fixed place, last page only)
       if (isLastPage) {
-        const signatureX = pageWidth - 18 - 67;
-        const signatureY = pageHeight - 49;
-        if (options.includeSignature) {
-          const signatureHeight = 11;
+        const signatureX =
+          pageWidth - REPORT_SIGNATURE_RIGHT_MM - REPORT_SIGNATURE_WIDTH_MM;
+        const signatureY = signatureTop;
+        if (options.includeSignature && assets.signature) {
+          const signatureHeight = SIGNATURE_IMAGE_AREA_MM;
           const signatureWidth =
-            signatureHeight * assets.signature.width / assets.signature.height;
+            (signatureHeight * assets.signature.width) / assets.signature.height;
           pdf.addImage(
             assets.signature.data,
             "PNG",
-            signatureX + (67 - signatureWidth) / 2,
+            signatureX + (REPORT_SIGNATURE_WIDTH_MM - signatureWidth) / 2,
             signatureY,
             signatureWidth,
             signatureHeight
           );
         }
         pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.2);
         pdf.setLineDashPattern([1, 0.8], 0);
-        pdf.line(signatureX, signatureY + 12, signatureX + 67, signatureY + 12);
+        pdf.line(
+          signatureX,
+          signatureY + 12,
+          signatureX + REPORT_SIGNATURE_WIDTH_MM,
+          signatureY + 12
+        );
         pdf.setLineDashPattern([], 0);
-        pdf.setFont("helvetica", "normal");
+        pdf.setFont(FONT, "normal");
         pdf.setFontSize(9);
-        pdf.text("Medical Laboratory Technologist", signatureX + 33.5, signatureY + 16, {
-          align: "center",
-        });
+        pdf.text(
+          "Medical Laboratory Technologist",
+          signatureX + REPORT_SIGNATURE_WIDTH_MM / 2,
+          signatureY + 16,
+          { align: "center" }
+        );
       }
     }
   }
 
-  drawReadyReportField(pdf, label, value, x, y, labelWidth, valueWidth) {
-    pdf.setFont("helvetica", "bold");
-    pdf.text(label, x, y, { maxWidth: labelWidth });
-    pdf.setFont("helvetica", "normal");
-    pdf.text(":", x + labelWidth, y);
+  // label / ":" / value (label column = labelChars monospace characters)
+  drawReadyReportField(pdf, label, value, x, y, labelChars, valueWidth) {
+    const ch = REPORT_CHAR_WIDTH_MM;
+    pdf.setFont("courier", "normal");
+    pdf.setFontSize(10);
+    pdf.text(label, x, y);
+    pdf.text(":", x + labelChars * ch, y);
     if (value) {
-      pdf.text(value, x + labelWidth + 2, y, { maxWidth: valueWidth });
+      pdf.text(value, x + (labelChars + 2) * ch, y, {
+        maxWidth: Math.max(valueWidth, 10),
+      });
     }
   }
 
@@ -2976,7 +3115,13 @@ class ReportEntryController {
 
     // Open preview in new window
     const previewWindow = window.open("", "_blank");
+    if (!previewWindow) {
+      this.showError("Please allow popups for this site to preview reports");
+      return;
+    }
+    previewWindow.document.open();
     previewWindow.document.write(this.generatePreviewHTML());
+    previewWindow.document.close();
   }
 
   async handleSaveAndPrint() {
@@ -3052,14 +3197,16 @@ class ReportEntryController {
     }
     if (!this.validateRequiredRowTotal()) return;
 
-    // Generate print content
-    const printContent = this.generatePrintHTML();
+    // Generate the complete, self-contained report document.
+    // autoPrint => the document opens the print dialog itself once its
+    // images (letterhead / signature) have finished loading.
+    const printContent = this.generatePrintHTML({ autoPrint: true });
 
-    // Open new window and immediately trigger print dialog
+    // Open new window and write the report document into it
     const printWindow = window.open(
       "",
       "_blank",
-      "width=800,height=600,scrollbars=yes,resizable=yes"
+      "width=900,height=700,scrollbars=yes,resizable=yes"
     );
 
     if (!printWindow) {
@@ -3067,244 +3214,8 @@ class ReportEntryController {
       return;
     }
 
-    // Write the complete HTML document to the new window
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Report Print - ${this.safeText(
-          this.selectedBill.bill_no
-        )}</title>
-        <style>
-          @page { 
-            size: A4; 
-            margin: ${this.shouldIncludeLetterhead() ? "0" : "16mm 2mm"};
-          }
-          
-          body { 
-            font-family: Arial, sans-serif; 
-            color: #111; 
-            margin: 0;
-            padding: 0;
-            background: white;
-          }
-          
-          .page {
-            display: flex;
-            flex-direction: column;
-            height: ${this.shouldIncludeLetterhead() ? "297mm" : "calc(297mm - 32mm)"};
-            position: relative;
-          }
-
-          .letterhead-header,
-          .letterhead-footer {
-            position: fixed;
-            left: 0;
-            width: 100vw;
-            z-index: 10;
-          }
-
-          .letterhead-header { top: 0; }
-          .letterhead-footer { bottom: 0; }
-
-          .letterhead-header img,
-          .letterhead-footer img {
-            display: block;
-            width: 100%;
-            height: auto;
-          }
-          
-          .report-container { 
-            width: 100%; 
-            background: white;
-            padding: 20px;
-            padding-bottom: 18mm;
-            box-sizing: border-box;
-            margin-left: -10px;
-          }
-          
-          .content-area { flex: 1 0 auto; }
-          
-          .top-space { 
-            height: calc(40mm - 16mm); 
-          }
-          
-          .info { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 8px 8px; 
-            font-size: 10px; 
-            margin-bottom: 4px; 
-          }
-          
-          .info-col { 
-            display: grid; 
-            grid-auto-rows: min-content; 
-            gap: 2px; 
-          }
-          
-          .info .info-col:last-child { 
-            margin-left: 15mm; 
-          }
-          
-          .row { 
-            display: grid; 
-            grid-template-columns: 140px 8px 1fr; 
-            align-items: baseline; 
-          }
-          
-          .label { 
-            font-weight: 700; 
-            text-transform: uppercase; 
-            letter-spacing: 0.2px; 
-            white-space: nowrap; 
-          }
-          
-          .colon { 
-            text-align: center; 
-          }
-          
-          .investigation-line { 
-            display: grid; 
-            grid-template-columns: 140px 8px 1fr; 
-            align-items: baseline; 
-            margin-top: 16px; 
-            font-size: 10px; 
-          }
-          
-          .investigation-line .label, 
-          .investigation-line .colon { 
-            white-space: nowrap; 
-          }
-          .investigation-value {
-            font-weight: 700;
-          }
-          
-          .hr { 
-            margin-top: 8px; 
-            border-top: 1px solid #999; 
-          }
-          
-          table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            font-size: 10px; 
-            margin-top: 8px; 
-          }
-          
-          .results-table { 
-            width: 100%; 
-            table-layout: auto;
-            border-collapse: separate; 
-            border-spacing: 0 2px; 
-          }
-          
-          .results-table th, 
-          .results-table td { 
-            border: none; 
-            padding: 2px 6px; 
-            vertical-align: top; 
-          }
-          
-          .results-table thead th { 
-            background: #fff; 
-            font-weight: 700; 
-            text-align: left; 
-          }
-          
-          .results-table thead th:nth-child(2) { 
-            transform: translateX(0); 
-            white-space: nowrap;
-          }
-
-          .results-table tbody td:nth-child(2) {
-            white-space: nowrap;
-          }
-          
-          .results-table tbody td:nth-child(2)::before { 
-            content: ":"; 
-            display: inline-block; 
-            width: 10px; 
-            text-align: center; 
-            margin-right: 6px; 
-          }
-          
-          .results-table tbody tr.empty-category-row td:nth-child(2)::before { 
-            content: ""; 
-          }
-          
-          .results-table tbody tr.hide-value-colon td:nth-child(2)::before { 
-            content: ""; 
-          }
-          
-          .results-table tbody td:nth-child(2) { 
-            padding-left: 0; 
-            transform: translateX(0); 
-          }
-          
-          .results-table tbody td:first-child { 
-            font-size: 10px;
-            font-weight: 400; 
-            text-align: left;
-            white-space: nowrap;
-            vertical-align: middle;
-          }
-          .results-table thead th:first-child {
-            text-align: left;
-          }
-          
-          .remarks { 
-            margin-top: 18mm; 
-            font-size: 10px; 
-          }
-          
-          .remarks .label { 
-            font-weight: 700; 
-          }
-          
-          /* The generated report HTML is nested inside this wrapper.
-             Cancel the wrapper offsets so the inner .page starts exactly at the
-             printable area (keeps the signature at a fixed A4 position), while
-             keeping the inner content where it was. */
-          .report-container .page { margin-top: -20px; }
-          .report-container .report-container { padding-top: 40px; }
-          .report-container .signature-section { right: calc(18mm - 30px); }
-
-          @media print {
-            .page {
-              box-sizing: border-box;
-              overflow: hidden;
-              break-inside: avoid;
-              page-break-inside: avoid;
-              break-after: avoid;
-              page-break-after: avoid;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="page">
-          <div class="report-container content-area">
-          ${printContent}
-          </div>
-        </div>
-        <script>
-          ${this.getPrintFitScript()}
-          // Automatically trigger print dialog when page loads - optimized for speed
-          window.onload = function() {
-            // Reduced delay for faster response
-            setTimeout(function() {
-              window.fitReportToOnePage();
-              window.print();
-            }, 50);
-          };
-        </script>
-      </body>
-      </html>
-    `);
-
+    printWindow.document.open();
+    printWindow.document.write(printContent);
     printWindow.document.close();
   }
 
@@ -3469,66 +3380,158 @@ class ReportEntryController {
     return this.generatePrintLayoutHTML(true, options);
   }
 
+  // ---------------------------------------------------------------------
+  // Standard report layout helpers (shared by print HTML and PDF download)
+  // ---------------------------------------------------------------------
+
+  // Column widths (%) of the results table, in column order:
+  // TEST | RESULT | UNIT | [FLAG] | [REFERENCE VALUE]
+  getReportColumnWidthsPct(hasFlag, hasRefRange) {
+    if (hasFlag && hasRefRange) return [43, 15, 12.5, 7, 22.5];
+    if (hasRefRange) return [44, 16, 14, 26];
+    if (hasFlag) return [44, 18, 16, 22];
+    return [50, 25, 25];
+  }
+
+  // Row pitch (mm). 6.35 mm like the reference report; shrinks (down to
+  // 4.4 mm) when a test has many rows so everything still fits above the
+  // fixed signature block.
+  getReportRowPitchMm(rowCount, reservedMm = 0, bodyTopMm = REPORT_TABLE_BODY_TOP_MM) {
+    if (!rowCount) return REPORT_ROW_PITCH_MAX_MM;
+    const bottomLimit =
+      297 - SIGNATURE_BOTTOM_FROM_SHEET_MM - SIGNATURE_BLOCK_HEIGHT_MM - 2;
+    const available = bottomLimit - bodyTopMm - reservedMm;
+    return Math.max(
+      REPORT_ROW_PITCH_MIN_MM,
+      Math.min(REPORT_ROW_PITCH_MAX_MM, available / rowCount)
+    );
+  }
+
+  // Approximate height (mm) needed by the "Comment :-" block
+  estimateCommentsHeightMm(commentsText) {
+    const text = (commentsText || "").toString();
+    if (!text.trim()) return 0;
+    const perLine = Math.floor(
+      (210 - REPORT_LEFT_MM - REPORT_RIGHT_MM) / REPORT_CHAR_WIDTH_MM
+    );
+    const lines = text
+      .split(/\r?\n/)
+      .reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / perLine)), 0);
+    return 8 + REPORT_LINE_HEIGHT_MM + 2 + lines * REPORT_LINE_HEIGHT_MM;
+  }
+
+  // "dd/mm/yyyy hh:mm" (local time)
+  formatReportDateTime(value) {
+    if (!value) return "";
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    const p = (n) => String(n).padStart(2, "0");
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(
+      d.getHours()
+    )}:${p(d.getMinutes())}`;
+  }
+
+  // Remark (Low / High / Normal) -> printed FLAG (L / H / blank)
+  mapRemarkToFlag(remark) {
+    const text = (remark || "").toString().trim();
+    const lower = text.toLowerCase();
+    if (!text || lower === "normal") return "";
+    if (lower === "high") return "H";
+    if (lower === "low") return "L";
+    return text.toUpperCase();
+  }
+
+  escapeHtml(value) {
+    return (value == null ? "" : String(value))
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   // Build a print-ready HTML using a clean template that mirrors the PDF layout
   generatePrintLayoutHTML(isForPrint, options = {}) {
     const bill = this.selectedBill;
     const billItem = this.selectedTestItem;
+    const esc = (value) => this.escapeHtml(value);
     const includeLetterhead =
       options.includeLetterhead ?? this.shouldIncludeLetterhead();
     const includeSignature =
       options.includeSignature ?? this.shouldIncludeSignature();
+    const autoPrint = Boolean(options.autoPrint);
     const now = new Date();
-    const reportDate = this.safeText(
-      new Date(bill.bill_date).toISOString().split("T")[0]
+    const receivedOn = esc(
+      this.formatReportDateTime(bill.created_at || bill.bill_date)
     );
-    const printDate = now.toLocaleTimeString();
-    const testName = billItem
-      ? this.safeText(
-          billItem.tests?.test_name || billItem.packages?.package_name || ""
-        ).toUpperCase()
-      : this.getTestTypes(bill).toUpperCase();
-    const specimen = billItem
-      ? this.getSpecimenForTest(billItem).toUpperCase()
-      : this.getSpecimenTypes(bill).toUpperCase();
-    
+    const reportedOn = esc(this.formatReportDateTime(now));
+    const testNameRaw = billItem
+      ? (billItem.tests?.test_name || billItem.packages?.package_name || "")
+      : this.getTestTypes(bill);
+    const testName = esc(testNameRaw.toString().toUpperCase());
+    const specimen = esc(
+      (billItem
+        ? this.getSpecimenForTest(billItem)
+        : this.getSpecimenTypes(bill)
+      )
+        .toString()
+        .toUpperCase()
+    );
+
+    // Optional department / section heading (e.g. CLINICAL CHEMISTRY)
+    const departmentRaw =
+      billItem?.tests?.department || billItem?.tests?.category || "";
+    const department =
+      typeof departmentRaw === "string"
+        ? esc(departmentRaw.trim().toUpperCase())
+        : "";
+
     // Format age to use YEARS, MONTHS, DAYS instead of y, m, d
     const ageRaw = this.safeText(this.ageInput?.value || "");
-    const formattedAge = ageRaw
-      .replace(/(\d+)y/g, (_, value) => `${value.padStart(2, "0")} YEARS`)
-      .replace(/(\d+)m/g, (_, value) => `${value.padStart(2, "0")} MONTHS`)
-      .replace(/(\d+)d/g, (_, value) => `${value.padStart(2, "0")} DAYS`)
-      .toUpperCase();
-    
-    const gender = this.safeText(this.genderInput?.value || "").toUpperCase();
+    const formattedAge = esc(
+      ageRaw
+        .replace(/(\d+)y/g, (_, value) => `${value.padStart(2, "0")} YEARS`)
+        .replace(/(\d+)m/g, (_, value) => `${value.padStart(2, "0")} MONTHS`)
+        .replace(/(\d+)d/g, (_, value) => `${value.padStart(2, "0")} DAYS`)
+        .toUpperCase()
+    );
+
+    const gender = esc((this.genderInput?.value || "").toUpperCase());
     const isOutMedicalCenter = bill.centers?.is_out_medical === true;
     const centerLabel = isOutMedicalCenter ? "COLLECTION SITE" : "CENTER";
-    const centerDisplayName = this.safeText(
-      isOutMedicalCenter
+    const centerDisplayName = esc(
+      (isOutMedicalCenter
         ? bill.company_name || ""
         : bill.centers?.center_name || ""
-    ).toUpperCase();
+      )
+        .toString()
+        .toUpperCase()
+    );
+    // Comments keep their original case (easier to read, like the reference)
     const commentsRaw = this.commentsResultInput?.value || "";
-    const commentsText = this.safeText(commentsRaw).toUpperCase();
+    const commentsText = esc(commentsRaw.trim());
     const hasComments = commentsRaw.trim().length > 0;
-    const notesText = this.safeText((this.specialNotesInput?.value ?? this.commentsResultInput?.value) || "").toUpperCase();
-    const title = this.safeText(bill.patient_title || "").toUpperCase();
-    
+    const title = esc((bill.patient_title || "").toString().toUpperCase());
+    const patientName = esc((bill.patient_name || "").toString().toUpperCase());
+    const requestedBy = esc((this.refByInput?.value || "").toUpperCase());
+    const invNo = esc((bill.bill_no || "").toString().toUpperCase());
+
     // Get footer link (image URL) from the selected test
-    const footerLink = billItem?.tests?.footer_text 
-      ? (billItem.tests.footer_text || "").trim() 
+    const footerLink = billItem?.tests?.footer_text
+      ? (billItem.tests.footer_text || "").trim()
       : "";
 
     // Use <base> so relative assets resolve from current page path
     const baseHref = document.baseURI || "./";
 
     // Hide optional columns in print if there are no values at all
-    const { hasRefRange: showRefRange, hasRemark: showRemark } =
+    const { hasRefRange: showRefRange, hasRemark: hasFlagValues } =
       this.detectPrintableOptionalColumns();
+    const showFlag = showRefRange || hasFlagValues;
 
     // ------------------------------------------------------------------
     // Signature block - LOCKED to a fixed position on the A4 sheet:
     // bottom edge = SIGNATURE_BOTTOM_FROM_SHEET_MM above the sheet bottom.
-    // .page starts at the printable area, so subtract the bottom @page margin.
     // ------------------------------------------------------------------
     const sheetBottomMarginMm = includeLetterhead
       ? 0
@@ -3550,90 +3553,181 @@ class ReportEntryController {
             <div class="signature-label">Medical Laboratory Technologist</div>
           </div>`;
 
-    return `
-    <html>
+    // Results table (rows first, so the row pitch can adapt to the row count)
+    const resultsHTML = this.generatePrintableResultsHTML(
+      showFlag,
+      true,
+      showRefRange
+    );
+    const rowCount = (resultsHTML.match(/<tr/g) || []).length;
+    const reservedMm =
+      this.estimateCommentsHeightMm(commentsRaw) + (footerLink ? 30 : 0);
+    const rowPitchMm = this.getReportRowPitchMm(rowCount, reservedMm);
+    const columnWidths = this.getReportColumnWidthsPct(showFlag, showRefRange);
+    const colgroupHTML = columnWidths
+      .map((w) => `<col style="width:${w}%">`)
+      .join("");
+
+    const autoPrintScript = autoPrint
+      ? `<script>
+          window.addEventListener("load", function () {
+            setTimeout(function () {
+              window.fitReportToOnePage();
+              window.print();
+            }, 150);
+          });
+        </script>`
+      : "";
+
+    return `<!DOCTYPE html>
+    <html lang="en">
       <head>
-        <base href="${baseHref}">
+        <base href="${esc(baseHref)}">
         <meta charset="utf-8" />
-        <title>Report ${this.safeText(bill.bill_no)}${
-      billItem ? ` - ${this.safeText(testName)}` : ""
+        <title>Report ${esc(bill.bill_no)}${
+      billItem ? ` - ${testName}` : ""
     }</title>
         <style>
-          @page { size: A4; margin: ${includeLetterhead ? "0" : "16mm 2mm"}; }
-          body { font-family: Arial, sans-serif; color: #111; margin: 0; padding: 0; }
-          .page { 
-            display: flex; 
-            flex-direction: column; 
-            height: ${includeLetterhead ? "297mm" : "calc(297mm - 32mm)"};
-            position: relative; 
+          /* ===== Standard laboratory report layout =====
+             Monospace 10 pt, black, 12 mm left / 6 mm right margin,
+             solid rule under the table header, aligned columns,
+             fixed signature block (see constants at top of file). */
+          @page { size: A4; margin: 0; }
+          * { box-sizing: border-box; }
+          html, body { margin: 0; padding: 0; background: #fff; }
+          body {
+            font-family: ${REPORT_FONT_FAMILY};
+            font-size: 10pt;
+            line-height: 1.25;
+            color: #000;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
-          .report-container { width: 100%; margin-left: ${includeLetterhead ? "0" : "-10px"}; padding-bottom: ${containerPaddingBottomMm}mm; box-sizing: border-box; }
-          .content-area { flex: 1 0 auto; }
-          .top-space { height: ${includeLetterhead ? "50mm" : "calc(40mm - 16mm)"}; }
-          .info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 8px; font-size: 10px; margin-top: ${includeLetterhead ? "0" : "10mm"}; margin-bottom: 4px; line-height: 1.4; }
-          .letterhead-header, .letterhead-footer { position: fixed; left: 0; width: 100vw; z-index: 10; }
+          @media screen {
+            body { background: #d9d9d9; }
+            .page { box-shadow: 0 0 6px rgba(0,0,0,.35); }
+          }
+
+          .page {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            width: 210mm;
+            height: 297mm;
+            margin: 0 auto;
+            overflow: hidden;
+            background: #fff;
+          }
+
+          .letterhead-header, .letterhead-footer { position: absolute; left: 0; width: 210mm; z-index: 1; }
           .letterhead-header { top: 0; }
           .letterhead-footer { bottom: 0; }
           .letterhead-header img, .letterhead-footer img { display: block; width: 100%; height: auto; }
-          .info-col { display: grid; grid-auto-rows: min-content; gap: 4px; }
-          .info .info-col:last-child { margin-left: calc(15mm + 3px); }
-          .row { display: grid; grid-template-columns: 180px 8px 1fr; align-items: baseline; }
-          .info-col:first-child .row { grid-template-columns: 140px 8px 1fr; }
-          .label { font-weight: 700; text-transform: uppercase; letter-spacing: 0.2px; white-space: nowrap; }
-          .colon { text-align: center; }
-          .investigation-line { display: grid; grid-template-columns: 140px 8px 1fr; align-items: baseline; margin-top: 16px; font-size: 10px; line-height: 1.4; }
-          .investigation-line .label, .investigation-line .colon { white-space: nowrap; }
-          .investigation-value { font-weight: 700; }
-          .hr { margin-top: 8px; border-top: 1px solid #999; }
-          table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 8px; line-height: 1.4; }
-          .results-table { width: 100%; table-layout: auto; border-collapse: separate; border-spacing: 0 1.5px; }
-          .results-table th, .results-table td { border: none; padding: 3px 6px; vertical-align: top; }
-          .results-table thead th { background: #fff; font-weight: 700; text-align: left; }
-          .results-table thead th:nth-child(2) { transform: translateX(0); white-space: nowrap; }
-          .results-table tbody td:nth-child(2) { white-space: nowrap; }
-          .results-table tbody td:nth-child(2)::before { content: ":"; display: inline-block; width: 10px; text-align: center; margin-right: 6px; }
-          .results-table tbody tr.empty-category-row td:nth-child(2)::before { content: ""; }
-          .results-table tbody tr.hide-value-colon td:nth-child(2)::before { content: ""; }
-          .results-table tbody td:nth-child(2) { padding-left: 0; transform: translateX(0); }
-          .results-table tbody td:first-child { 
-            font-size: 10px;
-            font-weight: 400; 
+
+          .report-container {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            padding: 0 ${REPORT_RIGHT_MM}mm ${containerPaddingBottomMm}mm ${REPORT_LEFT_MM}mm;
+          }
+          .content-area { flex: 1 0 auto; }
+          .top-space { height: ${REPORT_TOP_SPACE_MM}mm; }
+
+          /* Department (centre) + page number (right) */
+          .title-row {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: end;
+            height: 5mm;
+            margin-bottom: 3mm;
+          }
+          .department { grid-column: 2; text-align: center; }
+          .page-no { grid-column: 3; text-align: right; }
+
+          /* Patient / sample information */
+          .info { display: grid; grid-template-columns: 52% 48%; line-height: ${REPORT_LINE_HEIGHT_MM}mm; }
+          .info-col { display: block; }
+          .row { display: grid; grid-template-columns: 19ch 2ch 1fr; align-items: baseline; }
+          .info-col:first-child .row { grid-template-columns: 17ch 2ch 1fr; }
+          .label { text-transform: uppercase; white-space: nowrap; }
+          .colon { text-align: left; }
+
+          /* TEST/PROFILE line */
+          .investigation-line {
+            display: grid;
+            grid-template-columns: 17ch 2ch 1fr;
+            align-items: baseline;
+            margin-top: 5.7mm;
+            font-weight: 700;
+            line-height: ${REPORT_LINE_HEIGHT_MM}mm;
+          }
+          .investigation-line .label { text-decoration: underline; text-underline-offset: 1px; }
+          .investigation-value { text-decoration: underline; text-underline-offset: 1px; }
+
+          /* Results table */
+          .results-table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            margin-top: 6mm;
+          }
+          .results-table thead th {
+            height: 7mm;
+            padding: 0 2mm 1.5mm 0;
+            font-weight: 400;
             text-align: left;
+            vertical-align: top;
             white-space: nowrap;
-            vertical-align: middle;
+            border-bottom: 0.35mm solid #000;
           }
-          .results-table thead th:first-child {
+          .results-table tbody td {
+            height: ${rowPitchMm.toFixed(2)}mm;
+            padding: 0 2mm 0 0;
             text-align: left;
+            vertical-align: middle;
+            line-height: 1.2;
           }
-          .footer-link-section { 
-            margin-top: 12mm; 
-            text-align: left; 
-            border-top: 1px solid #999;
-            padding-top: 4mm;
-            page-break-inside: avoid; 
+          .results-table tbody td:first-child { text-transform: uppercase; overflow-wrap: anywhere; }
+          .results-table tbody td.value-cell { white-space: nowrap; }
+          .results-table tbody td.ref-cell { white-space: pre; }
+          .results-table tbody td.flag-cell { overflow-wrap: anywhere; }
+          .results-table tbody tr.group-row td { font-weight: 700; }
+          .results-table tbody tr.flag-abnormal td.value-cell,
+          .results-table tbody tr.flag-abnormal td.flag-cell { font-weight: 700; }
+
+          /* Optional footer image of the test */
+          .footer-link-section {
+            margin-top: 6mm;
+            padding-top: 3mm;
+            border-top: 0.3mm solid #000;
+            page-break-inside: avoid;
             break-inside: avoid;
           }
-          .footer-link-section img { 
+          .footer-link-section img {
+            display: block;
             width: 100% !important;
             max-width: 100% !important;
             max-height: none !important;
             height: auto !important;
-            display: block;
             margin: 0;
             object-fit: contain;
           }
-          .remarks { margin-top: 18mm; font-size: 10px; line-height: 1.4; }
-          .remarks .label { font-weight: 700; }
+
+          /* Comment block: bold title, dotted rule, text */
+          .remarks { margin-top: 8mm; line-height: ${REPORT_LINE_HEIGHT_MM}mm; }
+          .remarks-title { font-weight: 700; }
+          .remarks-rule { width: 25mm; border-top: 0.4mm dotted #000; margin: 0.4mm 0 1.4mm; }
+          .remarks-body { white-space: pre-wrap; overflow-wrap: anywhere; }
 
           /* ---- Signature block: fixed position on the A4 sheet ---- */
           .signature-section {
             position: absolute;
-            right: 18mm;
+            right: ${REPORT_SIGNATURE_RIGHT_MM}mm;
             bottom: ${signatureBottomMm}mm;
             display: flex;
             flex-direction: column;
             align-items: stretch;
-            width: 32%;
+            width: ${REPORT_SIGNATURE_WIDTH_MM}mm;
             page-break-inside: avoid;
             break-inside: avoid;
             z-index: 30;
@@ -3648,46 +3742,21 @@ class ReportEntryController {
             overflow: hidden;
             text-align: center;
           }
-          .signature-image img {
-            display: block;
-            max-width: 100%;
-            max-height: 100%;
-            width: auto;
-            height: auto;
-          }
-          .signature-line { 
-            width: 100%; 
-            height: 1px; 
-            border-bottom: 1px dashed #000; 
-            margin-bottom: 2px; 
-          }
-          .signature-label { 
-            font-size: 10px; 
-            font-weight: 500;
-            text-align: center; 
-            width: 100%; 
-            word-wrap: break-word; 
-            margin-bottom: 0;
-          }
+          .signature-image img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; }
+          .signature-line { width: 100%; height: 1px; border-bottom: 1px dashed #000; margin-bottom: 2px; }
+          .signature-label { font-size: 9pt; text-align: center; width: 100%; word-wrap: break-word; margin-bottom: 0; }
 
           .no-print-btn { text-align: center; margin-top: 16px; }
-          
+
           @media print {
             .no-print { display: none !important; }
             .page {
-              box-sizing: border-box;
-              overflow: hidden;
+              box-shadow: none;
               break-inside: avoid;
               page-break-inside: avoid;
               break-after: avoid;
               page-break-after: avoid;
             }
-          }
-          
-          ${
-            isForPrint
-              ? "@media print { .no-print { display: none !important; } }"
-              : ""
           }
         </style>
       </head>
@@ -3700,54 +3769,52 @@ class ReportEntryController {
           <div class="report-container content-area">
             <div class="top-space"></div>
 
+            <div class="title-row">
+              <div class="department">${department}</div>
+              <div class="page-no">Page 1 of 1</div>
+            </div>
+
             <div class="info">
               <div class="info-col">
-                <div class="row"><div class="label">NAME</div><div class="colon">:</div><div>${title ? title + " " : ""}${this.safeText(
-                  bill.patient_name
-                ).toUpperCase()}</div></div>
+                <div class="row"><div class="label">NAME</div><div class="colon">:</div><div>${title ? title + " " : ""}${patientName}</div></div>
                 <div class="row"><div class="label">AGE</div><div class="colon">:</div><div>${formattedAge}</div></div>
                 <div class="row"><div class="label">GENDER</div><div class="colon">:</div><div>${gender}</div></div>
-                <div class="row"><div class="label">REQUESTED BY</div><div class="colon">:</div><div>${this.safeText(
-                  this.refByInput?.value || ""
-                ).toUpperCase()}</div></div>
+                <div class="row"><div class="label">REQUESTED BY</div><div class="colon">:</div><div>${requestedBy}</div></div>
                 <div class="row"><div class="label">${centerLabel}</div><div class="colon">:</div><div>${centerDisplayName}</div></div>
               </div>
               <div class="info-col">
-                <div class="row"><div class="label">SAMPLE RECEIVED ON</div><div class="colon">:</div><div>${reportDate}</div></div>
-                <div class="row"><div class="label">SAMPLE REPORTED ON</div><div class="colon">:</div><div>${printDate}</div></div>
-                <div class="row"><div class="label">INV NO</div><div class="colon">:</div><div>${this.safeText(
-                  bill.bill_no
-                ).toUpperCase()}</div></div>
+                <div class="row"><div class="label">SAMPLE RECEIVED ON</div><div class="colon">:</div><div>${receivedOn}</div></div>
+                <div class="row"><div class="label">SAMPLE REPORTED ON</div><div class="colon">:</div><div>${reportedOn}</div></div>
+                <div class="row"><div class="label">INV NO</div><div class="colon">:</div><div>${invNo}</div></div>
                 <div class="row"><div class="label">SAMPLE TYPE</div><div class="colon">:</div><div>${specimen}</div></div>
               </div>
             </div>
 
             <div class="investigation-line">
-              <div class="label">INVESTIGATION</div>
+              <div class="label">TEST/PROFILE</div>
               <div class="colon">:</div>
-              <div class="investigation-value">${this.safeText(testName)}</div>
+              <div class="investigation-value">${testName}</div>
             </div>
 
-            <div class="hr"></div>
-
             <table class="results-table">
+              <colgroup>${colgroupHTML}</colgroup>
               <thead>
                 <tr>
-                  <th style="width: 30%">INVESTIGATION</th>
-                  <th style="width: 30%">RESULT</th>
-                  <th style="width: 10%">UNIT</th>
-                  ${showRefRange ? `<th style="width: 20%">REFERENCE RANGE</th>` : ""}
-                  ${showRemark ? `<th style="width: 10%">REMARK</th>` : ""}
+                  <th>TEST</th>
+                  <th>RESULT</th>
+                  <th>UNIT</th>
+                  ${showFlag ? `<th>FLAG</th>` : ""}
+                  ${showRefRange ? `<th>REFERENCE VALUE</th>` : ""}
                 </tr>
               </thead>
               <tbody>
-                ${this.generatePrintableResultsHTML(showRemark, true, showRefRange)}
+                ${resultsHTML}
               </tbody>
             </table>
 
             ${footerLink ? `
             <div class="footer-link-section">
-              <img src="${this.safeText(footerLink)}" alt="Footer Image" style="width:100%;max-width:100%;max-height:none;height:auto;display:block;margin:0;" onerror="this.style.display='none';" />
+              <img src="${esc(footerLink)}" alt="Footer Image" onerror="this.style.display='none';" />
             </div>
             ` : ''}
 
@@ -3755,8 +3822,9 @@ class ReportEntryController {
               hasComments
                 ? `
             <div class="remarks">
-              <span class="label">COMMENT:</span>
-              <span style="white-space: pre-wrap; margin-left: 8px;">${commentsText}</span>
+              <div class="remarks-title">Comment :-</div>
+              <div class="remarks-rule"></div>
+              <div class="remarks-body">${commentsText}</div>
             </div>
             `
                 : ""
@@ -3773,6 +3841,7 @@ class ReportEntryController {
           }
         </div>
         <script>${this.getPrintFitScript()}</script>
+        ${autoPrintScript}
       </body>
     </html>`;
   }
@@ -3802,8 +3871,9 @@ class ReportEntryController {
   }
 
   // Read current table and build printable rows
+  // Columns: TEST | RESULT | UNIT | [FLAG] | [REFERENCE VALUE]
   generatePrintableResultsHTML(
-    includeRemark = true,
+    includeFlag = true,
     includeUnit = true,
     includeRefRange = true
   ) {
@@ -3811,58 +3881,83 @@ class ReportEntryController {
     if (!tbody) return "";
     const rows = Array.from(tbody.querySelectorAll("tr"));
     if (!rows.length) return "";
-    const printTestId =
-      this.selectedTestItem?.tests?.id || this.selectedTestItem?.test_id || null;
-    const skipColonSet = printTestId
-      ? SKIP_VALUE_ENTRY_ROW_INDICES_BY_TEST_ID[printTestId]
-      : null;
+    const esc = (value) => this.escapeHtml(value);
 
-    const html = rows
-      .map((row, rowIndex) => {
-        const cells = row.querySelectorAll("td");
-        if (cells.length < 4) return "";
+    // 1) Read every row
+    const parsed = rows.map((row) => {
+      const cells = row.querySelectorAll("td");
+      if (cells.length < 4) return null;
+      return {
+        category: (cells[0]?.textContent || "").trim(),
+        value: (cells[1]?.querySelector("input")?.value || "").trim(),
+        uom: (cells[2]?.textContent || "").trim(),
+        ref: (cells[3]?.textContent || "").trim(),
+        flag: this.mapRemarkToFlag(cells[4]?.querySelector("input")?.value || ""),
+      };
+    });
 
-        const category = (cells[0]?.textContent || "").trim();
-        const value = (cells[1]?.querySelector("input")?.value || "").trim();
-        const uom = (cells[2]?.textContent || "").trim();
-        const ref = (cells[3]?.textContent || "").trim();
-        const remark = (cells[4]?.querySelector("input")?.value || "").trim();
+    // 2) Align the dash of "min - max" reference ranges (monospace columns),
+    //    e.g. "140.0 - 239.0" / "10.0  - 200.0"
+    const splitRef = (ref) => {
+      const index = ref.indexOf(" - ");
+      return index > 0
+        ? { min: ref.slice(0, index), rest: ref.slice(index + 3) }
+        : null;
+    };
+    let maxMinLength = 0;
+    parsed.forEach((item) => {
+      const parts = item ? splitRef(item.ref) : null;
+      if (parts) maxMinLength = Math.max(maxMinLength, parts.min.length);
+    });
+    const alignRef = (ref) => {
+      const parts = splitRef(ref);
+      return parts ? `${parts.min.padEnd(maxMinLength)} - ${parts.rest}` : ref;
+    };
+
+    const renderRow = (item, categoryHTML, isEmptyCategoryRow) => {
+      const isGroup =
+        !isEmptyCategoryRow &&
+        !item.value &&
+        !item.uom &&
+        !item.ref &&
+        !item.flag;
+      const classes = [];
+      if (isEmptyCategoryRow) classes.push("empty-category-row");
+      if (isGroup) classes.push("group-row");
+      if (item.flag) classes.push("flag-abnormal");
+      const classAttr =
+        classes.length > 0 ? ` class="${classes.join(" ")}"` : "";
+      const tds = [
+        `<td>${categoryHTML}</td>`,
+        `<td class="value-cell">${esc(item.value)}</td>`,
+      ];
+      if (includeUnit) tds.push(`<td class="unit-cell">${esc(item.uom)}</td>`);
+      if (includeFlag) tds.push(`<td class="flag-cell">${esc(item.flag)}</td>`);
+      if (includeRefRange)
+        tds.push(`<td class="ref-cell">${esc(alignRef(item.ref))}</td>`);
+      return `<tr${classAttr}>${tds.join("")}</tr>`;
+    };
+
+    const html = parsed
+      .map((item) => {
+        if (!item) return "";
 
         const hasAny =
-          category ||
-          value ||
-          (includeUnit && uom) ||
-          (includeRefRange && ref) ||
-          (includeRemark && remark);
-
-        const hideValueColon =
-          Boolean(skipColonSet && skipColonSet.has(rowIndex));
-
-        const renderRow = (categoryHTML, isEmptyCategoryRow, hideColon) => {
-          const classes = [];
-          if (isEmptyCategoryRow) classes.push("empty-category-row");
-          if (hideColon) classes.push("hide-value-colon");
-          const classAttr =
-            classes.length > 0 ? ` class="${classes.join(" ")}"` : "";
-          const tds = [
-            `<td>${categoryHTML}</td>`,
-            `<td>${this.safeText(value)}</td>`,
-          ];
-          if (includeUnit) tds.push(`<td>${this.safeText(uom)}</td>`);
-          if (includeRefRange) tds.push(`<td>${this.safeText(ref)}</td>`);
-          if (includeRemark) tds.push(`<td>${this.safeText(remark)}</td>`);
-          return `<tr${classAttr}>${tds.join("")}</tr>`;
-        };
+          item.category ||
+          item.value ||
+          (includeUnit && item.uom) ||
+          (includeRefRange && item.ref) ||
+          (includeFlag && item.flag);
 
         // Preserve empty/nameless sub-category rows as visual spacing
-        if (!category) {
-          return renderRow("&nbsp;", true, false);
+        if (!item.category) {
+          return renderRow(item, "&nbsp;", true);
         }
 
         // Skip completely empty rows (no category and no other data)
         if (!hasAny) return "";
 
-        return renderRow(this.safeText(category), false, hideValueColon);
+        return renderRow(item, esc(item.category), false);
       })
       .filter(Boolean)
       .join("");
@@ -3870,11 +3965,11 @@ class ReportEntryController {
     const colspan =
       2 +
       (includeUnit ? 1 : 0) +
-      (includeRefRange ? 1 : 0) +
-      (includeRemark ? 1 : 0);
+      (includeFlag ? 1 : 0) +
+      (includeRefRange ? 1 : 0);
     return (
       html ||
-      `<tr><td colspan="${colspan}" style="text-align:center;color:#777;">No results entered</td></tr>`
+      `<tr><td colspan="${colspan}" style="text-align:center;">No results entered</td></tr>`
     );
   }
 
@@ -3892,7 +3987,10 @@ class ReportEntryController {
       const ref = (cells[3]?.textContent || "").trim();
       if (ref) hasRefRange = true;
 
-      const remark = (cells[4]?.querySelector("input")?.value || "").trim();
+      // "Normal" remarks print as an empty flag, so only H / L / custom count
+      const remark = this.mapRemarkToFlag(
+        cells[4]?.querySelector("input")?.value || ""
+      );
       if (remark) hasRemark = true;
 
       if (hasRefRange && hasRemark) break;
@@ -4722,6 +4820,6 @@ class ReportEntryController {
 // Initialize controller when DOM is loaded
 document.addEventListener("DOMContentLoaded", () => {
   const controller = new ReportEntryController();
-  // Expose for external triggers (history table clicks)
+  // Expose for external threads (history table clicks)
   window.ReportEntryController = controller;
 });
