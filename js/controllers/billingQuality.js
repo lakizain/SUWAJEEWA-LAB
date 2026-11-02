@@ -69,6 +69,7 @@
     const remaining = d.remaining_amount != null ? r2(d.remaining_amount) : r2(final - paid);
     const dLabel = dType === "fixed" ? "Discount" : `Discount (${dVal}%)`;
     const age = this.formatAge(d.patient_age_years, d.patient_age_months, d.patient_age_days);
+    const patientName = `${d.patient_title ? d.patient_title + " " : ""}${d.patient_name || ""}`.toLocaleUpperCase();
     const kv = (k, v) => (v ? `<div class="kv"><span class="k">${k}</span><span class="v">: ${esc(v)}</span></div>` : "");
     const rows = (tests || []).map((t) => {
       const q = parseFloat(t.qty) || 1, p = parseFloat(t.price) || 0;
@@ -85,7 +86,7 @@
       <div class="doc-title">PAYMENT RECEIPT</div>
       ${kv("Bill No", bill.bill_no)}
       ${kv("Date", `${dateStr}  ${timeStr}`)}
-      ${kv("Patient", `${d.patient_title ? d.patient_title + " " : ""}${d.patient_name || ""}`)}
+      ${kv("Patient", patientName)}
       ${kv("Age / Sex", [age, d.patient_gender].filter(Boolean).join(" / "))}
       ${kv("Tel", d.patient_phone || "Not Given")}
       ${kv("Ref By", (d.ref_by || "N/A") + (d.reference_rid ? ` (${d.reference_rid})` : ""))}
