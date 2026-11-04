@@ -1627,6 +1627,26 @@ class ReportEntryController {
           if (!cell.text) return;
           pdf.setFont(FONT, cell.bold ? "bold" : "normal");
           pdf.setFontSize(10);
+          if (header === "RESULT") {
+            const nextPopulatedColumn = report.headers.findIndex(
+              (nextHeader, index) =>
+                index > colIndex && cellFor(nextHeader).text
+            );
+            const availableWidth =
+              (nextPopulatedColumn === -1
+                ? rightEdge
+                : columnX[nextPopulatedColumn]) -
+              columnX[colIndex] -
+              2;
+            let fontSize = 10;
+            while (
+              fontSize > 6 &&
+              pdf.getTextWidth(cell.text) > availableWidth
+            ) {
+              fontSize = Math.max(6, fontSize - 0.25);
+              pdf.setFontSize(fontSize);
+            }
+          }
           if (cell.wrap) {
             pdf.text(cell.text, columnX[colIndex], y, {
               maxWidth: columnWidths[colIndex] - 2,
@@ -3873,6 +3893,56 @@ class ReportEntryController {
 
   getPrintFitScript() {
     return `
+      window.fitResultValuesToColumns = function () {
+        const table = document.querySelector(".results-table");
+        if (!table) return;
+
+        const context = document.createElement("canvas").getContext("2d");
+        if (!context) return;
+
+        table.querySelectorAll("tbody .value-cell").forEach(function (cell) {
+          cell.style.fontSize = "";
+          const style = window.getComputedStyle(cell);
+          const cellRect = cell.getBoundingClientRect();
+          const tableRight = table.getBoundingClientRect().right;
+          const nextPopulatedCell = Array.from(cell.parentElement.cells)
+            .slice(cell.cellIndex + 1)
+            .find(function (nextCell) {
+              return nextCell.textContent.trim();
+            });
+          const availableRight = nextPopulatedCell
+            ? nextPopulatedCell.getBoundingClientRect().left
+            : tableRight;
+          const availableWidth =
+            availableRight -
+            cellRect.left -
+            parseFloat(style.paddingLeft) -
+            parseFloat(style.paddingRight) -
+            1;
+          const baseSizePt = parseFloat(style.fontSize) * 0.75;
+          let fontSizePt = baseSizePt;
+          const measureText = function (sizePt) {
+            context.font =
+              style.fontWeight +
+              " " +
+              (sizePt * 96) / 72 +
+              "px " +
+              style.fontFamily;
+            return context.measureText(cell.textContent).width;
+          };
+
+          while (
+            fontSizePt > 6 &&
+            measureText(fontSizePt) > availableWidth
+          ) {
+            fontSizePt = Math.max(6, fontSizePt - 0.25);
+          }
+          if (fontSizePt < baseSizePt) {
+            cell.style.fontSize = fontSizePt + "pt";
+          }
+        });
+      };
+
       window.fitReportToOnePage = function () {
         const reports = document.querySelectorAll(".report-container");
         const report = reports[reports.length - 1];
@@ -3881,6 +3951,7 @@ class ReportEntryController {
 
         report.style.transform = "none";
         report.style.width = "";
+        window.fitResultValuesToColumns();
         const availableHeight = page.clientHeight;
         const contentHeight = report.scrollHeight;
         if (availableHeight > 0 && contentHeight > availableHeight) {
