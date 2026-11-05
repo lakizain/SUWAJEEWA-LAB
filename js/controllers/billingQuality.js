@@ -75,7 +75,7 @@
       const q = parseFloat(t.qty) || 1, p = parseFloat(t.price) || 0;
       return `<tr><td>${esc(t.short_name || t.test_name)}</td><td class="q">${q}</td><td class="a">${money(p * q)}</td></tr>`;
     }).join("");
-    const logo = new URL("Imgs/suwajeewa_logo%20b%20nd%20w.png", document.baseURI).href;
+    const logo = new URL("Imgs/suwajeewa_lab_loogo.png", document.baseURI).href;
 
     return `
       <div class="center">

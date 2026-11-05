@@ -3387,7 +3387,7 @@ class BillingController {
       <!-- Header -->
       <div class="header">
         <div class="logo-container">
-          <img src="Imgs/suwajeewa_logo.png" alt="Suwajeewa Laboratory Logo" style="max-width: 100px; max-height: 100px; margin-bottom: 10px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <img src="Imgs/suwajeewa_lab_loogo.png" alt="Suwajeewa Laboratory Logo" style="max-width: 100px; max-height: 100px; margin-bottom: 10px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
           <div class="logo-placeholder" style="display: none;">//LOGO HERE</div>
         </div>
         <div class="lab-name">${center.center_name}</div>
