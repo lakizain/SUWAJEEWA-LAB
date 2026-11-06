@@ -42,6 +42,16 @@ CREATE TABLE IF NOT EXISTS center_package_prices (
     UNIQUE(center_id, package_id)
 );
 
+CREATE TABLE IF NOT EXISTS center_test_availability (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    center_id UUID NOT NULL REFERENCES centers(id) ON DELETE CASCADE,
+    test_id UUID NOT NULL REFERENCES tests(id) ON DELETE CASCADE,
+    is_available BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    UNIQUE(center_id, test_id)
+);
+
 ALTER TABLE bill_items
     ADD COLUMN IF NOT EXISTS is_package_component BOOLEAN NOT NULL DEFAULT false;
 
@@ -51,6 +61,8 @@ CREATE INDEX IF NOT EXISTS idx_center_test_prices_test_id
     ON center_test_prices(test_id);
 CREATE INDEX IF NOT EXISTS idx_center_test_prices_center_test
     ON center_test_prices(center_id, test_id);
+CREATE INDEX IF NOT EXISTS idx_center_test_availability_center_test
+    ON center_test_availability(center_id, test_id);
 CREATE INDEX IF NOT EXISTS idx_center_package_prices_center_id
     ON center_package_prices(center_id);
 CREATE INDEX IF NOT EXISTS idx_center_package_prices_package_id
@@ -128,6 +140,16 @@ BEGIN
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column();
     END IF;
+    IF NOT EXISTS (
+        SELECT 1
+          FROM pg_trigger
+         WHERE tgname = 'update_center_test_availability_updated_at'
+    ) THEN
+        CREATE TRIGGER update_center_test_availability_updated_at
+            BEFORE UPDATE ON center_test_availability
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+    END IF;
 
     IF NOT EXISTS (
         SELECT 1
@@ -143,6 +165,7 @@ END $$;
 
 ALTER TABLE center_test_prices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE center_package_prices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE center_test_availability ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
@@ -175,11 +198,26 @@ BEGIN
             USING (true)
             WITH CHECK (true);
     END IF;
+    IF NOT EXISTS (
+        SELECT 1
+          FROM pg_policies
+         WHERE schemaname = 'public'
+           AND tablename = 'center_test_availability'
+           AND policyname = 'Allow all for authenticated'
+    ) THEN
+        CREATE POLICY "Allow all for authenticated"
+            ON center_test_availability
+            FOR ALL
+            TO authenticated
+            USING (true)
+            WITH CHECK (true);
+    END IF;
 END $$;
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT ALL ON TABLE center_test_prices TO anon, authenticated;
 GRANT ALL ON TABLE center_package_prices TO anon, authenticated;
+GRANT ALL ON TABLE center_test_availability TO anon, authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION get_test_price_for_center TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION get_package_price_for_center TO anon, authenticated;
@@ -195,13 +233,17 @@ SELECT
     c.cid,
     ctp.price AS center_price,
     COALESCE(ctp.price, t.price) AS resolved_price,
-    (ctp.price IS NOT NULL) AS has_center_price
+    (ctp.price IS NOT NULL) AS has_center_price,
+    COALESCE(cta.is_available, true) AS is_center_available
 FROM tests t
 CROSS JOIN centers c
 LEFT JOIN center_test_prices ctp
        ON ctp.center_id = c.id
       AND ctp.test_id = t.id
       AND ctp.is_active = true
+LEFT JOIN center_test_availability cta
+       ON cta.center_id = c.id
+      AND cta.test_id = t.id
 WHERE t.is_active = true
   AND c.is_active = true;
 
@@ -228,6 +270,8 @@ WHERE p.is_active = true
 
 COMMENT ON TABLE center_test_prices IS
     'Center-specific test price overrides. Falls back to tests.price when no override exists.';
+COMMENT ON TABLE center_test_availability IS
+    'Center-specific test availability. Tests are available by default unless explicitly disabled for a center.';
 COMMENT ON TABLE center_package_prices IS
     'Center-specific package price overrides. Falls back to packages.price when no override exists.';
 COMMENT ON COLUMN bill_items.is_package_component IS

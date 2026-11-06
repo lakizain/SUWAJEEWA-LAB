@@ -69,6 +69,7 @@ class PricingManagementController {
       "loadPricingBtn",
       "saveTestPricesBtn",
       "resetTestPricesBtn",
+      "deactivateAllTestsBtn",
       "savePackagePricesBtn",
       "resetPackagePricesBtn",
     ].forEach((id) => {
@@ -83,6 +84,7 @@ class PricingManagementController {
     [
       "saveTestPricesBtn",
       "resetTestPricesBtn",
+      "deactivateAllTestsBtn",
       "savePackagePricesBtn",
       "resetPackagePricesBtn",
     ].forEach((id) => {
@@ -145,6 +147,10 @@ class PricingManagementController {
 
     document.getElementById("resetTestPricesBtn")?.addEventListener("click", () => {
       this.resetTestPrices();
+    });
+
+    document.getElementById("deactivateAllTestsBtn")?.addEventListener("click", () => {
+      this.deactivateAllTests();
     });
 
     document.getElementById("savePackagePricesBtn")?.addEventListener("click", () => {
@@ -213,7 +219,7 @@ class PricingManagementController {
       if (!centers.length) {
         this.setPageAlert("Active centers not found. Please add a center first.", "warning");
         this.testTableBody.innerHTML =
-          '<tr><td colspan="6" class="text-center">No active centers available</td></tr>';
+          '<tr><td colspan="7" class="text-center">No active centers available</td></tr>';
         this.packageTableBody.innerHTML =
           '<tr><td colspan="6" class="text-center">No active centers available</td></tr>';
         return;
@@ -287,6 +293,13 @@ class PricingManagementController {
         this.setPricingActionButtonsDisabled(
           !centerIsSelected || this.pricingLoadedCenterId !== centerId
         );
+        const deactivateAllButton = document.getElementById("deactivateAllTestsBtn");
+        if (deactivateAllButton) {
+          deactivateAllButton.disabled =
+            !centerIsSelected ||
+            this.pricingLoadedCenterId !== centerId ||
+            this.testsWithPrices.length === 0;
+        }
       }
     }
   }
@@ -302,7 +315,7 @@ class PricingManagementController {
     if (this.packageSummary) this.packageSummary.innerHTML = "";
     if (this.testTableBody) {
       this.testTableBody.innerHTML =
-        '<tr><td colspan="6" class="text-center">Loading selected center pricing...</td></tr>';
+        '<tr><td colspan="7" class="text-center">Loading selected center pricing...</td></tr>';
     }
     if (this.packageTableBody) {
       this.packageTableBody.innerHTML =
@@ -360,6 +373,7 @@ class PricingManagementController {
     idKey,
     nameKey,
     codeKey,
+    availabilityField = null,
     resetHandlerName,
   }) {
     const filteredItems = this.getFilteredItems(items, searchTerm, searchFields);
@@ -368,7 +382,7 @@ class PricingManagementController {
 
     if (!filteredItems.length) {
       tbody.innerHTML =
-        '<tr><td colspan="6" class="text-center">No pricing rows match the current filter</td></tr>';
+        `<tr><td colspan="${availabilityField ? 7 : 6}" class="text-center">No pricing rows match the current filter</td></tr>`;
       return;
     }
 
@@ -382,6 +396,9 @@ class PricingManagementController {
       const sourceBadge = item.has_center_price
         ? '<span class="badge-center">Center Override</span>'
         : '<span class="badge-global">Global Default</span>';
+      const isAvailable = availabilityField
+        ? item[availabilityField] !== false
+        : true;
 
       const row = document.createElement("tr");
       row.innerHTML = `
@@ -409,6 +426,23 @@ class PricingManagementController {
             }
           </span>
         </td>
+        ${
+          availabilityField
+            ? `<td>
+                <span class="badge ${isAvailable ? "bg-success" : "bg-secondary"}">
+                  ${isAvailable ? "Active" : "Deactivated"}
+                </span>
+                <button
+                  class="btn btn-sm ${isAvailable ? "btn-outline-danger" : "btn-outline-success"} ms-2"
+                  data-set-availability="${!isAvailable}"
+                  data-item-id="${idValue}"
+                  aria-label="${isAvailable ? "Deactivate" : "Activate"} test"
+                >
+                  ${isAvailable ? "Deactivate" : "Activate"}
+                </button>
+              </td>`
+            : ""
+        }
         <td>
           ${
             item.has_center_price
@@ -433,6 +467,15 @@ class PricingManagementController {
         this[resetHandlerName](itemId);
       });
     });
+
+    tbody.querySelectorAll("[data-set-availability]").forEach((button) => {
+      button.addEventListener("click", () => {
+        this.setSingleTestAvailability(
+          button.getAttribute("data-item-id"),
+          button.getAttribute("data-set-availability") === "true"
+        );
+      });
+    });
   }
 
   renderTestPricingTable() {
@@ -446,6 +489,7 @@ class PricingManagementController {
       idKey: "id",
       nameKey: "test_name",
       codeKey: "short_name",
+      availabilityField: "is_center_available",
       resetHandlerName: "resetSingleTestPrice",
     });
   }
@@ -463,6 +507,55 @@ class PricingManagementController {
       codeKey: "pgid",
       resetHandlerName: "resetSinglePackagePrice",
     });
+  }
+
+  async setSingleTestAvailability(testId, isAvailable) {
+    if (!this.ensureCenterSelected() || !testId) return;
+    const centerId = this.currentCenterId;
+
+    try {
+      await this.pricingService.setCenterTestAvailability(
+        centerId,
+        testId,
+        isAvailable
+      );
+      this.showSuccess(
+        isAvailable
+          ? "Test activated for this center"
+          : "Test deactivated for this center"
+      );
+      if (centerId === this.getSelectedCenterId()) await this.loadPricing(centerId);
+    } catch (error) {
+      console.error("Error updating test availability:", error);
+      this.showError(error?.message || "Failed to update test availability");
+    }
+  }
+
+  async deactivateAllTests() {
+    if (!this.ensureCenterSelected() || !this.testsWithPrices.length) return;
+    const centerId = this.currentCenterId;
+    const centerName =
+      this.centerSelect?.selectedOptions?.[0]?.textContent || "selected center";
+    if (
+      !window.confirm(
+        `Deactivate all ${this.testsWithPrices.length} tests for ${centerName}?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await this.pricingService.setAllCenterTestsAvailability(
+        centerId,
+        this.testsWithPrices.map((test) => test.id),
+        false
+      );
+      this.showSuccess(`All tests deactivated for ${centerName}`);
+      if (centerId === this.getSelectedCenterId()) await this.loadPricing(centerId);
+    } catch (error) {
+      console.error("Error deactivating all center tests:", error);
+      this.showError(error?.message || "Failed to deactivate all tests");
+    }
   }
 
   updatePriceDiff(input) {

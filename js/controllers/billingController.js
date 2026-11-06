@@ -2905,7 +2905,7 @@ class BillingController {
       tests = pricingService
         ? await pricingService.searchTestsForBilling(value, this.getSelectedCenterId())
         : [];
-      if ((!tests || tests.length === 0) && window.Config) {
+      if (!pricingService && window.Config) {
         const sampleTests = window.Config.getSampleData("tests") || [];
         tests = sampleTests.filter(
           (t) =>
@@ -3072,7 +3072,7 @@ class BillingController {
       console.log("Tests from service:", tests);
 
       // Fallback to sample data if no results from DB
-      if ((!tests || tests.length === 0) && window.Config) {
+      if (!pricingService && window.Config) {
         const sampleTests = window.Config.getSampleData("tests") || [];
         console.log("Using sample tests:", sampleTests);
         tests = sampleTests.filter(

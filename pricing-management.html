@@ -232,7 +232,7 @@
             </h1>
 
             <div class="pricing-note">
-                Global prices in the tests and packages tables remain the system default. Save a center price only when that center needs an override.
+                Global prices in the tests and packages tables remain the system default. Save a center price only when that center needs an override. Deactivated tests are hidden from billing for the selected center and can be reactivated individually here.
             </div>
 
             <div id="pricingPageAlert"></div>
@@ -294,6 +294,10 @@
                                     <i class="fas fa-undo"></i>
                                     Reset to Global
                                 </button>
+                                <button id="deactivateAllTestsBtn" class="btn btn-danger">
+                                    <i class="fas fa-ban"></i>
+                                    Deactivate All Tests
+                                </button>
                             </div>
                         </div>
 
@@ -324,12 +328,13 @@
                                             <th>Global Price</th>
                                             <th>Center Price</th>
                                             <th>Difference</th>
+                                            <th>Center Status</th>
                                             <th>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="testPricingTableBody">
                                         <tr>
-                                            <td colspan="6" class="text-center">
+                                            <td colspan="7" class="text-center">
                                                 Select a center and click "Load Pricing"
                                             </td>
                                         </tr>

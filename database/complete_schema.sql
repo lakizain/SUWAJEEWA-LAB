@@ -163,6 +163,16 @@ CREATE TABLE IF NOT EXISTS center_package_prices (
     UNIQUE(center_id, package_id)
 );
 
+CREATE TABLE IF NOT EXISTS center_test_availability (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    center_id UUID NOT NULL REFERENCES centers(id) ON DELETE CASCADE,
+    test_id UUID NOT NULL REFERENCES tests(id) ON DELETE CASCADE,
+    is_available BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(center_id, test_id)
+);
+
 -- =============================================
 -- BILLING MANAGEMENT TABLES
 -- =============================================
@@ -294,6 +304,7 @@ CREATE INDEX IF NOT EXISTS idx_package_tests_test_id ON package_tests(test_id);
 CREATE INDEX IF NOT EXISTS idx_center_test_prices_center_id ON center_test_prices(center_id);
 CREATE INDEX IF NOT EXISTS idx_center_test_prices_test_id ON center_test_prices(test_id);
 CREATE INDEX IF NOT EXISTS idx_center_test_prices_center_test ON center_test_prices(center_id, test_id);
+CREATE INDEX IF NOT EXISTS idx_center_test_availability_center_test ON center_test_availability(center_id, test_id);
 CREATE INDEX IF NOT EXISTS idx_center_package_prices_center_id ON center_package_prices(center_id);
 CREATE INDEX IF NOT EXISTS idx_center_package_prices_package_id ON center_package_prices(package_id);
 CREATE INDEX IF NOT EXISTS idx_center_package_prices_center_package ON center_package_prices(center_id, package_id);
@@ -346,6 +357,9 @@ CREATE TRIGGER update_packages_updated_at BEFORE UPDATE ON packages
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_center_test_prices_updated_at BEFORE UPDATE ON center_test_prices
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_center_test_availability_updated_at BEFORE UPDATE ON center_test_availability
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_center_package_prices_updated_at BEFORE UPDATE ON center_package_prices
@@ -411,6 +425,7 @@ ALTER TABLE reference_ranges ENABLE ROW LEVEL SECURITY;
 ALTER TABLE package_tests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE center_test_prices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE center_package_prices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE center_test_availability ENABLE ROW LEVEL SECURITY;
 
 -- Create permissive policies for development (adjust for production)
 DO $$ BEGIN
@@ -507,6 +522,12 @@ DO $$ BEGIN
     -- Center package prices table policies
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='center_package_prices' AND policyname='Allow all for authenticated') THEN
         CREATE POLICY "Allow all for authenticated" ON center_package_prices
+            FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    END IF;
+
+    -- Center test availability policies
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='center_test_availability' AND policyname='Allow all for authenticated') THEN
+        CREATE POLICY "Allow all for authenticated" ON center_test_availability
             FOR ALL TO authenticated USING (true) WITH CHECK (true);
     END IF;
 END $$;
@@ -629,13 +650,17 @@ SELECT
     c.cid,
     ctp.price AS center_price,
     COALESCE(ctp.price, t.price) AS resolved_price,
-    (ctp.price IS NOT NULL) AS has_center_price
+    (ctp.price IS NOT NULL) AS has_center_price,
+    COALESCE(cta.is_available, true) AS is_center_available
 FROM tests t
 CROSS JOIN centers c
 LEFT JOIN center_test_prices ctp
        ON ctp.center_id = c.id
       AND ctp.test_id = t.id
       AND ctp.is_active = true
+LEFT JOIN center_test_availability cta
+       ON cta.center_id = c.id
+      AND cta.test_id = t.id
 WHERE t.is_active = true
   AND c.is_active = true;
 

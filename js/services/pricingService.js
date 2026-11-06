@@ -110,6 +110,22 @@ class PricingService {
     return priceMap;
   }
 
+  async getCenterTestAvailabilityMap(testIds, centerId) {
+    if (!this.isSupabaseAvailable() || !centerId || !testIds.length) {
+      return new Map();
+    }
+
+    const { data, error } = await this.supabase
+      .from("center_test_availability")
+      .select("test_id, is_available")
+      .eq("center_id", centerId)
+      .in("test_id", testIds);
+
+    if (error) throw error;
+
+    return new Map((data || []).map((row) => [row.test_id, row.is_available]));
+  }
+
   applyResolvedPrices(items, centerPriceMap, idField = "id") {
     return (items || []).map((item) => {
       const globalPrice = parseFloat(item.price) || 0;
@@ -129,17 +145,25 @@ class PricingService {
     const effectiveCenterId = this.ensureAllowedCenterId(centerId);
     const tests = await this.fetchActiveTests();
     const testIds = tests.map((test) => test.id).filter(Boolean);
-    const centerPriceMap = await this.getCenterPriceMap(
-      "center_test_prices",
-      "test_id",
-      testIds,
-      effectiveCenterId
-    );
-    return this.applyResolvedPrices(tests, centerPriceMap).sort((a, b) =>
+    const [centerPriceMap, availabilityMap] = await Promise.all([
+      this.getCenterPriceMap(
+        "center_test_prices",
+        "test_id",
+        testIds,
+        effectiveCenterId
+      ),
+      this.getCenterTestAvailabilityMap(testIds, effectiveCenterId),
+    ]);
+    return this.applyResolvedPrices(tests, centerPriceMap)
+      .map((test) => ({
+        ...test,
+        is_center_available: availabilityMap.get(test.id) !== false,
+      }))
+      .sort((a, b) =>
       String(a.test_name || "").localeCompare(String(b.test_name || ""), undefined, {
         sensitivity: "base",
       })
-    );
+      );
   }
 
   async getResolvedTestsByIds(testIds, centerId = null) {
@@ -154,14 +178,20 @@ class PricingService {
 
     if (error) throw error;
 
-    const centerPriceMap = await this.getCenterPriceMap(
-      "center_test_prices",
-      "test_id",
-      uniqueTestIds,
-      effectiveCenterId
-    );
+    const [centerPriceMap, availabilityMap] = await Promise.all([
+      this.getCenterPriceMap(
+        "center_test_prices",
+        "test_id",
+        uniqueTestIds,
+        effectiveCenterId
+      ),
+      this.getCenterTestAvailabilityMap(uniqueTestIds, effectiveCenterId),
+    ]);
 
-    return this.applyResolvedPrices(tests || [], centerPriceMap);
+    return this.applyResolvedPrices(tests || [], centerPriceMap).map((test) => ({
+      ...test,
+      is_center_available: availabilityMap.get(test.id) !== false,
+    }));
   }
 
   async searchTestsForBilling(searchTerm, centerId = null) {
@@ -189,14 +219,64 @@ class PricingService {
     if (error) throw error;
 
     const testIds = (tests || []).map((test) => test.id).filter(Boolean);
-    const centerPriceMap = await this.getCenterPriceMap(
-      "center_test_prices",
-      "test_id",
-      testIds,
-      effectiveCenterId
-    );
+    const [centerPriceMap, availabilityMap] = await Promise.all([
+      this.getCenterPriceMap(
+        "center_test_prices",
+        "test_id",
+        testIds,
+        effectiveCenterId
+      ),
+      this.getCenterTestAvailabilityMap(testIds, effectiveCenterId),
+    ]);
 
-    return this.applyResolvedPrices(tests || [], centerPriceMap);
+    return this.applyResolvedPrices(tests || [], centerPriceMap)
+      .filter((test) => availabilityMap.get(test.id) !== false);
+  }
+
+  async setCenterTestAvailability(centerId, testId, isAvailable) {
+    this.ensureSupabaseAvailable();
+    const effectiveCenterId = this.ensureAllowedCenterId(centerId);
+    if (!effectiveCenterId || !testId || typeof isAvailable !== "boolean") {
+      throw new Error("A center, test, and valid availability are required");
+    }
+
+    const { error } = await this.supabase
+      .from("center_test_availability")
+      .upsert(
+        {
+          center_id: effectiveCenterId,
+          test_id: testId,
+          is_available: isAvailable,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "center_id,test_id" }
+      );
+
+    if (error) throw error;
+  }
+
+  async setAllCenterTestsAvailability(centerId, testIds, isAvailable) {
+    this.ensureSupabaseAvailable();
+    const effectiveCenterId = this.ensureAllowedCenterId(centerId);
+    if (!effectiveCenterId || typeof isAvailable !== "boolean") {
+      throw new Error("A center and valid availability are required");
+    }
+
+    const uniqueTestIds = [...new Set((testIds || []).filter(Boolean))];
+    for (let start = 0; start < uniqueTestIds.length; start += 500) {
+      const entries = uniqueTestIds.slice(start, start + 500).map((testId) => ({
+        center_id: effectiveCenterId,
+        test_id: testId,
+        is_available: isAvailable,
+        updated_at: new Date().toISOString(),
+      }));
+      const { error } = await this.supabase
+        .from("center_test_availability")
+        .upsert(entries, { onConflict: "center_id,test_id" });
+      if (error) throw error;
+    }
+
+    return uniqueTestIds.length;
   }
 
   async getPackagesWithCenterPrices(centerId = null) {
