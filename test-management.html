@@ -942,6 +942,7 @@
                                 <thead class="table-dark">
                                     <tr>
                                         <th>HEADING</th>
+                                        <th>BOLD</th>
                                         <th>UOM</th>
                                         <th>MALE REF RANGE</th>
                                         <th>FEMALE REF RANGE</th>
@@ -954,7 +955,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="subcategoryTableBody">
-                                    <tr><td colspan="10" class="no-data">Please select a test first</td></tr>
+                                    <tr><td colspan="11" class="no-data">Please select a test first</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1004,7 +1005,7 @@
             if (!tbody) return;
             const list = preloaded || await testService.getTestSubcategories(selectedTestId);
             if (!list || list.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" class="no-data">No sub-categories found</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="11" class="no-data">No sub-categories found</td></tr>`;
                 return;
             }
             // Show heading as subcategory_name and UOM, but display blank rows as empty
@@ -1012,7 +1013,10 @@
                 const isBlankRow = sub.subcategory_name.startsWith('Blank Row');
                 return `
                 <tr>
-                    <td>${isBlankRow ? '' : sub.subcategory_name}</td>
+                    <td class="${sub.is_bold ? 'fw-bold' : ''}">${isBlankRow ? '' : sub.subcategory_name}</td>
+                    <td class="text-center">
+                        <input type="checkbox" class="form-check-input subcategory-bold-toggle" data-subcategory-id="${sub.id}" aria-label="Bold ${isBlankRow ? 'blank row' : sub.subcategory_name}" ${sub.is_bold ? 'checked' : ''}>
+                    </td>
                     <td>${sub.uom || ''}</td>
                     <td id="row-male-${sub.id}">—</td>
                     <td id="row-female-${sub.id}">—</td>
@@ -1039,7 +1043,7 @@
                     </td>
                 </tr>
                 <tr id="suggestions-row-${sub.id}" style="display: none;">
-                    <td colspan="10" class="p-0">
+                    <td colspan="11" class="p-0">
                         <div id="suggestions-${sub.id}" class="suggestions-section">
                             <div class="p-3">
                                 <h6 class="text-info">Suggestions for ${isBlankRow ? 'Blank Row' : sub.subcategory_name}</h6>
@@ -1059,6 +1063,20 @@
                 </tr>
                 `;
             }).join('');
+
+            tbody.querySelectorAll('.subcategory-bold-toggle').forEach(toggle => {
+                toggle.addEventListener('change', async function () {
+                    const subcategoryId = this.getAttribute('data-subcategory-id');
+                    try {
+                        await testService.updateTestSubcategory(subcategoryId, { is_bold: this.checked });
+                        this.closest('tr').querySelector('td').classList.toggle('fw-bold', this.checked);
+                    } catch (error) {
+                        console.error('Error updating subcategory bold setting:', error);
+                        this.checked = !this.checked;
+                        alert('Failed to update bold setting');
+                    }
+                });
+            });
             // Populate male/female preview columns from existing ranges
             for (const sub of list) {
                 const refs = await testService.getSubcategoryReferenceRanges(sub.id);

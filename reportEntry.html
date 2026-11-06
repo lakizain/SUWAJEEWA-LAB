@@ -1116,9 +1116,21 @@
                             const remarkText = (cells[4].textContent || '').trim();
                             const isEmptyRow = !valueText && !uomText && !refText && !remarkText;
                             const categoryText = isEmptyRow ? '' : (cells[0].textContent || '');
+                            const escapeHtml = (value) => value.replace(/[&<>"']/g, (char) => ({
+                                '&': '&amp;',
+                                '<': '&lt;',
+                                '>': '&gt;',
+                                '"': '&quot;',
+                                "'": '&#39;'
+                            })[char]);
+                            const categoryHtml = categoryText
+                                ? (row.dataset.subcategoryBold === 'true'
+                                    ? `<strong>${escapeHtml(categoryText)}</strong>`
+                                    : escapeHtml(categoryText))
+                                : '&nbsp;';
                             html += `
                                 <tr>
-                                    <td>${categoryText || '&nbsp;'}</td>
+                                    <td>${categoryHtml}</td>
                                     <td>${valueText || '&nbsp;'}</td>
                                     <td>${uomText || '&nbsp;'}</td>
                                     <td>${refText || '&nbsp;'}</td>

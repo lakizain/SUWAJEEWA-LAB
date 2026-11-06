@@ -564,6 +564,7 @@ class TestService {
         ...(updateData.less_more_comment !== undefined ? { less_more_comment: updateData.less_more_comment } : {}),
         ...(updateData.less_more_mark !== undefined ? { less_more_mark: updateData.less_more_mark } : {}),
         ...(updateData.decimal_places !== undefined ? { decimal_places: updateData.decimal_places } : {}),
+        ...(updateData.is_bold !== undefined ? { is_bold: updateData.is_bold } : {}),
       };
 
       if (payload.subcategory_name !== undefined && typeof payload.subcategory_name === "string") {

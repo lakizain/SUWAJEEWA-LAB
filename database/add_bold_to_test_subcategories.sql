@@ -1,0 +1,2 @@
+ALTER TABLE test_subcategories
+ADD COLUMN IF NOT EXISTS is_bold BOOLEAN NOT NULL DEFAULT false;

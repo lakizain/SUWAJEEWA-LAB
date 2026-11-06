@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS test_subcategories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     test_id UUID REFERENCES tests(id) ON DELETE CASCADE,
     subcategory_name VARCHAR(255) NOT NULL,
+    is_bold BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

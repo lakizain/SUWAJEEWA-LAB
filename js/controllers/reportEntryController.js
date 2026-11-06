@@ -3985,6 +3985,7 @@ class ReportEntryController {
       if (cells.length < 4) return null;
       return {
         category: (cells[0]?.textContent || "").trim(),
+        categoryBold: row.dataset.subcategoryBold === "true",
         value: (cells[1]?.querySelector("input")?.value || "").trim(),
         uom: (cells[2]?.textContent || "").trim(),
         ref: (cells[3]?.textContent || "").trim(),
@@ -4013,6 +4014,7 @@ class ReportEntryController {
     const renderRow = (item, categoryHTML, isEmptyCategoryRow) => {
       const isGroup =
         !isEmptyCategoryRow &&
+        !item.categoryBold &&
         !item.value &&
         !item.uom &&
         !item.ref &&
@@ -4053,7 +4055,10 @@ class ReportEntryController {
         // Skip completely empty rows (no category and no other data)
         if (!hasAny) return "";
 
-        return renderRow(item, esc(item.category), false);
+        const categoryHTML = item.categoryBold
+          ? `<strong>${esc(item.category)}</strong>`
+          : esc(item.category);
+        return renderRow(item, categoryHTML, false);
       })
       .filter(Boolean)
       .join("");
@@ -4296,12 +4301,14 @@ class ReportEntryController {
     subcategories.forEach((sub, rowIndex) => {
       const row = document.createElement("tr");
       row.setAttribute("data-subcategory-id", sub.id);
+      row.dataset.subcategoryBold = sub.is_bold ? "true" : "false";
 
       const categoryName = this.safeText(sub.subcategory_name);
       const normalizedName = categoryName.replace(/\u00a0/g, " ").trim();
 
       const tdCat = document.createElement("td");
       tdCat.textContent = normalizedName;
+      if (sub.is_bold) tdCat.style.fontWeight = "bold";
       row.appendChild(tdCat);
 
       const tdVal = document.createElement("td");
