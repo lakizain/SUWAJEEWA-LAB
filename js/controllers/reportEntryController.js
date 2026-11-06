@@ -1413,6 +1413,7 @@ class ReportEntryController {
           return {
             name: cells[0] || "",
             value: cells[1] || "",
+            positive: this.isPositiveResult(cells[1]),
             unit: column("UNIT"),
             flag: column("FLAG"),
             referenceRange: column("REFERENCE VALUE"),
@@ -1611,7 +1612,10 @@ class ReportEntryController {
             case "TEST":
               return { text: result.name.toUpperCase(), bold: result.group, wrap: true };
             case "RESULT":
-              return { text: result.value, bold: result.abnormal };
+              return {
+                text: result.value,
+                bold: result.abnormal || result.positive,
+              };
             case "UNIT":
               return { text: result.unit };
             case "FLAG":
@@ -3486,6 +3490,10 @@ class ReportEntryController {
     return text.toUpperCase();
   }
 
+  isPositiveResult(value) {
+    return /^\s*positive\b/i.test((value || "").toString());
+  }
+
   escapeHtml(value) {
     return (value == null ? "" : String(value))
       .replace(/&/g, "&amp;")
@@ -3737,6 +3745,7 @@ class ReportEntryController {
           .results-table tbody td.ref-cell { white-space: pre; }
           .results-table tbody td.flag-cell { overflow-wrap: anywhere; }
           .results-table tbody tr.group-row td { font-weight: 700; }
+          .results-table tbody td.positive-result { font-weight: 700; }
           .results-table tbody tr.flag-abnormal td.value-cell,
           .results-table tbody tr.flag-abnormal td.flag-cell { font-weight: 700; }
 
@@ -4025,9 +4034,12 @@ class ReportEntryController {
       if (item.flag) classes.push("flag-abnormal");
       const classAttr =
         classes.length > 0 ? ` class="${classes.join(" ")}"` : "";
+      const valueClass = this.isPositiveResult(item.value)
+        ? "value-cell positive-result"
+        : "value-cell";
       const tds = [
         `<td>${categoryHTML}</td>`,
-        `<td class="value-cell">${esc(item.value)}</td>`,
+        `<td class="${valueClass}">${esc(item.value)}</td>`,
       ];
       if (includeFlag) tds.push(`<td class="flag-cell">${esc(item.flag)}</td>`);
       if (includeRefRange)
