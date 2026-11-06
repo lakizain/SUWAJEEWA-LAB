@@ -5,13 +5,13 @@ const THREE_DECIMAL_VALUE_TEST_ID = "3ea45cbd-4b12-4ae1-9983-52e759219e98";
 /**
  * Signature section is LOCKED to a fixed place on the A4 sheet (it does not
  * depend on where the test results end).
- *   - Section bottom : 31 mm above the bottom edge of the A4 sheet
- *   - Section height : ~18 mm  (=> section top is ~248 mm from the sheet top)
+ *   - Section bottom : 36 mm above the bottom edge of the A4 sheet
+ *   - Section height : ~18 mm  (=> section top is ~243 mm from the sheet top)
  * The section contains: signature image area, the "....." line and the
  * "Medical Laboratory Technologist" label. The line + label are always shown;
  * the signature image appears only when "Print with signature" is ticked.
  */
-const SIGNATURE_BOTTOM_FROM_SHEET_MM = 31;
+const SIGNATURE_BOTTOM_FROM_SHEET_MM = 36;
 const SIGNATURE_BLOCK_HEIGHT_MM = 18;
 const SIGNATURE_IMAGE_AREA_MM = 11;
 // @page margin is now 0 for BOTH letterhead / no-letterhead printing, so the
