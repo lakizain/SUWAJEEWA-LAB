@@ -526,9 +526,9 @@ DO $$ BEGIN
     END IF;
 
     -- Center test availability policies
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='center_test_availability' AND policyname='Allow all for authenticated') THEN
-        CREATE POLICY "Allow all for authenticated" ON center_test_availability
-            FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='center_test_availability' AND policyname='Allow all for anon and authenticated') THEN
+        CREATE POLICY "Allow all for anon and authenticated" ON center_test_availability
+            FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
     END IF;
 END $$;
 
