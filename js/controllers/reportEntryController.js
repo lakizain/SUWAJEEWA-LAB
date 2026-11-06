@@ -3430,11 +3430,11 @@ class ReportEntryController {
   // ---------------------------------------------------------------------
 
   // Column widths (%) of the results table, in column order:
-  // TEST | RESULT | UNIT | [FLAG] | [REFERENCE VALUE]
+  // TEST | RESULT | [FLAG] | [REFERENCE VALUE] | UNIT
   getReportColumnWidthsPct(hasFlag, hasRefRange) {
-    if (hasFlag && hasRefRange) return [43, 15, 12.5, 7, 22.5];
-    if (hasRefRange) return [44, 16, 14, 26];
-    if (hasFlag) return [44, 18, 16, 22];
+    if (hasFlag && hasRefRange) return [43, 15, 7, 22.5, 12.5];
+    if (hasRefRange) return [44, 16, 26, 14];
+    if (hasFlag) return [44, 18, 22, 16];
     return [50, 25, 25];
   }
 
@@ -3847,9 +3847,9 @@ class ReportEntryController {
                 <tr>
                   <th>TEST</th>
                   <th>RESULT</th>
-                  <th>UNIT</th>
                   ${showFlag ? `<th>FLAG</th>` : ""}
                   ${showRefRange ? `<th>REFERENCE VALUE</th>` : ""}
+                  <th>UNIT</th>
                 </tr>
               </thead>
               <tbody>
@@ -3967,7 +3967,7 @@ class ReportEntryController {
   }
 
   // Read current table and build printable rows
-  // Columns: TEST | RESULT | UNIT | [FLAG] | [REFERENCE VALUE]
+  // Columns: TEST | RESULT | [FLAG] | [REFERENCE VALUE] | UNIT
   generatePrintableResultsHTML(
     includeFlag = true,
     includeUnit = true,
@@ -4029,10 +4029,10 @@ class ReportEntryController {
         `<td>${categoryHTML}</td>`,
         `<td class="value-cell">${esc(item.value)}</td>`,
       ];
-      if (includeUnit) tds.push(`<td class="unit-cell">${esc(item.uom)}</td>`);
       if (includeFlag) tds.push(`<td class="flag-cell">${esc(item.flag)}</td>`);
       if (includeRefRange)
         tds.push(`<td class="ref-cell">${esc(alignRef(item.ref))}</td>`);
+      if (includeUnit) tds.push(`<td class="unit-cell">${esc(item.uom)}</td>`);
       return `<tr${classAttr}>${tds.join("")}</tr>`;
     };
 
