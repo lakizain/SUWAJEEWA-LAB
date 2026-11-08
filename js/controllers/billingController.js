@@ -1688,9 +1688,13 @@ class BillingController {
       errors.push("Invalid age in months");
     }
 
+    const hasAgeYearsOrMonths =
+      billData.patient_age_years !== null ||
+      billData.patient_age_months !== null;
     if (
       billData.patient_age_days !== null &&
-      (billData.patient_age_days < 0 || billData.patient_age_days > 31)
+      (billData.patient_age_days < 0 ||
+        (hasAgeYearsOrMonths && billData.patient_age_days > 31))
     ) {
       errors.push("Invalid age in days");
     }
@@ -2829,6 +2833,7 @@ class BillingController {
           const input = event.target;
           const query = input.value.trim();
           const requestId = ++this.collectionSiteSearchRequestId;
+          if (event.inputType?.startsWith("delete")) return;
           if (query.length < 2) return;
 
           try {
@@ -3336,11 +3341,13 @@ class BillingController {
 
     const now = new Date();
     const formattedDate = now.toLocaleDateString("si-LK", {
+      timeZone: window.SriLankaTime.timeZone,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
     });
     const formattedTime = now.toLocaleTimeString("si-LK", {
+      timeZone: window.SriLankaTime.timeZone,
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",

@@ -85,6 +85,7 @@ class ReportEntryController {
     // Subcategory navigation state for quick entry
     this.currentSubcategories = [];
     this.currentSubcategoryIndex = 0;
+    this.currentValueSuggestions = [];
 
     // Performance optimization caches
     this.subcategoriesCache = new Map();
@@ -181,7 +182,6 @@ class ReportEntryController {
     );
     this.topCategoryInput = document.getElementById("topCategoryInput");
     this.topValueInput = document.getElementById("topValueInput");
-    this.valueSuggestionsList = document.getElementById("valueSuggestions");
     this.commentsResultInput = document.getElementById("commentsResultInput");
     this.specialNotesInput = document.getElementById("specialNotesInput");
     if (!this.specialNotesInput && this.commentsResultInput) {
@@ -384,6 +384,9 @@ class ReportEntryController {
     if (this.topValueInput) {
       this.bindDecimalConstraint(this.topValueInput, () =>
         this.getValueDecimalPlacesForCurrentTest()
+      );
+      this.topValueInput.addEventListener("input", (event) =>
+        this.applyCurrentValueSuggestion(event)
       );
       this.topValueInput.addEventListener("keydown", (e) => {
         if (this.handleResultCopyPasteShortcut(e)) return;
@@ -645,11 +648,7 @@ class ReportEntryController {
   }
 
   getLocalDateValue(date = new Date()) {
-    return [
-      date.getFullYear(),
-      String(date.getMonth() + 1).padStart(2, "0"),
-      String(date.getDate()).padStart(2, "0"),
-    ].join("-");
+    return window.SriLankaTime.getDateValue(date);
   }
 
   async loadTodaysBills(centerId = this.getSelectedCenterId()) {
@@ -1275,7 +1274,7 @@ class ReportEntryController {
         throw new Error("No selected reports could be downloaded.");
       }
       pdf.save(
-        `Selected-Reports-${new Date().toISOString().slice(0, 10)}.pdf`
+        `Selected-Reports-${window.SriLankaTime.getDateValue()}.pdf`
       );
     } catch (e) {
       console.error("Failed to download ready reports", e);
@@ -2482,9 +2481,9 @@ class ReportEntryController {
     }
   }
 
-  // Populate suggestions for current subcategory to the datalist
+  // Load inline autocomplete suggestions for the current subcategory.
   async loadSuggestionsForSubcategory(subcategoryId) {
-    if (!this.valueSuggestionsList || !this.testService) return;
+    if (!this.testService) return;
     const requestId = ++this.suggestionsRequestId;
     this.clearValueSuggestions();
 
@@ -2500,19 +2499,16 @@ class ReportEntryController {
       if (requestId !== this.suggestionsRequestId) return;
 
       if (Array.isArray(suggestions)) {
-        // Use DocumentFragment for better performance
-        const fragment = document.createDocumentFragment();
-        suggestions.forEach((s) => {
-          const opt = document.createElement("option");
-          opt.value = (
-            s.suggestion_text ??
-            s.value ??
-            s.suggestion ??
-            ""
-          ).toString();
-          if (opt.value) fragment.appendChild(opt);
-        });
-        this.valueSuggestionsList.appendChild(fragment);
+        this.currentValueSuggestions = suggestions
+          .map((suggestion) =>
+            (
+              suggestion.suggestion_text ??
+              suggestion.value ??
+              suggestion.suggestion ??
+              ""
+            ).toString()
+          )
+          .filter(Boolean);
       }
     } catch (error) {
       if (requestId === this.suggestionsRequestId) {
@@ -2521,9 +2517,30 @@ class ReportEntryController {
     }
   }
 
+  applyCurrentValueSuggestion(event) {
+    const input = this.topValueInput;
+    if (
+      !input ||
+      event?.inputType?.startsWith("delete") ||
+      input.selectionStart !== input.selectionEnd
+    ) {
+      return;
+    }
+
+    const query = input.value.trim();
+    if (query.length < 2) return;
+
+    const match = this.currentValueSuggestions.find((suggestion) =>
+      suggestion.toLowerCase().startsWith(query.toLowerCase())
+    );
+    if (!match || match.length <= query.length) return;
+
+    input.value = match;
+    input.setSelectionRange(query.length, match.length);
+  }
+
   clearValueSuggestions() {
-    if (!this.valueSuggestionsList) return;
-    this.valueSuggestionsList.innerHTML = "";
+    this.currentValueSuggestions = [];
   }
 
   // Clear all caches to free memory
@@ -3049,7 +3066,9 @@ class ReportEntryController {
           <div class="d-flex w-100 justify-content-between">
             <strong>${this.safeText(bill.bill_no)}</strong>
             <small class="text-muted">${this.safeText(
-              new Date(bill.bill_date).toLocaleDateString()
+              new Date(bill.bill_date).toLocaleDateString("si-LK", {
+                timeZone: window.SriLankaTime.timeZone,
+              })
             )}</small>
           </div>
           <div class="small">${this.safeText(bill.patient_name)}${
@@ -3475,15 +3494,20 @@ class ReportEntryController {
     return 8 + REPORT_LINE_HEIGHT_MM + 2 + lines * REPORT_LINE_HEIGHT_MM;
   }
 
-  // "dd/mm/yyyy hh:mm" (local time)
+  // Format the timestamp using Sri Lanka's business timezone.
   formatReportDateTime(value) {
     if (!value) return "";
     const d = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(d.getTime())) return "";
-    const p = (n) => String(n).padStart(2, "0");
-    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(
-      d.getHours()
-    )}:${p(d.getMinutes())}`;
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: window.SriLankaTime.timeZone,
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(d).replace(",", "");
   }
 
   // Remark (Low / High / Normal) -> printed FLAG (L / H / blank)

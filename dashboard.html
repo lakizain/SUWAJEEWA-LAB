@@ -245,6 +245,7 @@
             const now = new Date();
 
             const timeParts = now.toLocaleTimeString('en-US', {
+                timeZone: window.SriLankaTime.timeZone,
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
@@ -252,6 +253,7 @@
             }).split(' ');
 
             const dateText = now.toLocaleDateString('en-US', {
+                timeZone: window.SriLankaTime.timeZone,
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',

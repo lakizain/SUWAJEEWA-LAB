@@ -49,34 +49,23 @@ class ReportsService {
 
       // Apply date filters
       if (fromDate) {
-        const startOfDay = new Date(fromDate + "T00:00:00").toISOString();
+        const startOfDay = window.SriLankaTime.startOfDay(fromDate);
         query = query.gte("bill_date", startOfDay);
       } else {
         // Default to today if no fromDate provided
-        const today = new Date();
-        const startOfDay = new Date(
-          today.getFullYear(),
-          today.getMonth(),
-          today.getDate()
-        ).toISOString();
+        const today = window.SriLankaTime.getDateValue();
+        const startOfDay = window.SriLankaTime.startOfDay(today);
         query = query.gte("bill_date", startOfDay);
       }
 
       if (toDate) {
-        const endOfDay = new Date(toDate + "T23:59:59").toISOString();
-        query = query.lte("bill_date", endOfDay);
+        const startOfNextDay = window.SriLankaTime.startOfNextDay(toDate);
+        query = query.lt("bill_date", startOfNextDay);
       } else if (!fromDate) {
         // Default to end of today if no toDate provided and no fromDate
-        const today = new Date();
-        const endOfDay = new Date(
-          today.getFullYear(),
-          today.getMonth(),
-          today.getDate(),
-          23,
-          59,
-          59
-        ).toISOString();
-        query = query.lte("bill_date", endOfDay);
+        const today = window.SriLankaTime.getDateValue();
+        const startOfNextDay = window.SriLankaTime.startOfNextDay(today);
+        query = query.lt("bill_date", startOfNextDay);
       }
 
       // Apply center filter
@@ -119,7 +108,8 @@ class ReportsService {
         return this.getSampleMonthlySalesData();
       }
 
-      const targetYear = year || new Date().getFullYear();
+      const targetYear =
+        year || Number(window.SriLankaTime.getDateValue().slice(0, 4));
       const targetMonth =
         month !== null && month !== "all" ? parseInt(month) : null;
 
@@ -137,24 +127,30 @@ class ReportsService {
         .order("bill_date", { ascending: false });
 
       // Apply year filter
-      const startOfYear = new Date(targetYear, 0, 1).toISOString();
-      const endOfYear = new Date(targetYear, 11, 31, 23, 59, 59).toISOString();
-      query = query.gte("bill_date", startOfYear).lte("bill_date", endOfYear);
+      const startOfYear = window.SriLankaTime.toUtcIso(`${targetYear}-01-01`);
+      const startOfNextYear = window.SriLankaTime.toUtcIso(
+        `${Number(targetYear) + 1}-01-01`
+      );
+      query = query
+        .gte("bill_date", startOfYear)
+        .lt("bill_date", startOfNextYear);
 
       // Apply month filter if specific month is selected
       if (targetMonth !== null) {
-        const startOfMonth = new Date(targetYear, targetMonth, 1).toISOString();
-        const endOfMonth = new Date(
-          targetYear,
-          targetMonth + 1,
-          0,
-          23,
-          59,
-          59
-        ).toISOString();
+        const monthStartDate = window.SriLankaTime.monthStart(
+          `${targetYear}-01-01`,
+          targetMonth
+        );
+        const nextMonthStartDate = window.SriLankaTime.monthStart(
+          monthStartDate,
+          1
+        );
+        const startOfMonth = window.SriLankaTime.startOfDay(monthStartDate);
+        const startOfNextMonth =
+          window.SriLankaTime.startOfDay(nextMonthStartDate);
         query = query
           .gte("bill_date", startOfMonth)
-          .lte("bill_date", endOfMonth);
+          .lt("bill_date", startOfNextMonth);
       }
 
       // Apply center filter
@@ -174,6 +170,7 @@ class ReportsService {
       bills.forEach((bill) => {
         const billDate = new Date(bill.bill_date);
         const monthKey = billDate.toLocaleDateString("en-US", {
+          timeZone: window.SriLankaTime.timeZone,
           year: "numeric",
           month: "long",
         });
@@ -227,13 +224,13 @@ class ReportsService {
 
       // Apply date filters
       if (fromDate) {
-        const startOfDay = new Date(fromDate + "T00:00:00").toISOString();
+        const startOfDay = window.SriLankaTime.startOfDay(fromDate);
         query = query.gte("bill_date", startOfDay);
       }
 
       if (toDate) {
-        const endOfDay = new Date(toDate + "T23:59:59").toISOString();
-        query = query.lte("bill_date", endOfDay);
+        const startOfNextDay = window.SriLankaTime.startOfNextDay(toDate);
+        query = query.lt("bill_date", startOfNextDay);
       }
 
       // Apply center filter
@@ -314,13 +311,13 @@ class ReportsService {
 
       // Apply date filters
       if (fromDate) {
-        const startOfDay = new Date(fromDate + "T00:00:00").toISOString();
+        const startOfDay = window.SriLankaTime.startOfDay(fromDate);
         query = query.gte("bill_date", startOfDay);
       }
 
       if (toDate) {
-        const endOfDay = new Date(toDate + "T23:59:59").toISOString();
-        query = query.lte("bill_date", endOfDay);
+        const startOfNextDay = window.SriLankaTime.startOfNextDay(toDate);
+        query = query.lt("bill_date", startOfNextDay);
       }
 
       if (centerId && centerId !== "all") {
@@ -469,15 +466,12 @@ class ReportsService {
           .range(offset, offset + pageSize - 1);
 
         if (fromDate) {
-          query = query.gte(
-            "bill_date",
-            new Date(fromDate + "T00:00:00").toISOString()
-          );
+          query = query.gte("bill_date", window.SriLankaTime.startOfDay(fromDate));
         }
         if (toDate) {
-          query = query.lte(
+          query = query.lt(
             "bill_date",
-            new Date(toDate + "T23:59:59").toISOString()
+            window.SriLankaTime.startOfNextDay(toDate)
           );
         }
         if (centerId && centerId !== "all") {
@@ -818,48 +812,27 @@ class ReportsService {
         };
       }
 
-      const today = new Date();
-      const startOfDay = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate()
-      ).toISOString();
-      const endOfDay = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate(),
-        23,
-        59,
-        59
-      ).toISOString();
-
-      const startOfMonth = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        1
-      ).toISOString();
-      const endOfMonth = new Date(
-        today.getFullYear(),
-        today.getMonth() + 1,
-        0,
-        23,
-        59,
-        59
-      ).toISOString();
+      const today = window.SriLankaTime.getDateValue();
+      const startOfDay = window.SriLankaTime.startOfDay(today);
+      const startOfNextDay = window.SriLankaTime.startOfNextDay(today);
+      const monthStart = window.SriLankaTime.monthStart(today);
+      const nextMonthStart = window.SriLankaTime.monthStart(today, 1);
+      const startOfMonth = window.SriLankaTime.startOfDay(monthStart);
+      const startOfNextMonth = window.SriLankaTime.startOfDay(nextMonthStart);
 
       // Get today's data
       const { data: todayBills, error: todayError } = await this.supabase
         .from("bills")
         .select("final_amount")
         .gte("bill_date", startOfDay)
-        .lte("bill_date", endOfDay);
+        .lt("bill_date", startOfNextDay);
 
       // Get month's data
       const { data: monthBills, error: monthError } = await this.supabase
         .from("bills")
         .select("final_amount")
         .gte("bill_date", startOfMonth)
-        .lte("bill_date", endOfMonth);
+        .lt("bill_date", startOfNextMonth);
 
       if (todayError || monthError) {
         console.error("Error getting sales summary:", todayError || monthError);

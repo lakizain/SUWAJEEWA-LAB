@@ -130,6 +130,80 @@ window.APP_CONFIG = {
   },
 };
 
+window.SriLankaTime = {
+  timeZone: "Asia/Colombo",
+
+  isValidDateValue(dateValue) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue || "")) return false;
+    const [year, month, day] = dateValue.split("-").map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    );
+  },
+
+  getDateValue(date = new Date()) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: this.timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  },
+
+  addDays(dateValue, days) {
+    if (!this.isValidDateValue(dateValue)) {
+      throw new RangeError("Invalid Sri Lanka calendar date.");
+    }
+    const [year, month, day] = dateValue.split("-").map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day + days));
+    return [
+      date.getUTCFullYear(),
+      String(date.getUTCMonth() + 1).padStart(2, "0"),
+      String(date.getUTCDate()).padStart(2, "0"),
+    ].join("-");
+  },
+
+  monthStart(dateValue, offset = 0) {
+    if (!this.isValidDateValue(dateValue)) {
+      throw new RangeError("Invalid Sri Lanka calendar date.");
+    }
+    const [year, month] = dateValue.split("-").map(Number);
+    const date = new Date(Date.UTC(year, month - 1 + offset, 1));
+    return [
+      date.getUTCFullYear(),
+      String(date.getUTCMonth() + 1).padStart(2, "0"),
+      "01",
+    ].join("-");
+  },
+
+  toUtcIso(dateValue, timeValue = "00:00:00") {
+    if (
+      !this.isValidDateValue(dateValue) ||
+      !/^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(timeValue)
+    ) {
+      throw new RangeError("Invalid Sri Lanka date or time.");
+    }
+    const timestamp = new Date(`${dateValue}T${timeValue}+05:30`);
+    if (Number.isNaN(timestamp.getTime())) {
+      throw new RangeError("Invalid Sri Lanka date or time.");
+    }
+    return timestamp.toISOString();
+  },
+
+  startOfDay(dateValue) {
+    return this.toUtcIso(dateValue);
+  },
+
+  startOfNextDay(dateValue) {
+    return this.toUtcIso(this.addDays(dateValue, 1));
+  },
+};
+
 // Environment-specific configurations
 if (
   window.location.hostname === "localhost" ||

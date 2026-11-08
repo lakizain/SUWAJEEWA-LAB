@@ -294,15 +294,15 @@ class AdminBillsService {
       }
 
       // Get today's bills
-      const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59).toISOString();
+      const today = window.SriLankaTime.getDateValue();
+      const startOfDay = window.SriLankaTime.startOfDay(today);
+      const startOfNextDay = window.SriLankaTime.startOfNextDay(today);
 
       let todayQuery = this.supabase
         .from("bills")
         .select("final_amount, paid_amount, status")
         .gte("created_at", startOfDay)
-        .lte("created_at", endOfDay);
+        .lt("created_at", startOfNextDay);
 
       if (this.getUserCenterId()) {
         todayQuery = todayQuery.eq("center_id", this.getUserCenterId());
@@ -313,7 +313,9 @@ class AdminBillsService {
       if (todayError) throw todayError;
 
       // Get this month's bills
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
+      const startOfMonth = window.SriLankaTime.startOfDay(
+        window.SriLankaTime.monthStart(today)
+      );
       let monthQuery = this.supabase
         .from("bills")
         .select("final_amount, paid_amount, status")
@@ -400,6 +402,7 @@ class AdminBillsService {
     try {
       const date = new Date(dateString);
       return date.toLocaleDateString('en-US', {
+        timeZone: window.SriLankaTime.timeZone,
         year: 'numeric',
         month: 'short',
         day: 'numeric'

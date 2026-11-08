@@ -442,7 +442,9 @@
       
       const billDate = state.adminBillsService ? 
         state.adminBillsService.formatDate(bill.bill_date) : 
-        new Date(bill.bill_date).toLocaleDateString();
+        new Date(bill.bill_date).toLocaleDateString('en-US', {
+          timeZone: window.SriLankaTime.timeZone
+        });
         
       const remainingClass = parseFloat(bill.remaining_amount || 0) > 0 ? 'remaining' : 'amount';
       

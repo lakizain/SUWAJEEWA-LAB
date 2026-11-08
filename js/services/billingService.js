@@ -300,6 +300,14 @@ class BillingService {
         generatedBillNumber
       );
 
+      const parseOptionalAge = (value) => {
+        if (value === "" || value === null || typeof value === "undefined") {
+          return null;
+        }
+
+        return parseInt(value, 10);
+      };
+
       // If Supabase is not available, return mock data for offline mode
       if (!this.isSupabaseAvailable()) {
         console.warn("Creating bill in offline mode");
@@ -324,18 +332,9 @@ class BillingService {
         company_name: billData.company_name || null,
         patient_name: billData.patient_name,
         patient_title: billData.patient_title,
-        patient_age_years:
-          billData.patient_age_years !== ""
-            ? parseInt(billData.patient_age_years)
-            : null,
-        patient_age_months:
-          billData.patient_age_months !== ""
-            ? parseInt(billData.patient_age_months)
-            : null,
-        patient_age_days:
-          billData.patient_age_days !== ""
-            ? parseInt(billData.patient_age_days)
-            : null,
+        patient_age_years: parseOptionalAge(billData.patient_age_years),
+        patient_age_months: parseOptionalAge(billData.patient_age_months),
+        patient_age_days: parseOptionalAge(billData.patient_age_days),
         patient_gender: billData.patient_gender,
         ref_by: billData.ref_by || null, // Fixed to use ref_by instead of reference_id
         new_referral: billData.new_referral,
@@ -947,26 +946,15 @@ class BillingService {
   // Get billing statistics
   async getBillingStats() {
     try {
-      const today = new Date();
-      const startOfDay = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate()
-      ).toISOString();
-      const endOfDay = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate(),
-        23,
-        59,
-        59
-      ).toISOString();
+      const today = window.SriLankaTime.getDateValue();
+      const startOfDay = window.SriLankaTime.startOfDay(today);
+      const startOfNextDay = window.SriLankaTime.startOfNextDay(today);
 
       let todayQuery = this.supabase
         .from("bills")
         .select("final_amount, status")
         .gte("created_at", startOfDay)
-        .lte("created_at", endOfDay);
+        .lt("created_at", startOfNextDay);
 
       let totalQuery = this.supabase
         .from("bills")
@@ -1058,10 +1046,16 @@ class BillingService {
 
       // Apply filters
       if (filters.fromDate) {
-        query = query.gte("bill_date", filters.fromDate);
+        query = query.gte(
+          "bill_date",
+          window.SriLankaTime.startOfDay(filters.fromDate)
+        );
       }
       if (filters.toDate) {
-        query = query.lte("bill_date", filters.toDate);
+        query = query.lt(
+          "bill_date",
+          window.SriLankaTime.startOfNextDay(filters.toDate)
+        );
       }
       if (filters.centerId && filters.centerId !== "all") {
         query = query.eq("center_id", filters.centerId);
@@ -1133,10 +1127,16 @@ class BillingService {
 
       // Apply filters
       if (filters.fromDate) {
-        query = query.gte("bill_date", filters.fromDate);
+        query = query.gte(
+          "bill_date",
+          window.SriLankaTime.startOfDay(filters.fromDate)
+        );
       }
       if (filters.toDate) {
-        query = query.lte("bill_date", filters.toDate);
+        query = query.lt(
+          "bill_date",
+          window.SriLankaTime.startOfNextDay(filters.toDate)
+        );
       }
       if (filters.centerId && filters.centerId !== "all") {
         query = query.eq("center_id", filters.centerId);

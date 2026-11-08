@@ -198,12 +198,7 @@ class ReportEntryService {
 
   // Get today's bills with all test details
   async getTodaysBills(centerId) {
-    const today = new Date();
-    const todayValue = [
-      today.getFullYear(),
-      String(today.getMonth() + 1).padStart(2, "0"),
-      String(today.getDate()).padStart(2, "0"),
-    ].join("-");
+    const todayValue = window.SriLankaTime.getDateValue();
     return this.getBillsByDateRange(todayValue, todayValue, centerId);
   }
 
@@ -226,9 +221,8 @@ class ReportEntryService {
         throw new Error("The start date must be on or before the end date.");
       }
 
-      const startAt = new Date(`${fromDate}T00:00:00`);
-      const endBefore = new Date(`${toDate}T00:00:00`);
-      endBefore.setDate(endBefore.getDate() + 1);
+      const startAt = window.SriLankaTime.startOfDay(fromDate);
+      const endBefore = window.SriLankaTime.startOfNextDay(toDate);
 
       let query = this.supabase
         .from("bills")
@@ -245,8 +239,8 @@ class ReportEntryService {
           centers (center_name, is_out_medical)
         `
         )
-        .gte("bill_date", startAt.toISOString())
-        .lt("bill_date", endBefore.toISOString())
+        .gte("bill_date", startAt)
+        .lt("bill_date", endBefore)
         .order("created_at", { ascending: false });
 
       if (testId) {

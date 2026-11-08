@@ -135,8 +135,7 @@ class ReportsController {
 
     setupDateFilters() {
         // Set default date range (today)
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStr = window.SriLankaTime.getDateValue();
 
         // Daily filters
         const dailyFromDateInput = document.getElementById('daily-from-date');
@@ -425,6 +424,7 @@ class ReportsController {
                 const billDate = new Date(bill.bill_date);
                 if (!isNaN(billDate.getTime())) {
                     formattedDate = billDate.toLocaleDateString('en-GB', {
+                        timeZone: window.SriLankaTime.timeZone,
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric'
@@ -514,6 +514,7 @@ class ReportsController {
             if (fromDate === toDate) {
                 const date = new Date(fromDate);
                 dateRange = date.toLocaleDateString('en-GB', {
+                    timeZone: window.SriLankaTime.timeZone,
                     day: '2-digit',
                     month: 'short',
                     year: 'numeric'
@@ -521,7 +522,7 @@ class ReportsController {
             } else {
                 const from = new Date(fromDate);
                 const to = new Date(toDate);
-                dateRange = from.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' - ' + to.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                dateRange = from.toLocaleDateString('en-GB', { timeZone: window.SriLankaTime.timeZone, day: '2-digit', month: 'short' }) + ' - ' + to.toLocaleDateString('en-GB', { timeZone: window.SriLankaTime.timeZone, day: '2-digit', month: 'short', year: 'numeric' });
             }
         }
 
@@ -618,6 +619,7 @@ class ReportsController {
                 const billDate = new Date(item.date);
                 if (!isNaN(billDate.getTime())) {
                     formattedDate = billDate.toLocaleDateString('en-GB', {
+                        timeZone: window.SriLankaTime.timeZone,
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric'
@@ -827,7 +829,7 @@ class ReportsController {
                     '<div class="company-name">SUWAJEEWA LABORATORY</div>' +
                     '<div class="report-title">' + reportType + '</div>' +
                     (dateRange ? '<div class="date-range">' + dateRange + '</div>' : '') +
-                    '<div class="report-date">Generated on: ' + new Date().toLocaleString() + '</div>' +
+                    '<div class="report-date">Generated on: ' + new Date().toLocaleString('en-GB', { timeZone: window.SriLankaTime.timeZone }) + '</div>' +
                     '</div>' +
                     (summary ? summary.outerHTML : '') +
                     table.outerHTML +
@@ -895,6 +897,7 @@ class ReportsController {
             if (fromDate === toDate) {
                 const date = new Date(fromDate);
                 return 'Date: ' + date.toLocaleDateString('en-GB', {
+                    timeZone: window.SriLankaTime.timeZone,
                     day: '2-digit',
                     month: 'long',
                     year: 'numeric'
@@ -903,9 +906,11 @@ class ReportsController {
                 const from = new Date(fromDate);
                 const to = new Date(toDate);
                 return 'Period: ' + from.toLocaleDateString('en-GB', {
+                    timeZone: window.SriLankaTime.timeZone,
                     day: '2-digit',
                     month: 'long'
                 }) + ' - ' + to.toLocaleDateString('en-GB', {
+                    timeZone: window.SriLankaTime.timeZone,
                     day: '2-digit',
                     month: 'long',
                     year: 'numeric'
@@ -914,6 +919,7 @@ class ReportsController {
         } else if (fromDate) {
             const date = new Date(fromDate);
             return 'From: ' + date.toLocaleDateString('en-GB', {
+                timeZone: window.SriLankaTime.timeZone,
                 day: '2-digit',
                 month: 'long',
                 year: 'numeric'
@@ -921,6 +927,7 @@ class ReportsController {
         } else if (toDate) {
             const date = new Date(toDate);
             return 'Until: ' + date.toLocaleDateString('en-GB', {
+                timeZone: window.SriLankaTime.timeZone,
                 day: '2-digit',
                 month: 'long',
                 year: 'numeric'
@@ -958,7 +965,7 @@ class ReportsController {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = this.currentTab + '_report_' + new Date().toISOString().split('T')[0] + '.csv';
+                a.download = this.currentTab + '_report_' + window.SriLankaTime.getDateValue() + '.csv';
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);

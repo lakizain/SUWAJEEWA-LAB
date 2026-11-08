@@ -383,8 +383,7 @@
                                     <div>
                                         <label class="form-label">Value</label>
                                         <input id="topValueInput" type="text" class="form-control"
-                                            list="valueSuggestions" placeholder="Type value and press Enter">
-                                        <datalist id="valueSuggestions"></datalist>
+                                            placeholder="Type value and press Enter">
                                     </div>
                                     <div class="placeholder">
                                         <label class="form-label">UOM</label>
@@ -684,7 +683,9 @@
 
             function renderRows(bills) {
                 const todayTests = getCurrentTests();
-                const todayDate = new Date().toLocaleDateString();
+                const todayDate = new Date().toLocaleDateString('si-LK', {
+                    timeZone: window.SriLankaTime.timeZone
+                });
                 const ctrl = window.ReportEntryController;
                 const patientName = (ctrl && ctrl.selectedBill && ctrl.selectedBill.patient_name) ? ctrl.selectedBill.patient_name : (document.querySelector('#tab-summary input[readonly]')?.value || '').trim();
 
@@ -701,7 +702,9 @@
                 // Render historical tests: one row per test
                 if (Array.isArray(bills) && bills.length > 0) {
                     bills.forEach(bill => {
-                        const dateStr = bill.bill_date ? new Date(bill.bill_date).toLocaleDateString() : '';
+                        const dateStr = bill.bill_date ? new Date(bill.bill_date).toLocaleDateString('si-LK', {
+                            timeZone: window.SriLankaTime.timeZone
+                        }) : '';
                         const items = (bill.bill_items || []);
                         if (items.length === 0) {
                             rowsHtml += `<tr data-bill-no="${bill.bill_no}"><td>${dateStr}</td><td>${bill.patient_name || ''}</td><td></td></tr>`;
@@ -999,8 +1002,14 @@
         function populatePrintData() {
             // Get current date and time
             const now = new Date();
-            const dateStr = now.toLocaleDateString('en-GB');
-            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const dateStr = now.toLocaleDateString('en-GB', {
+                timeZone: window.SriLankaTime.timeZone
+            });
+            const timeStr = now.toLocaleTimeString('en-US', {
+                timeZone: window.SriLankaTime.timeZone,
+                hour: '2-digit',
+                minute: '2-digit'
+            });
 
             // Update print data from form fields
             document.getElementById('print-date').textContent = dateStr;

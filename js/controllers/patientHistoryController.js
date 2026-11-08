@@ -15,7 +15,9 @@
           .join(", ");
         const dateStr = window.app
           ? window.app.formatDate(bill.bill_date, "short")
-          : new Date(bill.bill_date).toLocaleDateString();
+          : new Date(bill.bill_date).toLocaleDateString("si-LK", {
+              timeZone: window.SriLankaTime.timeZone,
+            });
         const paidStr = window.app
           ? window.app.formatCurrency(bill.paid_amount || 0)
           : bill.paid_amount || 0;

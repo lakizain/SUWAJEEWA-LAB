@@ -448,20 +448,22 @@ class LaboratoryApp {
   // Format date
   formatDate(date, format = "short") {
     const d = new Date(date);
+    const timeZone = window.SriLankaTime?.timeZone || "Asia/Colombo";
 
     if (format === "short") {
-      return d.toLocaleDateString("si-LK");
+      return d.toLocaleDateString("si-LK", { timeZone });
     } else if (format === "long") {
       return d.toLocaleDateString("si-LK", {
+        timeZone,
         year: "numeric",
         month: "long",
         day: "numeric",
       });
     } else if (format === "datetime") {
-      return d.toLocaleString("si-LK");
+      return d.toLocaleString("si-LK", { timeZone });
     }
 
-    return d.toLocaleDateString("si-LK");
+    return d.toLocaleDateString("si-LK", { timeZone });
   }
 
   // Validate form data

@@ -44,12 +44,13 @@ class PublicReportController {
     const dateValue = String(value);
     const date = new Date(
       /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
-        ? `${dateValue}T00:00:00`
+        ? `${dateValue}T00:00:00+05:30`
         : dateValue
     );
     if (Number.isNaN(date.getTime())) return "DATE UNAVAILABLE";
 
     return date.toLocaleDateString(undefined, {
+      timeZone: window.SriLankaTime.timeZone,
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -117,11 +118,16 @@ class PublicReportController {
       ],
     ];
     const reportDate = bill.billDate
-      ? String(bill.billDate).slice(0, 10)
+      ? this.formatBillDate(bill.billDate)
       : "";
     const rightFields = [
       ["SAMPLE RECEIVED ON", reportDate],
-      ["SAMPLE REPORTED ON", new Date().toLocaleTimeString()],
+      [
+        "SAMPLE REPORTED ON",
+        new Date().toLocaleTimeString("en-GB", {
+          timeZone: window.SriLankaTime.timeZone,
+        }),
+      ],
       ["INV NO", (bill.billNo || "").toUpperCase()],
       ["SAMPLE TYPE", (report.specimen || "").toUpperCase()],
     ];
