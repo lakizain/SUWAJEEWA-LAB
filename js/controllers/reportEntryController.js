@@ -1485,7 +1485,12 @@ class ReportEntryController {
     // Columns (same ratios as the printed HTML table)
     const hasFlag = report.headers.includes("FLAG");
     const hasReferenceRange = report.headers.includes("REFERENCE VALUE");
-    let widthsPct = this.getReportColumnWidthsPct(hasFlag, hasReferenceRange);
+    const hasUnit = report.headers.includes("UNIT");
+    let widthsPct = this.getReportColumnWidthsPct(
+      hasFlag,
+      hasReferenceRange,
+      hasUnit
+    );
     if (widthsPct.length !== report.headers.length) {
       widthsPct = report.headers.map(() => 100 / report.headers.length);
     }
@@ -1631,7 +1636,7 @@ class ReportEntryController {
           const cell = cellFor(header);
           if (!cell.text) return;
           pdf.setFont(FONT, cell.bold ? "bold" : "normal");
-          pdf.setFontSize(10);
+          pdf.setFontSize(header === "RESULT" ? 12 : 10);
           if (header === "RESULT") {
             const nextPopulatedColumn = report.headers.findIndex(
               (nextHeader, index) =>
@@ -1643,12 +1648,12 @@ class ReportEntryController {
                 : columnX[nextPopulatedColumn]) -
               columnX[colIndex] -
               2;
-            let fontSize = 10;
+            let fontSize = 12;
             while (
-              fontSize > 6 &&
+              fontSize > 9 &&
               pdf.getTextWidth(cell.text) > availableWidth
             ) {
-              fontSize = Math.max(6, fontSize - 0.25);
+              fontSize = Math.max(9, fontSize - 0.25);
               pdf.setFontSize(fontSize);
             }
           }
@@ -3460,11 +3465,42 @@ class ReportEntryController {
 
   // Column widths (%) of the results table, in column order:
   // TEST | RESULT | [FLAG] | [REFERENCE VALUE] | UNIT
-  getReportColumnWidthsPct(hasFlag, hasRefRange) {
-    if (hasFlag && hasRefRange) return [43, 15, 7, 22.5, 12.5];
-    if (hasRefRange) return [44, 16, 26, 14];
-    if (hasFlag) return [44, 18, 22, 16];
-    return [50, 25, 25];
+  getReportColumnWidthsPct(hasFlag, hasRefRange, includeUnit = true) {
+    if (includeUnit) {
+      if (hasFlag && hasRefRange) return [30, 28, 7, 22.5, 12.5];
+      if (hasRefRange) return [31, 29, 26, 14];
+      if (hasFlag) return [31, 31, 22, 16];
+      return [35, 40, 25];
+    }
+
+    if (hasFlag && hasRefRange) return [30, 40, 7, 23];
+    if (hasRefRange) return [31, 43, 26];
+    if (hasFlag) return [31, 47, 22];
+    return [35, 65];
+  }
+
+  shouldHideUnitColumnForLongResults(hasFlag, hasRefRange) {
+    const rows = Array.from(this.resultsItemsBody?.querySelectorAll("tr") || []);
+    const resultColumnWidthMm =
+      (210 - REPORT_LEFT_MM - REPORT_RIGHT_MM) *
+      (this.getReportColumnWidthsPct(hasFlag, hasRefRange)[1] / 100);
+    const maxResultWidthMm = resultColumnWidthMm - 2;
+    let hasLongResult = false;
+
+    for (const row of rows) {
+      const cells = row.querySelectorAll("td");
+      if (cells.length < 4) continue;
+
+      const unit = (cells[2]?.textContent || "").trim();
+      if (unit) return false;
+
+      const value = (cells[1]?.querySelector("input")?.value || "").trim();
+      if (value.length * REPORT_CHAR_WIDTH_MM * 1.2 > maxResultWidthMm) {
+        hasLongResult = true;
+      }
+    }
+
+    return hasLongResult;
   }
 
   // Row pitch (mm). 6.35 mm like the reference report; shrinks (down to
@@ -3637,16 +3673,24 @@ class ReportEntryController {
           </div>`;
 
     // Results table (rows first, so the row pitch can adapt to the row count)
+    const includeUnit = !this.shouldHideUnitColumnForLongResults(
+      showFlag,
+      showRefRange
+    );
     const resultsHTML = this.generatePrintableResultsHTML(
       showFlag,
-      true,
+      includeUnit,
       showRefRange
     );
     const rowCount = (resultsHTML.match(/<tr/g) || []).length;
     const reservedMm =
       this.estimateCommentsHeightMm(commentsRaw) + (footerLink ? 30 : 0);
     const rowPitchMm = this.getReportRowPitchMm(rowCount, reservedMm);
-    const columnWidths = this.getReportColumnWidthsPct(showFlag, showRefRange);
+    const columnWidths = this.getReportColumnWidthsPct(
+      showFlag,
+      showRefRange,
+      includeUnit
+    );
     const colgroupHTML = columnWidths
       .map((w) => `<col style="width:${w}%">`)
       .join("");
@@ -3771,7 +3815,7 @@ class ReportEntryController {
             line-height: 1.2;
           }
           .results-table tbody td:first-child { text-transform: uppercase; overflow-wrap: anywhere; }
-          .results-table tbody td.value-cell { white-space: nowrap; }
+          .results-table tbody td.value-cell { white-space: nowrap; font-size: 12pt; }
           .results-table tbody td.ref-cell { white-space: pre; }
           .results-table tbody td.flag-cell { overflow-wrap: anywhere; }
           .results-table tbody tr.group-row td { font-weight: 700; }
@@ -3888,7 +3932,7 @@ class ReportEntryController {
                   <th>RESULT</th>
                   ${showFlag ? `<th>FLAG</th>` : ""}
                   ${showRefRange ? `<th>REFERENCE VALUE</th>` : ""}
-                  <th>UNIT</th>
+                  ${includeUnit ? "<th>UNIT</th>" : ""}
                 </tr>
               </thead>
               <tbody>
@@ -3971,10 +4015,10 @@ class ReportEntryController {
           };
 
           while (
-            fontSizePt > 6 &&
+            fontSizePt > 9 &&
             measureText(fontSizePt) > availableWidth
           ) {
-            fontSizePt = Math.max(6, fontSizePt - 0.25);
+            fontSizePt = Math.max(9, fontSizePt - 0.25);
           }
           if (fontSizePt < baseSizePt) {
             cell.style.fontSize = fontSizePt + "pt";
