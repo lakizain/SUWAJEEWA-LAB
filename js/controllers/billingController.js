@@ -1139,15 +1139,19 @@ class BillingController {
 
       let bill;
       if (this.editingBillId) {
-        // Update existing bill - exclude items from bill data
-        const { items, ...billUpdateData } = billData;
-        bill = await this.billingService.updateBill(
-          this.editingBillId,
-          {
-            ...billUpdateData,
-            bill_date: new Date().toISOString(),
-          }
-        );
+        // Update existing bill - exclude items from bill data.
+        // Keep the original bill_date/created_at so an edited bill stays on its
+        // original day: it must not re-enter today's pending list and its
+        // revenue must remain on the original bill date.
+        const { items, created_at, status, ...billUpdateData } = billData;
+        const remaining = Number(billUpdateData.remaining_amount) || 0;
+        const paid = Number(billUpdateData.paid_amount) || 0;
+        const derivedStatus =
+          remaining <= 0 ? "paid" : paid > 0 ? "partial" : "pending";
+        bill = await this.billingService.updateBill(this.editingBillId, {
+          ...billUpdateData,
+          status: derivedStatus,
+        });
 
         // Update bill items separately
         if (Array.isArray(items)) {

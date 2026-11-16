@@ -505,14 +505,15 @@ class BillingService {
           total_price: item.total_price ?? quantity * unitPrice,
           is_package_component: Boolean(item.is_package_component),
         };
-        if (item.is_package_component) {
-          update.report_status = "pending";
-        }
 
         if (!existing) {
+          // Newly added items start as pending (report_status column default)
           rowsToInsert.push({ bill_id: billId, ...update });
           continue;
         }
+
+        // Existing items keep their report_status so ready reports stay ready
+        // and pending reports stay pending after a bill update.
 
         retainedItemIds.add(existing.id);
         const { error: updateError } = await this.supabase
