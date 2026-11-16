@@ -3164,6 +3164,72 @@ class ReportEntryController {
     return true;
   }
 
+  // Persist a value still sitting in the top "Value" box into the current row
+  // so validation and saving always see the latest entry.
+  commitPendingTopValueToCurrentRow() {
+    const rawValue = (this.topValueInput?.value || "").trim();
+    if (!rawValue) return;
+    if (!this.currentSubcategories?.length || !this.resultsItemsBody) return;
+    if (this.isSkippedValueEntryRowIndex(this.currentSubcategoryIndex)) return;
+
+    const sub = this.currentSubcategories[this.currentSubcategoryIndex];
+    if (!sub) return;
+
+    const row = this.resultsItemsBody.querySelector(
+      `tr[data-subcategory-id="${sub.id}"]`
+    );
+    const valueInput = row?.querySelector("td:nth-child(2) input");
+    if (!valueInput || valueInput.readOnly) return;
+
+    valueInput.value = this.limitValueInputToDecimals(
+      rawValue,
+      true,
+      this.getValueDecimalPlacesForCurrentTest()
+    );
+    valueInput.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  // Every sub category available for result entry must have a value before the
+  // report can be saved or printed.
+  validateAllSubcategoryResultsEntered() {
+    if (!this.currentSubcategories?.length || !this.resultsItemsBody)
+      return true;
+
+    this.commitPendingTopValueToCurrentRow();
+
+    const missing = [];
+    this.currentSubcategories.forEach((sub, index) => {
+      // Rows skipped for manual entry are not user editable
+      if (this.isSkippedValueEntryRowIndex(index)) return;
+
+      const row = this.resultsItemsBody.querySelector(
+        `tr[data-subcategory-id="${sub.id}"]`
+      );
+      const valueInput = row?.querySelector("td:nth-child(2) input");
+      // Auto-calculated / read-only rows are not entered manually
+      if (!valueInput || valueInput.readOnly) return;
+
+      // Blank rows (spacers) are not available for result entry
+      const name = String(sub.subcategory_name ?? "")
+        .replace(/\u00a0/g, " ")
+        .trim();
+      if (!name || /^blank row/i.test(name)) return;
+
+      if (!(valueInput.value || "").trim()) missing.push(name);
+    });
+
+    if (missing.length > 0) {
+      this.showError(
+        `Please enter results for all sub categories before saving or printing. Missing: ${missing.join(
+          ", "
+        )}.`
+      );
+      return false;
+    }
+
+    return true;
+  }
+
   // Show/hide the right-panel results table header (Bill No. / Patient / Test)
   handleUpdate() {
     if (!this.selectedBill) {
@@ -3209,6 +3275,7 @@ class ReportEntryController {
       return;
     }
     if (!this.validateRequiredRowTotal()) return;
+    if (!this.validateAllSubcategoryResultsEntered()) return;
 
     try {
       // Collect data first
@@ -3275,6 +3342,7 @@ class ReportEntryController {
       return;
     }
     if (!this.validateRequiredRowTotal()) return;
+    if (!this.validateAllSubcategoryResultsEntered()) return;
 
     // Generate the complete, self-contained report document.
     // autoPrint => the document opens the print dialog itself once its
@@ -3330,6 +3398,7 @@ class ReportEntryController {
       return;
     }
     if (!this.validateRequiredRowTotal()) return;
+    if (!this.validateAllSubcategoryResultsEntered()) return;
 
     try {
       // Collect inputs
