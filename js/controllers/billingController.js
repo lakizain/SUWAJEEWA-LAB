@@ -3248,6 +3248,33 @@ class BillingController {
         const price = parseFloat(t.price) || 0;
         const qty = parseFloat(t.qty) || 1;
         const total = price * qty;
+        if (t.itemType === "package") {
+          const packageTests = Array.isArray(t.package_tests)
+            ? t.package_tests
+            : [];
+          const componentRows = packageTests
+            .map((packageTest) => {
+              const test = packageTest.tests || packageTest;
+              return `<tr class="package-component-row">
+                  <td>${test.test_name || ""}</td>
+                  <td>${test.short_name || ""}</td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>`;
+            })
+            .join("");
+
+          return `<tr class="table-primary package-summary-row">
+              <td colspan="2">Package: ${t.test_name || ""}</td>
+              <td>${price.toFixed(2)}</td>
+              <td>${qty}</td>
+              <td>${total.toFixed(2)}</td>
+              <td><button class="btn btn-danger btn-sm" data-action="delete-test" data-index="${idx}"><i class="fas fa-trash"></i></button></td>
+            </tr>${componentRows || `<tr class="package-component-row"><td colspan="6" class="text-muted">No tests configured for this package.</td></tr>`}`;
+        }
+
         return `<tr>
             <td>${t.test_name || ""}</td>
             <td>${t.short_name || ""}</td>
