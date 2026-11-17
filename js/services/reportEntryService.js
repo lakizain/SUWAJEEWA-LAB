@@ -231,7 +231,7 @@ class ReportEntryService {
           *,
           bill_items (
             *,
-            tests (test_name, short_name, price, duration, footer_text),
+            tests (test_name, short_name, price, duration, specimen, footer_text),
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
@@ -272,7 +272,7 @@ class ReportEntryService {
           *,
           bill_items (
             *,
-            tests (test_name, short_name, price, duration, footer_text),
+            tests (test_name, short_name, price, duration, specimen, footer_text),
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
@@ -309,7 +309,7 @@ class ReportEntryService {
           *,
           bill_items (
             *,
-            tests (test_name, short_name, price, duration, footer_text),
+            tests (test_name, short_name, price, duration, specimen, footer_text),
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
@@ -344,7 +344,7 @@ class ReportEntryService {
           *,
           bill_items (
             *,
-            tests (test_name, short_name, price, duration, footer_text),
+            tests (test_name, short_name, price, duration, specimen, footer_text),
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
@@ -398,7 +398,7 @@ class ReportEntryService {
           *,
           bill_items (
             *,
-            tests (test_name, short_name, price, duration, footer_text),
+            tests (test_name, short_name, price, duration, specimen, footer_text),
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),
@@ -432,7 +432,7 @@ class ReportEntryService {
           *,
           bill_items (
             *,
-            tests (test_name, short_name, price, duration, footer_text),
+            tests (test_name, short_name, price, duration, specimen, footer_text),
             packages (package_name, price),
             test_report_headers (created_by, updated_by)
           ),

@@ -4869,18 +4869,21 @@ class ReportEntryController {
   }
 
   getSpecimenTypes(bill) {
-    // This would need to be implemented based on your specimen data structure
-    return "Blood, Urine"; // Placeholder
+    const items = bill?.bill_items || [];
+    const specimens = items
+      .map((item) => this.getSpecimenForTest(item))
+      .map((value) => (value || "").toString().trim())
+      .filter(Boolean);
+    return [...new Set(specimens)].join(", ");
   }
 
   getSpecimenForTest(testItem) {
-    // Get specimen for a specific test item
-    if (testItem.tests?.specimen) {
-      return testItem.tests.specimen;
-    } else if (testItem.packages?.specimen) {
-      return testItem.packages.specimen;
-    }
-    return "Blood"; // Default specimen
+    // Get specimen for a specific test item (from test management)
+    return (
+      testItem?.tests?.specimen ||
+      testItem?.packages?.specimen ||
+      ""
+    );
   }
 
   setLoading(loading) {
