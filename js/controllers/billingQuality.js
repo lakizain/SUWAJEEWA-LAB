@@ -41,6 +41,8 @@
     table.items { width: 100%; border-collapse: collapse; }
     table.items th { text-align: left; font-size: 10px; border-bottom: 1px solid #000; padding: 2px 0; }
     table.items td { padding: 2px 0; vertical-align: top; }
+    .package-row { font-weight: 700; }
+    .package-component td { padding-left: 3mm !important; font-size: 10px; }
     .q { width: 8mm; text-align: center; } .a { width: 20mm; text-align: right; white-space: nowrap; }
     th.q { text-align: center; } th.a { text-align: right; }
     .row { display: flex; justify-content: space-between; margin: 2px 0; }
@@ -73,8 +75,23 @@
     const kv = (k, v) => (v ? `<div class="kv"><span class="k">${k}</span><span class="v">: ${esc(v)}</span></div>` : "");
     const rows = (tests || []).map((t) => {
       const q = parseFloat(t.qty) || 1, p = parseFloat(t.price) || 0;
+      if (t.itemType === "package") {
+        const componentRows = (Array.isArray(t.package_tests) ? t.package_tests : [])
+          .map((packageTest) => {
+            const component = packageTest?.tests || packageTest;
+            const name = component?.short_name || component?.test_name || "";
+            return `<tr class="package-component"><td colspan="3">- ${esc(name)}</td></tr>`;
+          })
+          .join("");
+        return `<tr class="package-row"><td>${esc(t.test_name || t.short_name)}</td><td class="q">${q}</td><td class="a">${money(p * q)}</td></tr>${componentRows}`;
+      }
       return `<tr><td>${esc(t.short_name || t.test_name)}</td><td class="q">${q}</td><td class="a">${money(p * q)}</td></tr>`;
     }).join("");
+    const itemColumnLabel = (tests || []).some(
+      (item) => item.itemType === "package"
+    )
+      ? "Package"
+      : "Test";
     const logo = new URL("Imgs/suwajeewa_lab_loogo.png", document.baseURI).href;
 
     return `
@@ -93,7 +110,7 @@
       ${kv("Collection Site", d.company_name)}
       <hr class="sep">
       <table class="items">
-        <thead><tr><th>Test</th><th class="q">Qty</th><th class="a">Amount (Rs.)</th></tr></thead>
+        <thead><tr><th>${itemColumnLabel}</th><th class="q">Qty</th><th class="a">Amount (Rs.)</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <hr class="sep solid">

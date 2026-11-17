@@ -1779,6 +1779,43 @@ class BillingController {
       .filter(Boolean);
   }
 
+  async loadMissingPackageTests(selectedTests, centerId) {
+    const needsPackageTests = selectedTests.some(
+      (item) =>
+        item.itemType === "package" &&
+        (!Array.isArray(item.package_tests) || item.package_tests.length === 0)
+    );
+    if (!needsPackageTests) return selectedTests;
+
+    const pricingService =
+      this.pricingService || window.app.getService("pricing");
+    if (!pricingService) {
+      throw new Error("Pricing service is unavailable for printing package tests");
+    }
+
+    return Promise.all(
+      selectedTests.map(async (item) => {
+        if (
+          item.itemType !== "package" ||
+          (Array.isArray(item.package_tests) && item.package_tests.length > 0)
+        ) {
+          return item;
+        }
+
+        const packageData = await pricingService.getResolvedPackageById(
+          item.id,
+          centerId
+        );
+        return {
+          ...item,
+          package_tests: Array.isArray(packageData?.package_tests)
+            ? packageData.package_tests
+            : [],
+        };
+      })
+    );
+  }
+
   buildBillDataForPrint(bill) {
     return {
       patient_title: bill.patient_title,
@@ -1809,11 +1846,15 @@ class BillingController {
         printContext.billData.center_id ||
         this.getSelectedCenterId() ||
         this.billingService?.getUserCenterId();
+      const selectedTests = await this.loadMissingPackageTests(
+        printContext.selectedTests || [],
+        centerId
+      );
 
       return {
         bill,
         billData: printContext.billData,
-        selectedTests: printContext.selectedTests || [],
+        selectedTests,
         centerInfo: await this.getCenterContactInfo(centerId),
       };
     }
@@ -1834,11 +1875,15 @@ class BillingController {
         centerFromBill && (centerFromBill.phone || centerFromBill.address)
           ? centerFromBill
           : await this.getCenterContactInfo(resolvedBill.center_id);
+      const selectedTests = await this.loadMissingPackageTests(
+        this.convertBillItemsToSelectedTests(billItems),
+        resolvedBill.center_id
+      );
 
       return {
         bill: resolvedBill,
         billData: this.buildBillDataForPrint(resolvedBill),
-        selectedTests: this.convertBillItemsToSelectedTests(billItems),
+        selectedTests,
         centerInfo,
       };
     }
@@ -1849,11 +1894,15 @@ class BillingController {
       billData.center_id ||
       this.getSelectedCenterId() ||
       this.billingService?.getUserCenterId();
+    const selectedTests = await this.loadMissingPackageTests(
+      [...this.selectedTests],
+      centerId
+    );
 
     return {
       bill,
       billData,
-      selectedTests: [...this.selectedTests],
+      selectedTests,
       centerInfo: await this.getCenterContactInfo(centerId),
     };
   }
