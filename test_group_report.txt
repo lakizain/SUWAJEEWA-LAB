@@ -61,7 +61,7 @@ TESTS WITH SUBCATEGORIES (96 tests)
    - Height
    - Weight
    - BMI
-   - Ideal Weight Range
+   - Ideal Weight
 
 16. C - REACTIVE PROTIEN (CRP) (CRP)
    - C REACTIVE PROTEIN

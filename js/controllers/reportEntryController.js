@@ -1976,7 +1976,7 @@ class ReportEntryController {
           this._autoCalcLock = false;
         }
       },
-      // 3b5166cc...: BMI test — ROW1=Age, ROW2=Height, ROW3=Weight; ROW4=BMI; ROW5=Ideal Weight Range
+      // 3b5166cc...: BMI test — ROW1=Age, ROW2=Height, ROW3=Weight; ROW4=BMI; ROW5=Ideal Weight
       "3b5166cc-755f-433e-833c-7e8c746c13ce": (inputs) => {
         const parse = (el) => {
           const raw = (el?.value || "").trim();
@@ -2005,20 +2005,84 @@ class ReportEntryController {
             inputs[iBmi].value = this.formatValueForInput(bmi, true, calcDp);
           }
 
-          // Ideal weight range from normal BMI 18.5–24.9 (kg)
-          let idealRange = "";
+          // Ideal weight uses a target BMI of 22 (kg).
+          let idealWeight = "";
           if (heightM != null && heightM > 0) {
-            const fmt = (v) => this.formatValueForInput(v, true, calcDp);
-            const minW = 18.5 * heightM * heightM;
-            const maxW = 24.9 * heightM * heightM;
-            idealRange = `${fmt(minW)} - ${fmt(maxW)}`;
+            idealWeight = this.formatValueForInput(
+              22 * heightM * heightM,
+              true,
+              calcDp
+            );
           }
-          if (inputs[iIdeal]) inputs[iIdeal].value = idealRange;
+          if (inputs[iIdeal]) inputs[iIdeal].value = idealWeight;
 
           [iBmi, iIdeal].forEach((idx) => {
             const el = inputs[idx];
             if (el) el.dispatchEvent(new Event("input", { bubbles: true }));
           });
+        } finally {
+          this._autoCalcLock = false;
+        }
+      },
+      // c20f8797... (EGFR): ROW1 = SERUM CREATININE; ROW2 = ESTIMATED GFR.
+      // Uses the 2021 CKD-EPI creatinine equation (race-free) with the
+      // patient's age and sex taken from the report header.
+      "c20f8797-54a9-42e1-a157-a7ba988e7fc5": (inputs) => {
+        const parse = (el) => {
+          const raw = (el?.value || "").trim();
+          const n = raw === "" ? null : Number(raw);
+          return Number.isNaN(n) ? null : n;
+        };
+
+        if (!Array.isArray(inputs) || inputs.length < 2) return;
+
+        const iCr = 0, iEgfr = 1;
+        const scr = parse(inputs[iCr]);
+
+        // Age in years: prefer the selected bill, fall back to the age field
+        const bill = this.selectedBill;
+        let ageYears = null;
+        if (bill && bill.patient_age_years != null && bill.patient_age_years !== "") {
+          const y = Number(bill.patient_age_years);
+          if (Number.isFinite(y)) ageYears = y;
+        }
+        if (ageYears == null) {
+          const rawAge = (this.ageInput?.value || "").trim();
+          const match = rawAge.match(/(\d+)\s*y/i);
+          if (match) ageYears = Number(match[1]);
+          else {
+            const n = Number(rawAge);
+            if (Number.isFinite(n)) ageYears = n;
+          }
+        }
+
+        // Sex from the header gender field ("Male"/"Female"/"M"/"F")
+        const gender = (this.genderInput?.value || "").toLowerCase().trim();
+        const isFemale = gender.startsWith("f");
+
+        if (this._autoCalcLock) return;
+        this._autoCalcLock = true;
+        try {
+          let egfr = null;
+          if (scr != null && scr > 0 && ageYears != null) {
+            const kappa = isFemale ? 0.7 : 0.9;
+            const alpha = isFemale ? -0.241 : -0.302;
+            const ratio = scr / kappa;
+            egfr =
+              142 *
+              Math.pow(Math.min(ratio, 1), alpha) *
+              Math.pow(Math.max(ratio, 1), -1.2) *
+              Math.pow(0.9938, ageYears) *
+              (isFemale ? 1.012 : 1);
+          }
+          // eGFR is conventionally reported as a whole number
+          if (inputs[iEgfr]) {
+            inputs[iEgfr].value = this.formatValueForInput(egfr, true, 0);
+          }
+
+          if (inputs[iEgfr]) {
+            inputs[iEgfr].dispatchEvent(new Event("input", { bubbles: true }));
+          }
         } finally {
           this._autoCalcLock = false;
         }
@@ -2048,6 +2112,7 @@ class ReportEntryController {
       "ebc9b307-ba15-4c2d-912b-7b82a179afe9": [0, 1],
       "3b5166cc-755f-433e-833c-7e8c746c13ce": [1, 2],
       "456fc82b-5031-46b4-9143-ad38ee788100": [0, 1],
+      "c20f8797-54a9-42e1-a157-a7ba988e7fc5": [0],
     };
 
     // Recalculate when source rows change
@@ -2065,8 +2130,9 @@ class ReportEntryController {
       "ba643e33-6ec9-4de7-b9d2-e266102cbb40": [2, 3, 6],  // rows 3,4,7
       "9517c4cb-95fa-4aa5-86bd-2babfe6d59ce": [2, 3],     // rows 3,4
       "ebc9b307-ba15-4c2d-912b-7b82a179afe9": [2, 3],     // rows 3,4
-      "3b5166cc-755f-433e-833c-7e8c746c13ce": [3, 4],     // rows 4,5: BMI, Ideal Weight Range
+      "3b5166cc-755f-433e-833c-7e8c746c13ce": [3, 4],     // rows 4,5: BMI, Ideal Weight
       "456fc82b-5031-46b4-9143-ad38ee788100": [2],        // row 3
+      "c20f8797-54a9-42e1-a157-a7ba988e7fc5": [1],        // row 2: eGFR
     };
 
     const outputs = outputsByTest[testId] || [];
@@ -2079,6 +2145,21 @@ class ReportEntryController {
       el.addEventListener("input", runCalc);
       el.addEventListener("change", runCalc);
     });
+
+    // EGFR also depends on the header age/sex: keep a single hook on those
+    // fields (they persist across re-renders) that calls the latest runCalc.
+    if (testId === "c20f8797-54a9-42e1-a157-a7ba988e7fc5") {
+      this._egfrRunCalc = runCalc;
+      [this.ageInput, this.genderInput].forEach((el) => {
+        if (!el || el.dataset.egfrCalcHook) return;
+        el.dataset.egfrCalcHook = "1";
+        const handler = () => {
+          if (typeof this._egfrRunCalc === "function") this._egfrRunCalc();
+        };
+        el.addEventListener("input", handler);
+        el.addEventListener("change", handler);
+      });
+    }
 
     // Initial calculation (in case values pre-filled)
     runCalc();
