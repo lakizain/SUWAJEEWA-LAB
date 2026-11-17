@@ -1734,8 +1734,23 @@ class BillingController {
   }
 
   convertBillItemsToSelectedTests(billItems) {
+    const componentsByPackage = new Map();
+    (billItems || [])
+      .filter((item) => item.is_package_component && item.package_id)
+      .forEach((item) => {
+        const packageId = String(item.package_id);
+        const components = componentsByPackage.get(packageId) || [];
+        components.push({
+          test_id: item.test_id || item.tests?.id,
+          tests: item.tests,
+        });
+        componentsByPackage.set(packageId, components);
+      });
+
     return (billItems || [])
       .map((item) => {
+        if (item.is_package_component) return null;
+
         if (item.tests) {
           return {
             id: item.tests.id,
@@ -1755,6 +1770,8 @@ class BillingController {
             price: parseFloat(item.unit_price) || 0,
             qty: item.quantity || 1,
             itemType: "package",
+            package_tests:
+              componentsByPackage.get(String(item.packages.id)) || [],
           };
         }
         return null;
@@ -1803,7 +1820,9 @@ class BillingController {
 
     if (bill?.id && this.billingService?.isSupabaseAvailable()) {
       const fullBill = await this.billingService.getBillById(bill.id);
-      const billItems = await this.billingService.getBillItems(bill.id);
+      const billItems = await this.billingService.getBillItems(bill.id, {
+        includeComponents: true,
+      });
       const resolvedBill = fullBill || bill;
       const centerFromBill = resolvedBill.centers && {
         center_name: resolvedBill.centers.center_name,
@@ -2168,6 +2187,14 @@ class BillingController {
             
             .test-price {
               font-weight: bold;
+            }
+
+            .package-print-row .test-name {
+              font-weight: bold;
+            }
+
+            .package-component-print-row .test-name {
+              padding-left: 8px;
             }
             
             .summary-section {
@@ -3491,14 +3518,35 @@ class BillingController {
       <!-- Tests Section -->
       <div class="tests-section">
         ${selectedTests
-          .map(
-            (test) => `
-          <div class="test-row">
-            <span class="test-name">${test.short_name || test.test_name}</span>
-            <span class="test-price">Rs. ${test.price.toFixed(2)}</span>
-          </div>
-        `
-          )
+          .map((test) => {
+            const price = parseFloat(test.price) || 0;
+            if (test.itemType === "package") {
+              const componentRows = (test.package_tests || [])
+                .map((packageTest) => {
+                  const component = packageTest.tests || packageTest;
+                  const testName = this.escapeHistoryText(
+                    component.short_name || component.test_name || ""
+                  );
+                  return `<div class="test-row package-component-print-row">
+                    <span class="test-name">${testName}</span>
+                    <span class="test-price"></span>
+                  </div>`;
+                })
+                .join("");
+
+              return `<div class="test-row package-print-row">
+                <span class="test-name">Package: ${this.escapeHistoryText(
+                  test.test_name || ""
+                )}</span>
+                <span class="test-price">Rs. ${price.toFixed(2)}</span>
+              </div>${componentRows}`;
+            }
+
+            return `<div class="test-row">
+              <span class="test-name">${test.short_name || test.test_name}</span>
+              <span class="test-price">Rs. ${price.toFixed(2)}</span>
+            </div>`;
+          })
           .join("")}
       </div>
       
@@ -3830,6 +3878,14 @@ class BillingController {
             min-width: 60px;
             margin: 0;
             padding: 0;
+          }
+
+          .package-print-row .test-name {
+            font-weight: bold;
+          }
+
+          .package-component-print-row .test-name {
+            padding-left: 8px;
           }
           
           .summary-section {
