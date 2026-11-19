@@ -207,16 +207,19 @@
                             <div class="row">
                                 <div class="col-12 mb-3">
                                     <label class="form-label">PGID</label>
-                                    <input type="text" class="form-control" value="Auto-generated" readonly>
+                                    <input type="text" class="form-control" id="package-pgid-input"
+                                        value="Auto-generated" readonly>
                                     <small class="text-muted">PGID will be automatically generated</small>
                                 </div>
                                 <div class="col-12 mb-3">
                                     <label class="form-label">Package Name *</label>
-                                    <input type="text" class="form-control" placeholder="Enter package name">
+                                    <input type="text" class="form-control" id="package-name-input"
+                                        placeholder="Enter package name">
                                 </div>
                                 <div class="col-12 mb-3">
                                     <label class="form-label">Price *</label>
-                                    <input type="text" class="form-control" placeholder="Enter package price">
+                                    <input type="text" class="form-control" id="package-price-input"
+                                        placeholder="Enter package price">
                                 </div>
                             </div>
                         </div>
@@ -234,9 +237,15 @@
                                 <i class="fas fa-list"></i>
                                 Package List
                             </div>
-                            <button class="btn btn-primary btn-sm">
+                            <button class="btn btn-primary btn-sm" id="refresh-btn">
                                 <i class="fas fa-sync-alt"></i> Refresh
                             </button>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="package-search-input">Search</label>
+                            <input type="text" class="form-control" id="package-search-input"
+                                placeholder="Search by Package Name or PGID">
                         </div>
 
                         <div class="table-responsive">
@@ -249,75 +258,11 @@
                                         <th style="background: #343a40; color: white;">ACTION</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="package-table-body">
                                     <tr>
-                                        <td><span class="badge-pgid">PGID005</span></td>
-                                        <td>
-                                            <div>PHI PACK</div>
-                                            <small class="text-muted">Created: 8/3/2025</small>
-                                        </td>
-                                        <td><span class="badge-price">Rs. 2000.00</span></td>
-                                        <td>
-                                            <button class="btn btn-warning btn-sm btn-update"><i
-                                                    class="fas fa-edit"></i></button>
-                                            <button class="btn btn-danger btn-sm btn-delete"><i
-                                                    class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="badge-pgid">PGID006</span></td>
-                                        <td>
-                                            <div>TEST PACK</div>
-                                            <small class="text-muted">Created: 8/3/2025</small>
-                                        </td>
-                                        <td><span class="badge-price">Rs. 3000.00</span></td>
-                                        <td>
-                                            <button class="btn btn-warning btn-sm btn-update"><i
-                                                    class="fas fa-edit"></i></button>
-                                            <button class="btn btn-danger btn-sm btn-delete"><i
-                                                    class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="badge-pgid">PGID007</span></td>
-                                        <td>
-                                            <div>TEST PACK</div>
-                                            <small class="text-muted">Created: 8/4/2025</small>
-                                        </td>
-                                        <td><span class="badge-price">Rs. 3000.00</span></td>
-                                        <td>
-                                            <button class="btn btn-warning btn-sm btn-update"><i
-                                                    class="fas fa-edit"></i></button>
-                                            <button class="btn btn-danger btn-sm btn-delete"><i
-                                                    class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="badge-pgid">PGID008</span></td>
-                                        <td>
-                                            <div>FULL BODY CHECK-UP</div>
-                                            <small class="text-muted">Created: 8/7/2025</small>
-                                        </td>
-                                        <td><span class="badge-price">Rs. 2700.00</span></td>
-                                        <td>
-                                            <button class="btn btn-warning btn-sm btn-update"><i
-                                                    class="fas fa-edit"></i></button>
-                                            <button class="btn btn-danger btn-sm btn-delete"><i
-                                                    class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="badge-pgid">PGID009</span></td>
-                                        <td>
-                                            <div>MEDICAL CHECK UP NALANDA</div>
-                                            <small class="text-muted">Created: 8/7/2025</small>
-                                        </td>
-                                        <td><span class="badge-price">Rs. 2100.00</span></td>
-                                        <td>
-                                            <button class="btn btn-warning btn-sm btn-update"><i
-                                                    class="fas fa-edit"></i></button>
-                                            <button class="btn btn-danger btn-sm btn-delete"><i
-                                                    class="fas fa-trash"></i></button>
+                                        <td colspan="4" class="empty-state">
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                            <div>Loading packages...</div>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -325,13 +270,13 @@
                         </div>
 
                         <div class="mt-3 d-flex gap-2">
-                            <button class="btn btn-primary">
+                            <button class="btn btn-primary" id="create-new-btn">
                                 <i class="fas fa-plus"></i> Create New
                             </button>
-                            <button class="btn btn-warning">
+                            <button class="btn btn-warning" id="update-selected-btn">
                                 <i class="fas fa-edit"></i> Update
                             </button>
-                            <button class="btn btn-danger">
+                            <button class="btn btn-danger" id="delete-selected-btn">
                                 <i class="fas fa-trash"></i> Delete
                             </button>
                         </div>
@@ -350,120 +295,149 @@
     <script src="js/services/centerService.js"></script>
     <script src="js/services/packageService.js"></script>
     <script src="js/services/referenceService.js"></script>
+    <script src="js/services/reportsService.js"></script>
     <script src="js/app.js"></script>
     <script>
         function waitForAppAndInit() {
             if (window.app && window.app.debounce && window.app.showWarning) {
-                let selectedPackageId = null;
-                const pgidInput = document.querySelector('input[readonly]');
-                const nameInput = document.querySelector('input[placeholder="Enter package name"]');
-                const priceInput = document.querySelector('input[placeholder="Enter package price"]');
-                const createBtn = document.querySelector('.panel .btn-primary'); // left panel create
-                const saveBtn = document.querySelector('.panel .btn-success'); // left panel save
-                const deleteBtn = document.querySelector('.panel .btn-danger'); // right panel delete
-                const updateBtn = document.querySelector('.panel .btn-warning'); // right panel update
-                const packageTableBody = document.querySelectorAll('table.table-bordered')[1].querySelector('tbody');
-                const refreshBtn = document.querySelector('.panel-header .btn.btn-primary.btn-sm');
+                // --- Element references (stable ids, no fragile selectors) ---
+                const pgidInput = document.getElementById('package-pgid-input');
+                const nameInput = document.getElementById('package-name-input');
+                const priceInput = document.getElementById('package-price-input');
+                const packageForm = document.getElementById('package-form');
+                const savePackageBtn = document.getElementById('save-package-btn');
+                const createNewBtn = document.getElementById('create-new-btn');
+                const updateSelectedBtn = document.getElementById('update-selected-btn');
+                const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+                const refreshBtn = document.getElementById('refresh-btn');
+                const packageSearchInput = document.getElementById('package-search-input');
+                const packageTableBody = document.getElementById('package-table-body');
 
-                // Helper: Clear form
+                const testSearchInput = document.getElementById('test-search-input');
+                const testSearchResultsDiv = document.getElementById('test-search-results');
+                const addTestToListBtn = document.getElementById('add-test-to-list-btn');
+                const selectedTestsList = document.getElementById('selected-tests-list');
+
+                // --- State ---
+                let selectedPackageId = null;
+                let selectedTests = [];
+                let allPackages = [];
+                let testSearchResults = [];
+                let selectedTestToAdd = null;
+                let isSaving = false;
+
+                // Keep the Save/Update button label in sync with the current mode
+                function setSaveButtonLabel() {
+                    savePackageBtn.innerHTML = selectedPackageId
+                        ? '<i class="fas fa-edit"></i> Update'
+                        : '<i class="fas fa-folder"></i> Save';
+                }
+
+                // Helper: Clear form (create mode)
                 function clearForm() {
                     selectedPackageId = null;
                     pgidInput.value = 'Auto-generated';
                     nameInput.value = '';
                     priceInput.value = '';
-                    // Use id selector for Save button
-                    document.getElementById('save-package-btn').textContent = 'Save';
+                    selectedTests = [];
+                    renderSelectedTests();
+                    setSaveButtonLabel();
                 }
 
                 // Helper: Fill form for edit
                 function fillForm(pkg) {
                     selectedPackageId = pkg.id;
-                    pgidInput.value = pkg.pgid;
-                    nameInput.value = pkg.package_name;
-                    priceInput.value = pkg.price;
-                    document.getElementById('save-package-btn').textContent = 'Update';
+                    pgidInput.value = pkg.pgid || 'Auto-generated';
+                    nameInput.value = pkg.package_name || '';
+                    priceInput.value = pkg.price ?? '';
                     // Load tests for this package
-                    if (pkg.package_tests && Array.isArray(pkg.package_tests)) {
-                        selectedTests = pkg.package_tests
+                    selectedTests = Array.isArray(pkg.package_tests)
+                        ? pkg.package_tests
                             .map(pt => pt.tests && pt.test_id
                                 ? { ...pt.tests, id: pt.test_id }
                                 : null)
-                            .filter(Boolean);
-                    } else {
-                        selectedTests = [];
-                    }
+                            .filter(Boolean)
+                        : [];
                     renderSelectedTests();
+                    setSaveButtonLabel();
                 }
 
-                // Helper: Render package list
-                async function renderPackages(searchTerm = '') {
-                    packageTableBody.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
-                    let pkgs = [];
+                // --- Package list (load + search + render + delete) ---
+                async function loadPackages() {
+                    packageTableBody.innerHTML = `<tr><td colspan="4" class="empty-state">
+                        <i class="fas fa-spinner fa-spin"></i><div>Loading packages...</div></td></tr>`;
                     try {
-                        if (searchTerm) {
-                            pkgs = await window.app.services.package.searchPackages(searchTerm);
-                        } else {
-                            pkgs = await window.app.services.package.getAllPackages();
-                        }
-                    } catch (e) {
+                        allPackages = await window.app.services.package.getAllPackages();
+                    } catch (err) {
+                        allPackages = [];
                         window.app.showError('Failed to load packages');
-                        packageTableBody.innerHTML = '<tr><td colspan="3">Error loading data</td></tr>';
-                        return;
                     }
-                    if (!pkgs || pkgs.length === 0) {
-                        packageTableBody.innerHTML = '<tr><td colspan="3">No packages found</td></tr>';
-                        return;
-                    }
+                    renderPackages();
+                }
+
+                // Search filter (client-side, matches package name or PGID)
+                function getFilteredPackages() {
+                    const term = (packageSearchInput.value || '').trim().toLowerCase();
+                    if (!term) return allPackages;
+                    const words = term.split(/\s+/).filter(Boolean);
+                    return allPackages.filter(pkg => {
+                        const haystack = `${pkg.package_name || ''} ${pkg.pgid || ''}`.toLowerCase();
+                        return words.every(word => haystack.includes(word));
+                    });
+                }
+
+                function renderPackages() {
+                    const pkgs = getFilteredPackages();
                     packageTableBody.innerHTML = '';
+                    if (!pkgs.length) {
+                        packageTableBody.innerHTML = `<tr><td colspan="4" class="empty-state">
+                            <i class="fas fa-info-circle"></i><div>No packages found</div></td></tr>`;
+                        return;
+                    }
                     pkgs.forEach(pkg => {
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
-                        <td><span class="badge-pgid">${pkg.pgid}</span></td>
-                        <td>
-                            <div>${pkg.package_name}</div>
-                            <small class="text-muted">Created: ${window.app.formatDate(pkg.created_at)}</small>
-                        </td>
-                        <td><span class="badge-price">Rs. ${pkg.price?.toFixed(2) ?? '0.00'}</span></td>
-                        <td>
-                            <button class="btn btn-warning btn-sm btn-update"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-danger btn-sm btn-delete"><i class="fas fa-trash"></i></button>
-                        </td>
-                    `;
+                            <td><span class="badge-pgid">${pkg.pgid || '-'}</span></td>
+                            <td>
+                                <div>${pkg.package_name || '-'}</div>
+                                <small class="text-muted">Created: ${pkg.created_at ? window.app.formatDate(pkg.created_at) : '-'}</small>
+                            </td>
+                            <td><span class="badge-price">Rs. ${Number(pkg.price || 0).toFixed(2)}</span></td>
+                            <td>
+                                <button class="btn btn-warning btn-sm btn-update" type="button"><i class="fas fa-edit"></i></button>
+                                <button class="btn btn-danger btn-sm btn-delete" type="button"><i class="fas fa-trash"></i></button>
+                            </td>
+                        `;
                         tr.querySelector('.btn-update').addEventListener('click', (e) => {
                             e.stopPropagation();
                             fillForm(pkg);
                         });
-                        tr.querySelector('.btn-delete').addEventListener('click', async (e) => {
+                        tr.querySelector('.btn-delete').addEventListener('click', (e) => {
                             e.stopPropagation();
-                            if (confirm('Are you sure you want to delete this package?')) {
-                                try {
-                                    await window.app.services.package.deletePackage(pkg.id);
-                                    window.app.showSuccess('Package deleted');
-                                    clearForm();
-                                    renderPackages();
-                                } catch (e) {
-                                    window.app.showError(e.message || 'Delete failed');
-                                }
-                            }
+                            handleDelete(pkg);
                         });
                         packageTableBody.appendChild(tr);
                     });
                 }
 
-                // Create New
-                createBtn.addEventListener('click', () => {
+                // Delete a package (single entry point used by row + toolbar buttons)
+                async function handleDelete(pkg) {
+                    if (!pkg || !pkg.id) return;
+                    if (!confirm(`Are you sure you want to delete "${pkg.package_name || 'this package'}"?`)) return;
+                    try {
+                        await window.app.services.package.deletePackage(pkg.id);
+                        window.app.showSuccess('Package deleted');
+                        if (selectedPackageId === pkg.id) clearForm();
+                        await loadPackages();
+                    } catch (err) {
+                        window.app.showError(err.message || 'Delete failed');
+                    }
+                }
+
+                // Create New (toolbar)
+                createNewBtn.addEventListener('click', () => {
                     clearForm();
                 });
-
-                let selectedTests = [];
-                let testSearchResults = [];
-                const testSearchInput = document.getElementById('test-search-input');
-                const testSearchResultsDiv = document.getElementById('test-search-results');
-                const addTestToListBtn = document.getElementById('add-test-to-list-btn');
-                const selectedTestsList = document.getElementById('selected-tests-list');
-                const savePackageBtn = document.getElementById('save-package-btn');
-                let selectedTestToAdd = null;
-                let isSaving = false;
 
                 // Debounced search
                 const searchTests = window.app.debounce(async function () {
@@ -518,12 +492,10 @@
                     }
                     selectedTests.push(selectedTestToAdd);
                     renderSelectedTests();
-                    // Only clear test search input and results
+                    // Only reset the test-search UI, never the package name/price fields
                     testSearchInput.value = '';
                     testSearchResultsDiv.innerHTML = '';
                     selectedTestToAdd = null;
-                    // DO NOT clear nameInput.value or priceInput.value here!
-                    // DO NOT call clearForm() here!
                 });
 
                 function renderSelectedTests() {
@@ -552,15 +524,18 @@
                     });
                 }
 
-                // JS: handle form submit for saving
-                const packageForm = document.getElementById('package-form');
+                // --- Insert / Update (form submit) ---
                 packageForm.addEventListener('submit', async function (e) {
                     e.preventDefault();
                     if (isSaving) return;
                     const name = nameInput.value.trim();
-                    const price = priceInput.value.trim();
-                    if (!name || !price) {
-                        window.app.showWarning('Package name and price are required');
+                    const price = parseFloat(priceInput.value.trim());
+                    if (!name) {
+                        window.app.showWarning('Package name is required');
+                        return;
+                    }
+                    if (isNaN(price) || price < 0) {
+                        window.app.showWarning('Please enter a valid price');
                         return;
                     }
                     if (selectedTests.length === 0) {
@@ -575,60 +550,66 @@
                             // Update
                             await window.app.services.package.updatePackage(selectedPackageId, {
                                 package_name: name,
-                                price: parseFloat(price)
+                                price: price
                             });
-                            await window.app.services.package.updatePackageTests(selectedPackageId, selectedTests.map(t => t.id));
+                            await window.app.services.package.updatePackageTests(
+                                selectedPackageId,
+                                selectedTests.map(t => t.id)
+                            );
                             window.app.showSuccess('Package updated');
                         } else {
                             // Create
                             await window.app.services.package.createPackage({
                                 package_name: name,
-                                price: parseFloat(price),
+                                price: price,
                                 tests: selectedTests.map(t => t.id)
                             });
                             window.app.showSuccess('Package created');
                         }
                         clearForm();
-                        renderPackages();
-                        selectedTests = [];
-                        renderSelectedTests();
-                    } catch (e) {
-                        window.app.showError(e.message || 'Save failed');
+                        await loadPackages();
+                    } catch (err) {
+                        window.app.showError(err.message || 'Save failed');
                     } finally {
                         isSaving = false;
                         savePackageBtn.disabled = false;
-                        savePackageBtn.innerHTML = '<i class="fas fa-folder"></i> Save';
+                        setSaveButtonLabel();
                     }
                 });
 
-                // Delete
-                deleteBtn.addEventListener('click', async () => {
-                    if (!selectedPackageId) return;
-                    if (confirm('Are you sure you want to delete this package?')) {
-                        try {
-                            await window.app.services.package.deletePackage(selectedPackageId);
-                            window.app.showSuccess('Package deleted');
-                            clearForm();
-                            renderPackages();
-                        } catch (e) {
-                            window.app.showError(e.message || 'Delete failed');
-                        }
+                // Delete (toolbar)
+                deleteSelectedBtn.addEventListener('click', () => {
+                    if (!selectedPackageId) {
+                        window.app.showWarning('Select a package from the list to delete');
+                        return;
                     }
+                    const pkg = allPackages.find(p => p.id === selectedPackageId);
+                    handleDelete(pkg || { id: selectedPackageId, package_name: nameInput.value.trim() });
                 });
 
-                // Update (right panel)
-                updateBtn.addEventListener('click', async () => {
-                    if (!selectedPackageId) return;
-                    saveBtn.click();
+                // Update (toolbar) - submits the loaded package for update
+                updateSelectedBtn.addEventListener('click', () => {
+                    if (!selectedPackageId) {
+                        window.app.showWarning('Select a package from the list to update');
+                        return;
+                    }
+                    if (typeof packageForm.requestSubmit === 'function') {
+                        packageForm.requestSubmit();
+                    } else {
+                        packageForm.dispatchEvent(new Event('submit', { cancelable: true }));
+                    }
                 });
 
                 // Refresh
                 refreshBtn.addEventListener('click', () => {
-                    renderPackages();
+                    loadPackages();
                 });
 
+                // Search
+                packageSearchInput.addEventListener('input', renderPackages);
+
                 // Initial load
-                renderPackages();
+                loadPackages();
             } else {
                 setTimeout(waitForAppAndInit, 50);
             }
@@ -636,21 +617,6 @@
         document.addEventListener('DOMContentLoaded', waitForAppAndInit);
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-    <!-- Supabase CDN -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-
-    <!-- Load configuration and services first -->
-    <script src="config/supabase.js"></script>
-    <script src="js/services/billingService.js"></script>
-    <script src="js/services/testService.js"></script>
-    <script src="js/services/referenceService.js"></script>
-    <script src="js/services/centerService.js"></script>
-    <script src="js/services/packageService.js"></script>
-    <script src="js/services/reportsService.js"></script>
-
-    <!-- Load main app -->
-    <script src="js/app.js"></script>
 </body>
 
 </html>

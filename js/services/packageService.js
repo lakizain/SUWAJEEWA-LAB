@@ -56,7 +56,7 @@ class PackageService {
         pgid: pgid,
         package_name: packageData.package_name,
         price: parseFloat(packageData.price),
-        is_active: packageData.is_active || true,
+        is_active: packageData.is_active ?? true,
       };
       const { data: pkg, error } = await this.supabase
         .from("packages")
