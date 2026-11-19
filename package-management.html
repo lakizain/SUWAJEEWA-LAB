@@ -367,7 +367,9 @@
                     packageTableBody.innerHTML = `<tr><td colspan="4" class="empty-state">
                         <i class="fas fa-spinner fa-spin"></i><div>Loading packages...</div></td></tr>`;
                     try {
-                        allPackages = await window.app.services.package.getAllPackages();
+                        const pkgs = await window.app.services.package.getAllPackages();
+                        // Hide inactive (soft-deleted) packages from the list
+                        allPackages = (pkgs || []).filter(p => p.is_active !== false);
                     } catch (err) {
                         allPackages = [];
                         window.app.showError('Failed to load packages');
@@ -425,8 +427,12 @@
                     if (!pkg || !pkg.id) return;
                     if (!confirm(`Are you sure you want to delete "${pkg.package_name || 'this package'}"?`)) return;
                     try {
-                        await window.app.services.package.deletePackage(pkg.id);
-                        window.app.showSuccess('Package deleted');
+                        const result = await window.app.services.package.deletePackage(pkg.id);
+                        if (result && result.deactivated) {
+                            window.app.showSuccess(`"${pkg.package_name || 'Package'}" removed from the list. It is kept for existing bills.`);
+                        } else {
+                            window.app.showSuccess('Package deleted');
+                        }
                         if (selectedPackageId === pkg.id) clearForm();
                         await loadPackages();
                     } catch (err) {

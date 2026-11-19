@@ -337,48 +337,44 @@ class PackageService {
   }
 
   // Delete package
+  // - If the package is not used anywhere: remove it permanently.
+  // - If it is referenced by existing bills: keep the bill history intact and
+  //   simply deactivate the package so it disappears from the active list.
   async deletePackage(packageId) {
     try {
-      // Guard: packages referenced by existing bills must be kept as-is,
-      // otherwise historical bill items lose their package link/name.
+      // Check whether the package is used in any existing bill
       const { count, error: refError } = await this.supabase
         .from("bill_items")
         .select("id", { count: "exact", head: true })
         .eq("package_id", packageId);
       if (refError) throw refError;
+
       if (count && count > 0) {
-        const { data: pkg } = await this.supabase
-          .from("packages")
-          .select("package_name")
-          .eq("id", packageId)
-          .maybeSingle();
-        const label = pkg?.package_name ? `"${pkg.package_name}"` : "This package";
-        throw new Error(
-          `${label} is used in ${count} existing bill item(s) and cannot be deleted. Existing bills are kept unchanged.`
-        );
+        // Used in bills -> keep the package (and its bill history) but hide it
+        await this.updatePackage(packageId, { is_active: false });
+        return { deleted: false, deactivated: true, billCount: count };
       }
 
-      // First delete package tests
+      // Not used anywhere -> permanent delete
       await this.supabase
         .from("package_tests")
         .delete()
         .eq("package_id", packageId);
 
-      // Then delete the package
       const { error } = await this.supabase
         .from("packages")
         .delete()
         .eq("id", packageId);
 
       if (error) {
+        // Fallback: foreign key violation (e.g. referenced elsewhere)
         if (error.code === "23503") {
-          throw new Error(
-            "This package is used in existing bills and cannot be deleted. Existing bills are kept unchanged."
-          );
+          await this.updatePackage(packageId, { is_active: false });
+          return { deleted: false, deactivated: true, billCount: 0 };
         }
         throw error;
       }
-      return true;
+      return { deleted: true };
     } catch (error) {
       console.error("Error deleting package:", error);
       throw error;
