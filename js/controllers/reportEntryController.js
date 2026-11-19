@@ -3219,8 +3219,10 @@ class ReportEntryController {
     const testId = this.selectedTestItem?.tests?.id || this.selectedTestItem?.test_id;
     if (testId !== "6eccf0e5-4a62-4504-8639-f8ab7d0723f6") return true;
 
-    const values = [2, 3, 4, 5, 6].map((index) => {
-      const subcategory = this.currentSubcategories?.[index];
+    const requiredSubcategories = [2, 3, 4, 5, 6]
+      .map((index) => this.currentSubcategories?.[index])
+      .filter((subcategory) => !subcategory?.is_bold);
+    const values = requiredSubcategories.map((subcategory) => {
       const row = subcategory && this.resultsItemsBody?.querySelector(
         `tr[data-subcategory-id="${subcategory.id}"]`
       );
@@ -3280,6 +3282,9 @@ class ReportEntryController {
 
     const missing = [];
     this.currentSubcategories.forEach((sub, index) => {
+      // Bold rows are section headings and do not require a result value.
+      if (sub.is_bold) return;
+
       // Rows skipped for manual entry are not user editable
       if (this.isSkippedValueEntryRowIndex(index)) return;
 
