@@ -339,6 +339,25 @@ class PackageService {
   // Delete package
   async deletePackage(packageId) {
     try {
+      // Guard: packages referenced by existing bills must be kept as-is,
+      // otherwise historical bill items lose their package link/name.
+      const { count, error: refError } = await this.supabase
+        .from("bill_items")
+        .select("id", { count: "exact", head: true })
+        .eq("package_id", packageId);
+      if (refError) throw refError;
+      if (count && count > 0) {
+        const { data: pkg } = await this.supabase
+          .from("packages")
+          .select("package_name")
+          .eq("id", packageId)
+          .maybeSingle();
+        const label = pkg?.package_name ? `"${pkg.package_name}"` : "This package";
+        throw new Error(
+          `${label} is used in ${count} existing bill item(s) and cannot be deleted. Existing bills are kept unchanged.`
+        );
+      }
+
       // First delete package tests
       await this.supabase
         .from("package_tests")
@@ -351,7 +370,14 @@ class PackageService {
         .delete()
         .eq("id", packageId);
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === "23503") {
+          throw new Error(
+            "This package is used in existing bills and cannot be deleted. Existing bills are kept unchanged."
+          );
+        }
+        throw error;
+      }
       return true;
     } catch (error) {
       console.error("Error deleting package:", error);
